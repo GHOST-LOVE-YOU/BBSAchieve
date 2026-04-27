@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 
-from .client import AuthError, ByrAuthClient
+from . import AuthError, ByrAuthClient
+from byr_boards import BoardService
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -22,6 +23,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ignore saved login state and perform a fresh login",
     )
 
+    board_parser = subparsers.add_parser(
+        "board",
+        help="Fetch a board page and print structured thread data",
+    )
+    board_parser.add_argument(
+        "--name",
+        default="IWhisper",
+        help="Board name, default is IWhisper",
+    )
+    board_parser.add_argument(
+        "--page",
+        type=int,
+        default=1,
+        help="Board page number, default is 1",
+    )
+    board_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Ignore saved login state and perform a fresh login before fetching",
+    )
+
     subparsers.add_parser("cookies", help="Print the locally saved cookies file")
     return parser
 
@@ -31,12 +53,19 @@ def main() -> int:
     args = parser.parse_args()
     command = args.command or "login"
     client = ByrAuthClient()
+    board_service = BoardService(client)
 
     try:
         if command == "status":
             result = client.check_status().to_dict()
         elif command == "login":
             result = client.ensure_login(force_relogin=args.force).to_dict()
+        elif command == "board":
+            result = board_service.fetch_page(
+                board_name=args.name,
+                page=args.page,
+                force_relogin=args.force,
+            ).to_dict()
         elif command == "cookies":
             result = {"cookies": client.cookie_store.serialize(client.cookie_store.load())}
         else:
