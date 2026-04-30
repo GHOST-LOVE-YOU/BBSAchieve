@@ -34,6 +34,7 @@
 4. 悄悄话中的匿名编号范围是 `0-999`。
 5. 多个真实用户可能在同一天被分配到相同匿名编号。
 6. 悄悄话匿名编号会在每天早上八点刷新。
+7. 悄悄话板块不强制匿名，发帖或回复也可能直接显示真实昵称。
 
 说明：
 
@@ -52,11 +53,14 @@
 ```text
 backend/
   AGENTS.md
+  README.md
   pyproject.toml
   uv.lock
   src/
     byr_auth/
     byr_boards/
+    byr_cli/
+    byr_threads/
 ```
 
 当前职责划分：
@@ -65,6 +69,8 @@ backend/
    负责登录态、cookie、会话检查等认证相关能力。
 2. `src/byr_boards/`
    负责板块页抓取与解析。
+3. `src/byr_threads/`
+   负责帖子详情页抓取与解析。
 
 后续推荐结构：
 
