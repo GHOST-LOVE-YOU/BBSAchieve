@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -45,3 +46,19 @@ def test_decode_text_respects_response_encoding() -> None:
     response.encoding = "gbk"
 
     assert BoardService._decode_text(response) == "悄悄话"
+
+
+def test_fetch_page_passes_sticky_filter_option() -> None:
+    service = BoardService(FakeAuthClient())
+    request = httpx.Request("GET", "https://bbs.byr.cn/board/IWhisper?p=1&_uid=42")
+    response = httpx.Response(200, content=b"<html></html>", request=request)
+    service.auth_client.client = httpx.Client(
+        transport=httpx.MockTransport(lambda _: response),
+        base_url="https://bbs.byr.cn",
+    )
+
+    with patch("byr_boards.service.parse_board_page", return_value="parsed") as parse_mock:
+        result = service.fetch_page(include_sticky_threads=True)
+
+    assert result == "parsed"
+    assert parse_mock.call_args.kwargs["include_sticky_threads"] is True

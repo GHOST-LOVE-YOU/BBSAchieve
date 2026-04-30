@@ -19,6 +19,7 @@ def parse_board_page(
     user_id: str,
     reused_cookies: bool,
     requested_url: str,
+    include_sticky_threads: bool = False,
 ) -> BoardPageResult:
     soup = BeautifulSoup(html, "html.parser")
 
@@ -74,6 +75,9 @@ def parse_board_page(
         if state_icon_node is not None:
             state_icon = " ".join(state_icon_node.get("class", []))
 
+        if not include_sticky_threads and _is_sticky_thread(state_icon):
+            continue
+
         threads.append(
             BoardThread(
                 title=title_anchor.get_text(" ", strip=True),
@@ -116,3 +120,7 @@ def _search_int(pattern: str, text: str) -> int | None:
 
 def _clean_cell_text(text: str) -> str:
     return text.lstrip("| ").strip()
+
+
+def _is_sticky_thread(state_icon: str) -> bool:
+    return "ico-pos-article-top" in state_icon.split()

@@ -44,6 +44,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Ignore saved login state and perform a fresh login before fetching",
     )
+    board_parser.add_argument(
+        "--include-sticky",
+        action="store_true",
+        help="Include sticky threads in board results",
+    )
 
     thread_parser = subparsers.add_parser(
         "thread",
@@ -93,6 +98,7 @@ def main() -> int:
                 board_name=args.name,
                 page=args.page,
                 force_relogin=args.force,
+                include_sticky_threads=args.include_sticky,
             ).to_dict()
         elif command == "thread":
             result = thread_service.fetch_page(

@@ -16,6 +16,7 @@ class BoardService:
         board_name: str = "IWhisper",
         page: int = 1,
         force_relogin: bool = False,
+        include_sticky_threads: bool = False,
     ) -> BoardPageResult:
         if page < 1:
             raise AuthError("Page must be greater than or equal to 1")
@@ -37,6 +38,7 @@ class BoardService:
                 user_id=auth_context.session.user_id,
                 reused_cookies=auth_context.reused_cookies,
                 requested_url=requested_url,
+                include_sticky_threads=include_sticky_threads,
             )
 
     @staticmethod

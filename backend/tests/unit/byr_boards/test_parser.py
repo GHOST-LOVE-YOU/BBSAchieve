@@ -37,22 +37,41 @@ def test_parse_board_page_extracts_real_first_page_snapshot() -> None:
     assert result.today_post_count > 0
     assert result.total_pages == 134
     assert result.has_next_page is True
-    assert len(result.threads) == 30
+    assert len(result.threads) == 21
 
     first_thread = result.threads[0]
-    assert first_thread.title.startswith("【提醒】禁止广告")
-    assert first_thread.article_id == "5738890"
-    assert first_thread.state_icon == "tag ico-pos-article-top"
-    assert first_thread.author == "houjian0520"
-    assert first_thread.reply_count == 0
-    assert first_thread.latest_reply_url.endswith("/5738890?p=1#a0")
-    assert first_thread.latest_reply_author == "houjian0520"
+    assert first_thread.title == "今年被打C的概率有1/5吗？"
+    assert first_thread.article_id == "8840031"
+    assert first_thread.state_icon == "tag ico-pos-article-light"
+    assert first_thread.author == "IWhisper#383"
+    assert first_thread.reply_count == 10
+    assert first_thread.latest_reply_url.endswith("/8840031?p=2#a10")
+    assert first_thread.latest_reply_author == "IWhisper#737"
 
     last_thread = result.threads[-1]
     assert last_thread.article_id == "8830220"
     assert last_thread.author.startswith("IWhisper#")
     assert last_thread.reply_count == 27
     assert last_thread.latest_reply_author.startswith("IWhisper#")
+
+
+def test_parse_board_page_can_include_sticky_threads() -> None:
+    html = load_fixture("iwhisper_page_1.html")
+
+    result = parse_board_page(
+        html=html,
+        board_name="IWhisper",
+        page=1,
+        user_id="fixture-user",
+        reused_cookies=True,
+        requested_url="https://bbs.byr.cn/board/IWhisper?p=1&_uid=fixture-user",
+        include_sticky_threads=True,
+    )
+
+    assert len(result.threads) == 30
+    assert result.threads[0].title.startswith("【提醒】禁止广告")
+    assert result.threads[0].article_id == "5738890"
+    assert result.threads[0].state_icon == "tag ico-pos-article-top"
 
 
 def test_parse_board_page_extracts_real_last_page_snapshot() -> None:
