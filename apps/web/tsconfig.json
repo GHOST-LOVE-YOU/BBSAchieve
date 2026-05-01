@@ -1,4 +1,5 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -19,7 +20,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["apps/web/*"],
+      "@bbs/domain": ["packages/domain/src/index.ts"],
+      "@bbs/state": ["packages/state/src/index.ts"],
+      "@bbs/test-utils": ["packages/test-utils/src/index.ts"]
     }
   },
   "include": [
