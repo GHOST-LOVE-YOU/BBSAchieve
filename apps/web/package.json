@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test": "vitest run tests/public-routes.test.tsx",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
