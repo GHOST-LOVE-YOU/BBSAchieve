@@ -122,6 +122,51 @@ class SyncService:
 
         return SyncUpdateResult(board_name=board_name, threads=threads)
 
+    def backfill_thread(
+        self,
+        *,
+        board_name: str,
+        article_id: str,
+        start_floor: int,
+        max_backfill_window: int,
+    ) -> "BackfillResult":
+        from .models import BackfillResult
+
+        cached = self.cache.get_thread_progress(
+            board_name=board_name,
+            article_id=article_id,
+        )
+        cached_reply_count = cached.reply_count if cached else None
+        if (
+            cached_reply_count is not None
+            and cached_reply_count - start_floor > max_backfill_window
+        ):
+            raise ValueError("Requested rewind exceeds max backfill window")
+        if self.thread_service is None:
+            raise ValueError("Thread service is required for backfill")
+
+        page = max(1, ((start_floor - 1) // 10) + 1)
+        thread_page = self.thread_service.fetch_page(
+            board_name=board_name,
+            article_id=article_id,
+            page=page,
+        )
+        posts = [
+            SyncPost(
+                post_id=post.post_id,
+                floor_label=post.floor_label,
+                author_display_name=post.author_display_name,
+                body=post.body,
+            )
+            for post in thread_page.posts
+        ]
+        return BackfillResult(
+            board_name=board_name,
+            article_id=article_id,
+            start_floor=start_floor,
+            posts=posts,
+        )
+
     @staticmethod
     def _build_sync_thread(
         *,

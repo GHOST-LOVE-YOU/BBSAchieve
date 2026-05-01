@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from byr_api.auth import _load_sync_token
 from byr_api.app import create_app
-from byr_sync.models import SyncPost, SyncThread
+from byr_sync.models import BackfillResult, SyncPost, SyncThread
 from byr_sync.service import SyncUpdateResult
 
 
@@ -27,6 +27,28 @@ class FakeSyncService:
                         )
                     ],
                 ),
+            ],
+        )
+
+    def backfill_thread(
+        self,
+        *,
+        board_name: str,
+        article_id: str,
+        start_floor: int,
+        max_backfill_window: int,
+    ) -> BackfillResult:
+        return BackfillResult(
+            board_name=board_name,
+            article_id=article_id,
+            start_floor=start_floor,
+            posts=[
+                SyncPost(
+                    post_id="p24",
+                    floor_label="24楼",
+                    author_display_name="alice",
+                    body="new reply",
+                )
             ],
         )
 
@@ -71,6 +93,31 @@ def test_sync_endpoint_returns_threads_with_valid_token(monkeypatch: pytest.Monk
                         "body": "new reply",
                     }
                 ],
+            }
+        ],
+    }
+
+
+def test_backfill_endpoint_returns_requested_thread_posts(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    client = TestClient(create_app(sync_service=FakeSyncService()))
+
+    response = client.get(
+        "/api/sync/backfill",
+        params={"board_name": "test_board", "article_id": "123", "start_floor": 24},
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "article_id": "123",
+        "start_floor": 24,
+        "posts": [
+            {
+                "post_id": "p24",
+                "floor_label": "24楼",
+                "author_display_name": "alice",
+                "body": "new reply",
             }
         ],
     }

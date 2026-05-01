@@ -24,3 +24,11 @@ class SyncThread:
     title: str
     reply_count: int
     posts: list[SyncPost] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class BackfillResult:
+    board_name: str
+    article_id: str
+    start_floor: int
+    posts: list[SyncPost] = field(default_factory=list)

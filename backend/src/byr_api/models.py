@@ -23,3 +23,10 @@ class SyncThreadResponse:
 class SyncUpdatesResponse:
     board_name: str
     threads: list[SyncThreadResponse]
+
+
+@dataclass(slots=True)
+class SyncBackfillResponse:
+    article_id: str
+    start_floor: int
+    posts: list[SyncPostResponse]

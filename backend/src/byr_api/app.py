@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 
 from .auth import require_sync_token
-from .models import SyncPostResponse, SyncThreadResponse, SyncUpdatesResponse
+from .models import (
+    SyncBackfillResponse,
+    SyncPostResponse,
+    SyncThreadResponse,
+    SyncUpdatesResponse,
+)
 from byr_auth import ByrAuthClient
 from byr_boards import BoardService
 from byr_sync import InMemorySyncCache
@@ -52,6 +57,37 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
                     ],
                 )
                 for thread in result.threads
+            ],
+        )
+
+    @app.get("/api/sync/backfill")
+    def sync_backfill(
+        board_name: str,
+        article_id: str,
+        start_floor: int,
+        _: str = Depends(require_sync_token),
+    ) -> SyncBackfillResponse:
+        try:
+            result = app.state.sync_service.backfill_thread(
+                board_name=board_name,
+                article_id=article_id,
+                start_floor=start_floor,
+                max_backfill_window=30,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return SyncBackfillResponse(
+            article_id=result.article_id,
+            start_floor=result.start_floor,
+            posts=[
+                SyncPostResponse(
+                    post_id=post.post_id,
+                    floor_label=post.floor_label,
+                    author_display_name=post.author_display_name,
+                    body=post.body,
+                )
+                for post in result.posts
             ],
         )
 

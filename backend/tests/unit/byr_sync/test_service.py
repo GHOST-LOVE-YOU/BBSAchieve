@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from byr_sync import InMemorySyncCache, THREAD_TTL_SECONDS
 from byr_sync.models import SyncPost
 from byr_sync.service import SyncService
@@ -248,3 +250,37 @@ def test_list_updates_does_not_repeat_cached_boundary_floor() -> None:
     assert cache.get_thread_progress(board_name="test_board", article_id="123").recent_post_ids == [
         "p21"
     ]
+
+
+def test_backfill_thread_rejects_rewind_beyond_limit() -> None:
+    thread_service = FakeThreadService(
+        thread_page=FakeThreadPage(
+            posts=[
+                FakeThreadPost(
+                    post_id="p31",
+                    floor_label="31楼",
+                    author_display_name="alice",
+                    body="new reply",
+                )
+            ]
+        )
+    )
+    cache = InMemorySyncCache()
+    cache.save_thread_progress(
+        board_name="test_board",
+        article_id="123",
+        reply_count=50,
+    )
+    service = SyncService(
+        board_service=FakeBoardService([]),
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    with pytest.raises(ValueError, match="Requested rewind exceeds max backfill window"):
+        service.backfill_thread(
+            board_name="test_board",
+            article_id="123",
+            start_floor=1,
+            max_backfill_window=30,
+        )
