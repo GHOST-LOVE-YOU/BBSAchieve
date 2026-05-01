@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { createReadingFlowDeps } from "../src/lib/readingFlowDeps";
 import { getBoardSummaries } from "@bbs/state";
+import { createReadingFlowDeps } from "../../../packages/state/src/runtime/readingFlowDeps";
 
 export default async function HomePage() {
   const result = await getBoardSummaries(createReadingFlowDeps());

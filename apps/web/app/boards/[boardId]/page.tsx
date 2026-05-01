@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { createReadingFlowDeps } from "../../../src/lib/readingFlowDeps";
 import { getBoardDetail } from "@bbs/state";
+import { createReadingFlowDeps } from "../../../../../packages/state/src/runtime/readingFlowDeps";
 
 export default async function BoardPage({
   params,

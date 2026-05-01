@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { createReadingFlowDeps } from "../../../src/lib/readingFlowDeps";
 import { getThreadDetail } from "@bbs/state";
+import { createReadingFlowDeps } from "../../../../../packages/state/src/runtime/readingFlowDeps";
 
 export default async function ThreadPage({
   params,
