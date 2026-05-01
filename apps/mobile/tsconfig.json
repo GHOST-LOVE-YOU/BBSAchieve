@@ -2,6 +2,7 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "types": ["expo-router/types", "expo", "react", "react-native"],
     "paths": {
       "@bbs/domain": ["../../packages/domain/src/index.ts"],
       "@bbs/state": ["../../packages/state/src/index.ts"],
@@ -20,5 +21,6 @@
     "**/*.d.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ]
+  ],
+  "exclude": ["__tests__"]
 }

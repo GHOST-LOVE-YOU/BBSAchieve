@@ -43,20 +43,23 @@ describe("mobile routes", () => {
   });
 
   it("shows visible copy when the board route is missing its parameter", async () => {
-    jest
-      .spyOn(ExpoRouter, "useLocalSearchParams")
-      .mockImplementation(() => ({ boardId: undefined } as any));
+    const useLocalSearchParamsMock = jest.spyOn(ExpoRouter, "useLocalSearchParams");
+    useLocalSearchParamsMock.mockImplementation(() => ({ boardId: undefined } as any));
 
-    renderRouter({
-      index: require("../src/app/index").default,
-      "boards/[boardId]": require("../src/app/boards/[boardId]").default,
-      "threads/[threadId]": require("../src/app/threads/[threadId]").default,
-      "inbox-binding": require("../src/app/inbox-binding").default,
-    }, {
-      initialUrl: "/boards/board:job",
-    });
+    try {
+      renderRouter({
+        index: require("../src/app/index").default,
+        "boards/[boardId]": require("../src/app/boards/[boardId]").default,
+        "threads/[threadId]": require("../src/app/threads/[threadId]").default,
+        "inbox-binding": require("../src/app/inbox-binding").default,
+      }, {
+        initialUrl: "/boards/board:job",
+      });
 
-    expect(await screen.findByText("版面不存在")).toBeTruthy();
+      expect(await screen.findByText("版面不存在")).toBeTruthy();
+    } finally {
+      useLocalSearchParamsMock.mockRestore();
+    }
   });
 
   it("shows visible copy when a thread does not exist", async () => {
