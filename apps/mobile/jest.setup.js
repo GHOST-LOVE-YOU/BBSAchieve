@@ -3,7 +3,13 @@ jest.mock("./src/components/animated-icon", () => ({
   AnimatedIcon: () => null,
 }));
 
-jest.mock("./src/components/app-tabs", () => () => null);
+jest.mock("./src/components/app-tabs", () => {
+  const { Slot } = require("expo-router");
+
+  return function MockedAppTabs() {
+    return Slot ? <Slot /> : null;
+  };
+});
 
 afterEach(() => {
   jest.restoreAllMocks();
