@@ -303,7 +303,7 @@ def test_backfill_thread_requires_thread_service() -> None:
         )
 
 
-def test_backfill_thread_allows_cache_miss() -> None:
+def test_backfill_thread_allows_cache_miss_when_page_stays_within_window() -> None:
     thread_service = FakeThreadService(
         thread_page=FakeThreadPage(
             posts=[
@@ -332,6 +332,35 @@ def test_backfill_thread_allows_cache_miss() -> None:
 
     assert [post.post_id for post in result.posts] == ["p22"]
     assert thread_service.calls == [("test_board", "123", 3)]
+
+
+def test_backfill_thread_rejects_cache_miss_when_observed_page_exceeds_window() -> None:
+    thread_service = FakeThreadService(
+        thread_page=FakeThreadPage(
+            posts=[
+                FakeThreadPost(
+                    post_id="p40",
+                    floor_label="40楼",
+                    author_display_name="alice",
+                    body="new reply",
+                )
+            ]
+        )
+    )
+    cache = InMemorySyncCache()
+    service = SyncService(
+        board_service=FakeBoardService([]),
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    with pytest.raises(ValueError, match="Requested rewind exceeds max backfill window"):
+        service.backfill_thread(
+            board_name="test_board",
+            article_id="123",
+            start_floor=1,
+            max_backfill_window=30,
+        )
 
 
 def test_backfill_thread_trims_posts_before_start_floor() -> None:

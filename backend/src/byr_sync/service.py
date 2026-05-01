@@ -136,13 +136,6 @@ class SyncService:
             board_name=board_name,
             article_id=article_id,
         )
-        cached_reply_count = cached.reply_count if cached else None
-        # The rewind window is enforced only when we know the cached reply count.
-        if (
-            cached_reply_count is not None
-            and cached_reply_count - start_floor > max_backfill_window
-        ):
-            raise ValueError("Requested rewind exceeds max backfill window")
         if self.thread_service is None:
             raise ValueError("Thread service is required for backfill")
 
@@ -152,6 +145,20 @@ class SyncService:
             article_id=article_id,
             page=page,
         )
+        observed_max_floor = self._observed_max_floor(thread_page.posts)
+        known_upper_floor = observed_max_floor
+        if cached is not None:
+            cached_reply_count = cached.reply_count
+            known_upper_floor = (
+                max(cached_reply_count, observed_max_floor)
+                if observed_max_floor is not None
+                else cached_reply_count
+            )
+        if (
+            known_upper_floor is not None
+            and known_upper_floor - start_floor > max_backfill_window
+        ):
+            raise ValueError("Requested rewind exceeds max backfill window")
         posts = self._build_backfill_posts(thread_page.posts, start_floor=start_floor)
         return BackfillResult(
             board_name=board_name,
@@ -218,6 +225,17 @@ class SyncService:
                 )
             )
         return posts
+
+    @staticmethod
+    def _observed_max_floor(thread_posts: list[ThreadPostLike]) -> int | None:
+        observed_floors = [
+            floor_number
+            for post in thread_posts
+            if (floor_number := SyncService._parse_floor_number(post.floor_label)) is not None
+        ]
+        if not observed_floors:
+            return None
+        return max(observed_floors)
 
     @staticmethod
     def _parse_floor_number(floor_label: str) -> int | None:
