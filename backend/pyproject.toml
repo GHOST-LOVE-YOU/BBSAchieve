@@ -5,18 +5,22 @@ description = "Minimal BYR BBS collection backend"
 requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.14.3",
+    "fastapi>=0.115.0",
     "httpx>=0.28.1",
+    "pytest>=8.4.2",
+    "redis>=5.2.0",
     "python-dotenv>=1.1.1",
+    "uvicorn>=0.32.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.4.2",
 ]
 
 [project.scripts]
 byr-auth = "byr_cli:main"
 byr-bbs = "byr_cli:main"
+byr-sync-api = "byr_api:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
