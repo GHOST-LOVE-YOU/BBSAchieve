@@ -3,6 +3,8 @@ jest.mock("./src/components/animated-icon", () => ({
   AnimatedIcon: () => null,
 }));
 
+jest.mock("@/global.css", () => ({}));
+
 afterEach(() => {
   jest.restoreAllMocks();
 });
