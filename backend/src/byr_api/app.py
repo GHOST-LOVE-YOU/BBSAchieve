@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 
 from .auth import require_sync_token
 from .models import (
@@ -64,7 +64,7 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
     def sync_backfill(
         board_name: str,
         article_id: str,
-        start_floor: int,
+        start_floor: int = Query(ge=1),
         _: str = Depends(require_sync_token),
     ) -> SyncBackfillResponse:
         try:

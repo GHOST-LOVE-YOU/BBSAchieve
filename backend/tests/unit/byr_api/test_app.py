@@ -123,6 +123,19 @@ def test_backfill_endpoint_returns_requested_thread_posts(monkeypatch: pytest.Mo
     }
 
 
+def test_backfill_endpoint_rejects_invalid_start_floor(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    client = TestClient(create_app(sync_service=FakeSyncService()))
+
+    response = client.get(
+        "/api/sync/backfill",
+        params={"board_name": "test_board", "article_id": "123", "start_floor": 0},
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_load_sync_token_prefers_environment_variable(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / ".env").write_text("BYR_SYNC_API_TOKEN=file-token\n", encoding="utf-8")
     monkeypatch.setenv("BYR_SYNC_API_TOKEN", "env-token")
