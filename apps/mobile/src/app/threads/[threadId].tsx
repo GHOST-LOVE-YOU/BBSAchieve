@@ -20,27 +20,72 @@ type ReplySummary = {
   publishedAt: string;
 };
 
+function getStatusText(status: "loading" | "notFound" | "error", message: string | null) {
+  if (status === "notFound") {
+    return "帖子不存在";
+  }
+
+  if (status === "error") {
+    return message ? `读取失败：${message}` : "读取失败";
+  }
+
+  return "加载中";
+}
+
 export default function ThreadPage() {
-  const { threadId } = useLocalSearchParams<{ threadId: string }>();
+  const { threadId } = useLocalSearchParams<{ threadId?: string | string[] }>();
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [replies, setReplies] = useState<ReplySummary[]>([]);
+  const [status, setStatus] = useState<"loading" | "notFound" | "error" | "success">("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const threadIdValue = Array.isArray(threadId) ? threadId[0] : threadId;
 
   useEffect(() => {
     let active = true;
 
-    void getThreadDetail(threadId, createReadingFlowDeps()).then((result) => {
-      if (!active || result.status !== "success") {
+    if (!threadIdValue) {
+      setThread(null);
+      setReplies([]);
+      setStatus("notFound");
+      setErrorMessage(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    void getThreadDetail(threadIdValue, createReadingFlowDeps()).then((result) => {
+      if (!active) {
+        return;
+      }
+
+      if (result.status !== "success") {
+        setThread(null);
+        setReplies([]);
+        setStatus(result.status);
+        setErrorMessage(result.status === "error" ? result.message : null);
         return;
       }
 
       setThread(result.thread);
       setReplies(result.replies);
+      setStatus("success");
+      setErrorMessage(null);
     });
 
     return () => {
       active = false;
     };
-  }, [threadId]);
+  }, [threadIdValue]);
+
+  if (status !== "success") {
+    return (
+      <View style={{ flex: 1, padding: 24, gap: 16 }}>
+        <Text style={{ fontSize: 28, fontWeight: "600" }}>帖子详情</Text>
+        <Text>{getStatusText(status, errorMessage)}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, padding: 24, gap: 16 }}>

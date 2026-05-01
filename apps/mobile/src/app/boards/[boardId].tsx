@@ -20,27 +20,72 @@ type ThreadSummary = {
   replyCount: number;
 };
 
+function getStatusText(status: "loading" | "notFound" | "error", message: string | null) {
+  if (status === "notFound") {
+    return "版面不存在";
+  }
+
+  if (status === "error") {
+    return message ? `读取失败：${message}` : "读取失败";
+  }
+
+  return "加载中";
+}
+
 export default function BoardPage() {
-  const { boardId } = useLocalSearchParams<{ boardId: string }>();
+  const { boardId } = useLocalSearchParams<{ boardId?: string | string[] }>();
   const [board, setBoard] = useState<BoardDetail | null>(null);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  const [status, setStatus] = useState<"loading" | "notFound" | "error" | "success">("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const boardIdValue = Array.isArray(boardId) ? boardId[0] : boardId;
 
   useEffect(() => {
     let active = true;
 
-    void getBoardDetail(boardId, createReadingFlowDeps()).then((result) => {
-      if (!active || result.status !== "success") {
+    if (!boardIdValue) {
+      setBoard(null);
+      setThreads([]);
+      setStatus("notFound");
+      setErrorMessage(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    void getBoardDetail(boardIdValue, createReadingFlowDeps()).then((result) => {
+      if (!active) {
+        return;
+      }
+
+      if (result.status !== "success") {
+        setBoard(null);
+        setThreads([]);
+        setStatus(result.status);
+        setErrorMessage(result.status === "error" ? result.message : null);
         return;
       }
 
       setBoard(result.board);
       setThreads(result.threads);
+      setStatus("success");
+      setErrorMessage(null);
     });
 
     return () => {
       active = false;
     };
-  }, [boardId]);
+  }, [boardIdValue]);
+
+  if (status !== "success") {
+    return (
+      <View style={{ flex: 1, padding: 24, gap: 16 }}>
+        <Text style={{ fontSize: 28, fontWeight: "600" }}>版面帖子</Text>
+        <Text>{getStatusText(status, errorMessage)}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, padding: 24, gap: 16 }}>
@@ -53,7 +98,7 @@ export default function BoardPage() {
               href={{
                 pathname: "/threads/[threadId]",
                 params: { threadId: thread.id },
-              } as never}
+              }}
             >
               <Text style={{ fontSize: 18, fontWeight: "500" }}>{thread.title}</Text>
             </Link>

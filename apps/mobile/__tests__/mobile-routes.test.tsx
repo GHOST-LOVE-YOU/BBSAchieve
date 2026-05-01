@@ -1,4 +1,5 @@
 import { renderRouter, screen } from "expo-router/testing-library";
+import * as ExpoRouter from "expo-router";
 
 describe("mobile routes", () => {
   it("renders board entries on the home page", async () => {
@@ -39,6 +40,36 @@ describe("mobile routes", () => {
 
     expect(await screen.findByText("A new listing has been mirrored and is ready to read.")).toBeTruthy();
     expect(screen.getByText("The mirror keeps the reading flow stable.")).toBeTruthy();
+  });
+
+  it("shows visible copy when the board route is missing its parameter", async () => {
+    jest
+      .spyOn(ExpoRouter, "useLocalSearchParams")
+      .mockImplementation(() => ({ boardId: undefined } as any));
+
+    renderRouter({
+      index: require("../src/app/index").default,
+      "boards/[boardId]": require("../src/app/boards/[boardId]").default,
+      "threads/[threadId]": require("../src/app/threads/[threadId]").default,
+      "inbox-binding": require("../src/app/inbox-binding").default,
+    }, {
+      initialUrl: "/boards/board:job",
+    });
+
+    expect(await screen.findByText("版面不存在")).toBeTruthy();
+  });
+
+  it("shows visible copy when a thread does not exist", async () => {
+    renderRouter({
+      index: require("../src/app/index").default,
+      "boards/[boardId]": require("../src/app/boards/[boardId]").default,
+      "threads/[threadId]": require("../src/app/threads/[threadId]").default,
+      "inbox-binding": require("../src/app/inbox-binding").default,
+    }, {
+      initialUrl: "/threads/missing-thread",
+    });
+
+    expect(await screen.findByText("帖子不存在")).toBeTruthy();
   });
 
   it("renders binding placeholder", async () => {
