@@ -137,6 +137,7 @@ class SyncService:
             article_id=article_id,
         )
         cached_reply_count = cached.reply_count if cached else None
+        # The rewind window is enforced only when we know the cached reply count.
         if (
             cached_reply_count is not None
             and cached_reply_count - start_floor > max_backfill_window
@@ -151,15 +152,7 @@ class SyncService:
             article_id=article_id,
             page=page,
         )
-        posts = [
-            SyncPost(
-                post_id=post.post_id,
-                floor_label=post.floor_label,
-                author_display_name=post.author_display_name,
-                body=post.body,
-            )
-            for post in thread_page.posts
-        ]
+        posts = self._build_backfill_posts(thread_page.posts, start_floor=start_floor)
         return BackfillResult(
             board_name=board_name,
             article_id=article_id,
@@ -194,6 +187,27 @@ class SyncService:
         for post in thread_posts:
             floor_number = SyncService._parse_floor_number(post.floor_label)
             if floor_number is not None and floor_number <= cached_reply_count:
+                continue
+            posts.append(
+                SyncPost(
+                    post_id=post.post_id,
+                    floor_label=post.floor_label,
+                    author_display_name=post.author_display_name,
+                    body=post.body,
+                )
+            )
+        return posts
+
+    @staticmethod
+    def _build_backfill_posts(
+        thread_posts: list[ThreadPostLike],
+        *,
+        start_floor: int,
+    ) -> list[SyncPost]:
+        posts: list[SyncPost] = []
+        for post in thread_posts:
+            floor_number = SyncService._parse_floor_number(post.floor_label)
+            if floor_number is not None and floor_number < start_floor:
                 continue
             posts.append(
                 SyncPost(

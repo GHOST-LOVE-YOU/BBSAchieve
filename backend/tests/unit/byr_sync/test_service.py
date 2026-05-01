@@ -284,3 +284,105 @@ def test_backfill_thread_rejects_rewind_beyond_limit() -> None:
             start_floor=1,
             max_backfill_window=30,
         )
+
+
+def test_backfill_thread_requires_thread_service() -> None:
+    cache = InMemorySyncCache()
+    service = SyncService(
+        board_service=FakeBoardService([]),
+        thread_service=None,
+        cache=cache,
+    )
+
+    with pytest.raises(ValueError, match="Thread service is required for backfill"):
+        service.backfill_thread(
+            board_name="test_board",
+            article_id="123",
+            start_floor=22,
+            max_backfill_window=30,
+        )
+
+
+def test_backfill_thread_allows_cache_miss() -> None:
+    thread_service = FakeThreadService(
+        thread_page=FakeThreadPage(
+            posts=[
+                FakeThreadPost(
+                    post_id="p22",
+                    floor_label="22楼",
+                    author_display_name="alice",
+                    body="new reply",
+                )
+            ]
+        )
+    )
+    cache = InMemorySyncCache()
+    service = SyncService(
+        board_service=FakeBoardService([]),
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    result = service.backfill_thread(
+        board_name="test_board",
+        article_id="123",
+        start_floor=22,
+        max_backfill_window=30,
+    )
+
+    assert [post.post_id for post in result.posts] == ["p22"]
+    assert thread_service.calls == [("test_board", "123", 3)]
+
+
+def test_backfill_thread_trims_posts_before_start_floor() -> None:
+    thread_service = FakeThreadService(
+        thread_page=FakeThreadPage(
+            posts=[
+                FakeThreadPost(
+                    post_id="p20",
+                    floor_label="20楼",
+                    author_display_name="alice",
+                    body="old reply",
+                ),
+                FakeThreadPost(
+                    post_id="p21",
+                    floor_label="21楼",
+                    author_display_name="alice",
+                    body="old reply",
+                ),
+                FakeThreadPost(
+                    post_id="p22",
+                    floor_label="22楼",
+                    author_display_name="alice",
+                    body="new reply",
+                ),
+                FakeThreadPost(
+                    post_id="p23",
+                    floor_label="23楼",
+                    author_display_name="alice",
+                    body="new reply",
+                ),
+                FakeThreadPost(
+                    post_id="p24",
+                    floor_label="24楼",
+                    author_display_name="alice",
+                    body="new reply",
+                ),
+            ]
+        )
+    )
+    cache = InMemorySyncCache()
+    service = SyncService(
+        board_service=FakeBoardService([]),
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    result = service.backfill_thread(
+        board_name="test_board",
+        article_id="123",
+        start_floor=22,
+        max_backfill_window=30,
+    )
+
+    assert [post.post_id for post in result.posts] == ["p22", "p23", "p24"]
