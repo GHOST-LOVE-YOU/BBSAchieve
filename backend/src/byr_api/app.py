@@ -11,7 +11,7 @@ from .models import (
 )
 from byr_auth import ByrAuthClient
 from byr_boards import BoardService
-from byr_sync import InMemorySyncCache
+from byr_sync.cache import RedisSyncCache
 from byr_sync.service import SyncService
 from byr_threads import ThreadService
 
@@ -20,7 +20,7 @@ def build_sync_service() -> SyncService:
     auth_client = ByrAuthClient()
     board_service = BoardService(auth_client=auth_client)
     thread_service = ThreadService(auth_client=auth_client)
-    cache = InMemorySyncCache()
+    cache = RedisSyncCache.from_env()
     return SyncService(
         board_service=board_service,
         thread_service=thread_service,

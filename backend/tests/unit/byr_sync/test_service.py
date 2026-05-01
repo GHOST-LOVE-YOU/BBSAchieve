@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from byr_sync import InMemorySyncCache, THREAD_TTL_SECONDS
+from byr_sync.cache import RedisSyncCache
 from byr_sync.models import SyncPost
 from byr_sync.service import SyncService
 
@@ -60,6 +61,25 @@ class FakeThreadService:
         return self.thread_page
 
 
+class FakeRedis:
+    def __init__(self) -> None:
+        self.hashes: dict[str, dict[str, str]] = {}
+        self.expirations: dict[str, int] = {}
+
+    def hset(self, key: str, mapping: dict[str, object]) -> int:
+        hash_value = self.hashes.setdefault(key, {})
+        for field, value in mapping.items():
+            hash_value[field] = str(value)
+        return len(mapping)
+
+    def hgetall(self, key: str) -> dict[str, str]:
+        return dict(self.hashes.get(key, {}))
+
+    def expire(self, key: str, seconds: int) -> bool:
+        self.expirations[key] = seconds
+        return True
+
+
 def test_save_thread_progress_sets_three_day_ttl() -> None:
     cache = InMemorySyncCache()
     recent_post_ids = ["p1", "p2"]
@@ -81,6 +101,32 @@ def test_save_thread_progress_sets_three_day_ttl() -> None:
 
     assert progress.recent_post_ids == ["p1", "p2"]
     assert cache.get_thread_progress(board_name="test_board", article_id="123") is progress
+
+
+def test_redis_cache_sets_expire_when_saving_progress() -> None:
+    redis_client = FakeRedis()
+    cache = RedisSyncCache(redis_client)
+
+    progress = cache.save_thread_progress(
+        board_name="IWhisper",
+        article_id="123",
+        reply_count=7,
+        recent_post_ids=["p1", "p2"],
+    )
+
+    assert progress.ttl_seconds == THREAD_TTL_SECONDS
+    assert redis_client.expirations["sync:thread:IWhisper:123"] == THREAD_TTL_SECONDS
+    assert redis_client.hashes["sync:thread:IWhisper:123"] == {
+        "board_name": "IWhisper",
+        "article_id": "123",
+        "reply_count": "7",
+        "ttl_seconds": str(THREAD_TTL_SECONDS),
+        "recent_post_ids": "p1,p2",
+    }
+    cached = cache.get_thread_progress(board_name="IWhisper", article_id="123")
+    assert cached is not None
+    assert cached.reply_count == 7
+    assert cached.recent_post_ids == ["p1", "p2"]
 
 
 def test_list_updates_returns_changed_threads() -> None:

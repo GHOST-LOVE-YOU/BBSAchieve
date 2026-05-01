@@ -31,9 +31,9 @@ uv run byr-bbs thread --board IWhisper --article-id 8830220 --page 2
 
 旧的 `byr-auth` 命令仍然可用，但共享 CLI 已迁移到 `byr_cli/`。
 
-## 同步 API 预留说明
+## 同步 API
 
-> 说明：以下内容属于规划中的实现目标，不代表当前仓库里已经具备可直接运行的同步 API。
+当前仓库已经具备可直接运行的同步 API，入口为 `byr-sync-api`。
 
 1. 启动本地 Redis：
 
@@ -53,3 +53,11 @@ uv run byr-bbs thread --board IWhisper --article-id 8830220 --page 2
    ```bash
    uv run byr-sync-api
    ```
+
+4. 访问接口：
+
+   - `GET /healthz`
+   - `GET /api/sync/updates`
+   - `GET /api/sync/backfill`
+
+同步接口会复用本地北邮人账号登录态，因此 `BBS_USERNAME` 和 `BBS_PASSWORD` 仍然需要在 `backend/.env` 中配置。`BYR_SYNC_API_TOKEN` 用于保护同步接口，`BYR_SYNC_REDIS_URL` 默认指向 `redis://127.0.0.1:6379/0`。
