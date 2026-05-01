@@ -31,9 +31,9 @@ uv run byr-bbs thread --board IWhisper --article-id 8830220 --page 2
 
 旧的 `byr-auth` 命令仍然可用，但共享 CLI 已迁移到 `byr_cli/`。
 
-## Sync API Setup
+## 同步 API 预留说明
 
-> 说明：以下内容是 planned/upcoming 的实现目标，不代表当前仓库里已经具备可直接运行的 Sync API。
+> 说明：以下内容属于规划中的实现目标，不代表当前仓库里已经具备可直接运行的同步 API。
 
 1. 启动本地 Redis：
 
