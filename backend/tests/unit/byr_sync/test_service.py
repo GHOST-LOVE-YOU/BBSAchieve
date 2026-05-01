@@ -28,8 +28,33 @@ class FakeBoardService:
         return FakeBoardPage(threads=self.threads)
 
 
+@dataclass(slots=True)
+class FakeThreadPost:
+    post_id: str
+    floor_label: str
+    author_display_name: str
+    body: str
+
+
+@dataclass(slots=True)
+class FakeThreadPage:
+    posts: list[FakeThreadPost]
+
+
 class FakeThreadService:
-    pass
+    def __init__(self, thread_page: FakeThreadPage | None = None) -> None:
+        self.thread_page = thread_page or FakeThreadPage(posts=[])
+        self.calls: list[tuple[str, str, int]] = []
+
+    def fetch_page(
+        self,
+        *,
+        board_name: str,
+        article_id: str,
+        page: int = 1,
+    ) -> FakeThreadPage:
+        self.calls.append((board_name, article_id, page))
+        return self.thread_page
 
 
 def test_save_thread_progress_sets_three_day_ttl() -> None:
@@ -89,3 +114,38 @@ def test_list_updates_normalizes_missing_reply_count_to_zero() -> None:
 
     assert result.threads[0].reply_count == 0
     assert cache.get_thread_progress(board_name="test_board", article_id="123").reply_count == 0
+
+
+def test_list_updates_includes_new_posts_after_cached_reply_count() -> None:
+    thread = FakeThread(article_id="123", title="First thread", reply_count=24)
+    thread_page = FakeThreadPage(
+        posts=[
+            FakeThreadPost(
+                post_id="p24",
+                floor_label="24楼",
+                author_display_name="alice",
+                body="new reply",
+            )
+        ]
+    )
+    board_service = FakeBoardService([thread])
+    thread_service = FakeThreadService(thread_page=thread_page)
+    cache = InMemorySyncCache()
+    cache.save_thread_progress(
+        board_name="test_board",
+        article_id="123",
+        reply_count=23,
+    )
+    service = SyncService(
+        board_service=board_service,
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    result = service.list_updates(board_name="test_board", limit=1)
+
+    assert result.threads[0].posts[0].post_id == "p24"
+    assert thread_service.calls == [("test_board", "123", 3)]
+    assert cache.get_thread_progress(board_name="test_board", article_id="123").recent_post_ids == [
+        "p24"
+    ]

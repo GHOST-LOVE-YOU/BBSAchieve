@@ -8,3 +8,19 @@ class ThreadProgress:
     reply_count: int
     ttl_seconds: int
     recent_post_ids: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class SyncPost:
+    post_id: str
+    floor_label: str
+    author_display_name: str
+    body: str
+
+
+@dataclass(slots=True)
+class SyncThread:
+    article_id: str
+    title: str
+    reply_count: int
+    posts: list[SyncPost] = field(default_factory=list)
