@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@bbs/domain": ["packages/domain/src/index.ts"],
+      "@bbs/state": ["packages/state/src/index.ts"],
+      "@bbs/ui-base": ["packages/ui-base/src/index.ts"],
+      "@bbs/test-utils": ["packages/test-utils/src/index.ts"]
+    }
+  }
+}
