@@ -8,6 +8,7 @@ export interface UserRecord {
 }
 
 export interface UserRepository {
+  findById(id: string): Promise<UserRecord | null>;
   findByUsername(username: string): Promise<UserRecord | null>;
   createBot(input: UserRecord): Promise<UserRecord>;
 }

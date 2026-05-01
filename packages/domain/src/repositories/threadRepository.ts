@@ -8,5 +8,6 @@ export interface ThreadRecord {
 
 export interface ThreadRepository {
   create(input: ThreadRecord): Promise<ThreadRecord>;
+  findById(id: string): Promise<ThreadRecord | null>;
   listByBoard(boardId: string): Promise<ThreadRecord[]>;
 }
