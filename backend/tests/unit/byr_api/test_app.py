@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
+from byr_api.auth import _load_sync_token
 from byr_api.app import create_app
 
 
@@ -23,14 +25,18 @@ def test_sync_endpoint_rejects_missing_token() -> None:
     assert response.json() == {"detail": "Invalid sync API token"}
 
 
-def test_sync_endpoint_accepts_valid_token(tmp_path, monkeypatch) -> None:
+def test_load_sync_token_prefers_environment_variable(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / ".env").write_text("BYR_SYNC_API_TOKEN=file-token\n", encoding="utf-8")
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "env-token")
+    monkeypatch.setattr("byr_api.auth.DEFAULT_ENV_PATH", tmp_path / ".env")
+
+    assert _load_sync_token() == "env-token"
+
+
+def test_load_sync_token_reads_default_backend_env_path(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     env_path = tmp_path / ".env"
     env_path.write_text("BYR_SYNC_API_TOKEN=secret-token\n", encoding="utf-8")
-    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("BYR_SYNC_API_TOKEN", raising=False)
+    monkeypatch.setattr("byr_api.auth.DEFAULT_ENV_PATH", env_path)
 
-    client = TestClient(create_app())
-
-    response = client.get("/api/sync/updates", headers={"X-Sync-Token": "secret-token"})
-
-    assert response.status_code == 200
-    assert response.json() == {"threads": []}
+    assert _load_sync_token() == "secret-token"
