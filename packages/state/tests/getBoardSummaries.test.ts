@@ -34,7 +34,7 @@ describe("getBoardSummaries", () => {
 
   it("orders threads by parsed time instead of string order", async () => {
     const deps = createReadingFlowDeps();
-    deps.threads.listByBoard = async (boardId) => {
+    deps.threads.listByBoard = async (boardId: string) => {
       if (boardId !== "board:job") {
         return [];
       }

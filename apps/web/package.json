@@ -11,15 +11,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bbs/domain": "workspace:*",
     "@bbs/state": "workspace:*",
-    "@bbs/test-utils": "workspace:*",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@bbs/domain": "workspace:*",
+    "@bbs/test-utils": "workspace:*",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

@@ -7,6 +7,12 @@ vi.mock("next/link", () => ({
   },
 }));
 
+const notFound = vi.hoisted(() => vi.fn());
+
+vi.mock("next/navigation", () => ({
+  notFound,
+}));
+
 import BoardPage from "../app/boards/[boardId]/page";
 import HomePage from "../app/page";
 import ThreadPage from "../app/threads/[threadId]/page";
@@ -34,5 +40,18 @@ describe("web public routes", () => {
     render(ui);
     expect(screen.getByText("A new listing has been mirrored and is ready to read.")).toBeTruthy();
     expect(screen.getByText("The mirror keeps the reading flow stable.")).toBeTruthy();
+  });
+
+  it("calls notFound for missing board or thread", async () => {
+    notFound.mockClear();
+
+    await BoardPage({
+      params: Promise.resolve({ boardId: "missing-board" }),
+    });
+    await ThreadPage({
+      params: Promise.resolve({ threadId: "missing-thread" }),
+    });
+
+    expect(notFound).toHaveBeenCalledTimes(2);
   });
 });
