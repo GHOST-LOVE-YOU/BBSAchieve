@@ -76,7 +76,7 @@ export async function getThreadDetail(
         authorName: author?.displayName ?? "未知作者",
         publishedAt: thread.publishedAt,
       },
-      replies: replyItems.sort((a, b) => (a.publishedAt > b.publishedAt ? 1 : -1)),
+      replies: replyItems.sort((a, b) => a.publishedAt.localeCompare(b.publishedAt)),
     };
   } catch (error) {
     return {
