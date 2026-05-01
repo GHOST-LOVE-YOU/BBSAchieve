@@ -13,6 +13,7 @@ export async function importForumData(
   },
 ) {
   const failedItems: Array<{ type: string; reason: string }> = [];
+  let importedThreads = 0;
 
   for (const user of input.users) {
     if (!(await deps.users.findByUsername(user.username))) {
@@ -42,6 +43,7 @@ export async function importForumData(
       body: thread.body,
       publishedAt: new Date().toISOString(),
     });
+    importedThreads += 1;
   }
 
   for (const reply of input.replies) {
@@ -49,7 +51,7 @@ export async function importForumData(
   }
 
   return {
-    importedThreads: input.threads.length,
+    importedThreads,
     failedItems,
   };
 }

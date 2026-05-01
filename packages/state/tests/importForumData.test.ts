@@ -43,4 +43,31 @@ describe("importForumData", () => {
     expect(result.importedThreads).toBe(1);
     expect(result.failedItems).toHaveLength(1);
   });
+
+  it("does not count threads whose author is missing", async () => {
+    const result = await importForumData(
+      {
+        mode: "best-effort",
+        users: [],
+        threads: [
+          {
+            boardId: "board-1",
+            authorUsername: "missing-user",
+            title: "失败帖",
+            body: "正文",
+          },
+        ],
+        replies: [],
+      },
+      {
+        users: new InMemoryUserRepository(),
+        threads: new InMemoryThreadRepository(),
+      },
+    );
+
+    expect(result.failedItems).toEqual([
+      { type: "thread", reason: "author missing" },
+    ]);
+    expect(result.importedThreads).toBe(0);
+  });
 });
