@@ -65,7 +65,9 @@ export async function getBoardDetail(
         name: board.name,
         description: board.description,
       },
-      threads: threadItems.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+      threads: threadItems.sort(
+        (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+      ),
     };
   } catch (error) {
     return {

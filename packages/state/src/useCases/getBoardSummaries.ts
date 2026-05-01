@@ -26,7 +26,11 @@ export async function getBoardSummaries(
       boards.map(async (board) => {
         const threads = await deps.threads.listByBoard(board.id);
         const latestThread =
-          [...threads].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0] ?? null;
+          [...threads]
+            .sort(
+              (a, b) =>
+                new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+            )[0] ?? null;
 
         return {
           id: board.id,
