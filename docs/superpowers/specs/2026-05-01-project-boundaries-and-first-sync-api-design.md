@@ -1,257 +1,258 @@
-# Project Boundaries And First Sync API Design
+# 项目边界与首个同步 API 设计
 
-## Summary
+## 概述
 
-This design covers two tightly related decisions:
+这份设计聚焦两个紧密相关的决定：
 
-1. Define project-level instruction boundaries so product context lives at the repository root instead of being mixed into backend-only guidance.
-2. Define the first external sync API that the future frontend will call to fetch recent forum changes and request targeted backfill when its local processing state falls behind.
+1. 明确项目级说明文档边界，让产品背景信息沉淀在仓库根目录，而不是混在仅后端使用的说明里。
+2. 定义首个对外同步 API，供未来前端拉取最近的论坛变化，并在本地处理进度落后时发起定向补拉。
 
-This design does not cover the full forum implementation, robot posting behavior, notification product flows, user-claim features, or historical data migration. Those remain important project context, but they are out of scope for this first spec.
+这份设计不覆盖完整论坛实现、机器人发帖策略、通知产品流程、用户认领功能、历史数据迁移细节。这些都仍然重要，但不属于本轮 spec 的实现范围。
 
-## Product Context
+## 产品背景
 
-The project is a forum sandbox built around mirrored data from the BYR BBS. The eventual frontend is intended to feel like a complete forum, including posting, replying, display, notifications, and login-related experiences. However, the most important participants in the sandbox are not ordinary users. They are robot identities created from backend-collected BYR data.
+这个项目是一个围绕北邮人论坛镜像数据构建的论坛沙盒。未来前端会尽量表现成一个完整论坛，包含发帖、回复、展示、通知、登录等体验。但在这个沙盒中，最重要的参与者并不是普通真实用户，而是由后端采集北邮人数据后映射出来的机器人身份。
 
-Real users and robot actors coexist in the sandbox:
+真实用户与机器人会同时存在：
 
-- The frontend periodically requests data from the backend.
-- The frontend transforms backend data into forum content and automatically posts on behalf of robot actors.
-- Robot activity can trigger in-forum notifications.
-- A real user may receive notifications by binding to a robot inbox for the current day.
-- Future features may allow users to claim a mirrored post or reply without binding to a robot inbox.
+- 前端会周期性向后端请求数据。
+- 前端会整理后端返回的数据，并自动代表机器人在沙盒论坛中发帖或回复。
+- 机器人行为会触发论坛内通知。
+- 真实用户可以通过绑定当天的机器人收件箱来接收通知。
+- 后续还可能支持不绑定机器人、直接认领某个镜像帖子或回复的能力。
 
-This product context should be visible to all future modules, not only the backend.
+这些背景属于整个项目，而不是仅属于后端。
 
-## Repository Instruction Boundaries
+## 仓库说明文档边界
 
-### Root `AGENTS.md`
+### 根目录 `AGENTS.md`
 
-Add a repository-root `AGENTS.md` to hold facts and collaboration rules that apply across the entire project.
+仓库根目录应该新增一个 `AGENTS.md`，用于保存对整个项目都成立的事实和协作规则。
 
-It should include:
+建议至少包含：
 
-- The project is a sandbox forum built around mirrored BYR forum activity.
-- Robot actors are first-class participants, not implementation detail.
-- Anonymous notification is one of the main product motivations.
-- The frontend is responsible for organizing backend data and creating robot-authored forum activity.
-- Real-user posting permissions are undecided and should not be assumed by downstream modules.
-- BYR source content may disappear over time because old threads can be deleted by the source forum.
-- Historical data migration from an older PostgreSQL and Prisma pipeline is expected before launch, but not part of the current implementation scope.
+- 这是一个围绕北邮人论坛镜像行为构建的论坛沙盒。
+- 机器人身份是产品的一等参与者，不是实现细节。
+- 匿名通知是核心产品动机之一。
+- 前端负责整理后端数据，并生成机器人发帖与回复行为。
+- 是否允许真实用户直接发帖目前尚未定案，下游模块不能擅自假设。
+- 北邮人源站的历史内容可能消失，因为旧帖子会被源论坛定期删除。
+- 正式上线前预计会从旧的 PostgreSQL + Prisma 流水线迁移历史数据，但这不属于当前实现范围。
+- 仓库内新增或维护的 Markdown 文档默认使用中文，除非有明确的特殊原因需要使用其他语言。
 
-It should avoid low-level backend specifics such as request endpoints, parsing details, DOM structure, or crawler-only recovery rules.
+这里不应该写后端专有细节，比如接口路径、页面 DOM 结构、解析策略、抓虫恢复细节等。
 
 ### `backend/AGENTS.md`
 
-Keep `backend/AGENTS.md`, but narrow it to backend concerns.
+`backend/AGENTS.md` 应该继续保留，但只聚焦后端边界。
 
-It should include:
+建议保留：
 
-- Backend responsibilities: authentication, collection, short-term cache management, and external sync APIs.
-- The backend is not the place to define forum product policy, robot-user social behavior, or notification UX.
-- The backend may assume source threads can disappear and should avoid hard assumptions that previously seen content remains fetchable forever.
-- The backend should optimize for stable collection and reproducible sync semantics.
+- 后端职责：认证、采集、短期缓存管理、对外同步 API。
+- 后端不负责定义论坛产品规则、机器人与真实用户的产品关系、通知交互体验。
+- 后端需要接受“源站线程可能消失”这一现实，不能假设曾经看到过的内容未来一定还能抓到。
+- 后端实现应优先保证采集稳定性和同步语义可复现。
 
-It should remove or move upward:
+建议移除或上移到根目录：
 
-- Full product vision for the sandbox forum.
-- Rules about how real users and robots interact at the product level.
-- Notification binding product ideas.
-- Future claim/ownership feature ideas.
+- 整个论坛沙盒的完整产品愿景。
+- 真实用户与机器人如何互动的产品级规则。
+- 用户绑定机器人收件箱的产品设想。
+- 未来认领帖子或回复的产品设想。
 
-### Subdirectory Guidance
+### 子目录规则
 
-As the codebase grows, module-local `AGENTS.md` files should contain only module-specific facts:
+随着代码库增长，各模块下的 `AGENTS.md` 只应该记录模块专属事实：
 
-- `backend/src/byr_auth/AGENTS.md`: login, cookies, session assumptions.
-- `backend/src/byr_boards/AGENTS.md`: board listing rules and parsing facts.
-- `backend/src/byr_threads/AGENTS.md`: thread parsing rules, pagination, reply extraction.
-- Future `frontend/AGENTS.md`: rendering, posting, notification, and client-side sync behavior.
+- `backend/src/byr_auth/AGENTS.md`：登录、cookie、会话假设。
+- `backend/src/byr_boards/AGENTS.md`：版面列表规则与解析事实。
+- `backend/src/byr_threads/AGENTS.md`：帖子页解析、分页、回复抽取规则。
+- 未来 `frontend/AGENTS.md`：渲染、发帖、通知、客户端同步行为。
 
-The rule is simple: global context belongs at the root, implementation-local context belongs beside the implementation.
+规则很简单：全局背景放根目录，实现细节贴近实现目录。
 
-## First External API Goal
+## 首个对外 API 的目标
 
-The first external API is for the future frontend, not for arbitrary third parties.
+首个对外 API 面向未来前端，而不是任意第三方调用方。
 
-Its purpose is to let the frontend:
+它的目标是让前端能够：
 
-- Poll for recent mirrored changes from one high-priority board.
-- Receive enough reply data to immediately continue robot posting and notification handling.
-- Request targeted backfill for a specific thread when the frontend discovers its own processing cursor is behind the backend's incremental result.
+- 轮询单个高优先级板块的最近变化。
+- 一次拿到足够的回复数据，直接继续后续机器人发帖和通知处理。
+- 当本地处理进度落后于后端增量结果时，按指定帖子发起定向补拉。
 
-This API is intentionally designed around a single-board first release so the end-to-end path can be validated before expanding scope.
+这个 API 首版只服务一个板块，目的是先跑通完整链路，再决定何时扩展。
 
-## First External API Shape
+## 首个对外 API 的形态
 
-The first release should expose a minimal pair of sync endpoints rather than a single all-purpose endpoint.
+首版不建议设计成一个万能接口，而是最小的一组同步接口。
 
-### 1. Main Pull Endpoint
+### 1. 主拉取接口
 
-This endpoint is the normal polling path used by the frontend on a fixed cadence.
+这是前端固定周期轮询的常规入口。
 
-Behavior:
+行为要求：
 
-- Protected by lightweight server-side token authentication.
-- Defaults to one supported board for the first release.
-- Uses a backend-owned default time window `y`.
-- Returns threads with recent changes plus the newly observed replies needed by the frontend to continue processing.
-- Supports a small set of narrowing parameters such as `limit`.
+- 使用轻量的服务端 token 鉴权。
+- 首版默认只支持一个板块。
+- 时间窗口 `y` 由后端配置并主导。
+- 返回“最近有变化的帖子”以及“这些帖子里前端需要立即处理的新回复”。
+- 参数只保留少量收窄能力，例如 `limit`。
 
-Important semantic choices:
+关键语义：
 
-- The frontend should be able to call this endpoint without providing a time cursor.
-- The backend, not the client, owns the default incremental window.
-- The response is not a full board snapshot.
-- The response is also not only thread metadata, because the frontend needs reply content immediately to drive robot posting.
+- 前端不需要自己传时间游标也能直接调用。
+- 默认增量窗口由后端负责，而不是由前端定义。
+- 返回值不是整个版面的完整快照。
+- 返回值也不应该只有帖子元数据，因为前端需要直接消费回复内容。
 
-### 2. Targeted Backfill Endpoint
+### 2. 定向补拉接口
 
-This endpoint is only for repair and resynchronization when the frontend detects that its local processing state is behind.
+这是修复和重同步用的接口，只在前端发现自己本地处理进度落后时调用。
 
-Example:
+例子：
 
-- The backend cache indicates that a thread already has at least 23 known replies.
-- The backend optimizes collection accordingly and returns only replies after that point in the normal incremental result.
-- The frontend discovers it has only safely processed through reply 21.
-- The frontend sends a targeted backfill request for that thread starting from reply 22.
+- 后端缓存显示某个帖子至少已经有 23 条回复。
+- 后端因此在正常增量返回时，只返回 23 条之后的新内容。
+- 前端却发现自己本地其实只安全处理到了第 21 条。
+- 这时前端主动请求该帖子从第 22 条开始补拉。
 
-Behavior:
+行为要求：
 
-- The frontend names the thread explicitly.
-- The frontend requests a rewind point explicitly.
-- The backend returns replies from the requested point forward, subject to a maximum rewind window.
-- The endpoint is not a general-purpose thread export. It is a controlled repair path.
+- 前端显式指定目标帖子。
+- 前端显式指定回退起点。
+- 后端从指定位置开始返回，受一个最大回退窗口保护。
+- 这个接口不是通用导出接口，而是受控的修复通道。
 
-This keeps the main loop simple while still giving the frontend a clean escape hatch when its local state drifts.
+这样主流程可以保持简单，而前端状态漂移时也有明确补救路径。
 
-## Why Not Add A General Consumption-Ack API Yet
+## 为什么首版不加入通用消费确认接口
 
-A generic "processed" or "consumed" callback API is intentionally out of scope for the first release.
+首版刻意不引入通用“已处理”或“已消费”回传接口。
 
-Reasons:
+原因：
 
-- It would force the first release to define a broader sync state machine than is currently necessary.
-- The main pull plus targeted backfill pair is enough to get the loop running.
-- The frontend is the primary orchestrator in this design and can decide when it needs backfill.
-- Acknowledgement semantics can be added later after real failure patterns are observed.
+- 一旦加入，会迫使首版同时定义更完整的同步状态机。
+- 主拉取加定向补拉，已经足够跑通当前链路。
+- 这套设计里前端才是同步编排主体，由前端决定何时需要补拉。
+- 等真实故障模式出现后，再决定是否补充消费确认语义更稳妥。
 
-This is a deliberate simplification, not an omission.
+这不是遗漏，而是刻意控制首版复杂度。
 
-## Cache Strategy
+## 缓存策略
 
-The backend should use Redis as a short-lived sync cache. It is not the final product database.
+后端使用 Redis 作为短期同步缓存，而不是最终业务数据库。
 
-Goals:
+目标：
 
-- Avoid repeatedly crawling from the first page for active threads.
-- Preserve short-term thread progress so incremental sync can start from a later point.
-- Support targeted backfill for threads that are still within the active cache window.
+- 避免活跃线程每次都从第一页重新抓。
+- 保存短期线程进度，让增量同步可以从更靠后的位置开始。
+- 支撑仍在缓存窗口内的定向补拉。
 
-The intended cache window is about three days.
+当前建议缓存窗口约为三天。
 
-That three-day value is a cache-retention policy, not a business anomaly rule.
+这里的“三天”是缓存保留策略，不是业务异常规则。
 
-Implications:
+含义如下：
 
-- Active-thread cache entries expire automatically after about three days.
-- If a thread becomes active again after its cache entry expires, the backend crawls it normally.
-- In that case the backend may return a wider range of replies than usual because the old short-term baseline is gone.
-- This wider return is acceptable behavior, not an exceptional error.
-- The frontend must handle duplicate or wider-than-usual reply ranges idempotently.
+- 活跃线程缓存大约三天后自动过期。
+- 如果一个帖子在缓存过期后再次活跃，后端仍然按正常逻辑重新抓取。
+- 因为短期基线已经丢失，后端这时可能会比平时多返回一些回复。
+- 这种“多返回”是协议允许的正常行为，不应视为异常错误。
+- 前端需要具备幂等处理能力，能够接受重复或范围偏宽的回复集合。
 
-## Suggested Redis State Model
+## 建议的 Redis 状态模型
 
-The first implementation only needs enough Redis structure to support incremental sync and controlled backfill.
+首版只需要支持增量同步和受控补拉所必需的最小缓存结构。
 
-Suggested categories:
+建议的状态分类：
 
-- Active thread index for the single supported board.
-- Per-thread progress summary, such as last known reply count or equivalent cursor.
-- Per-thread short-lived reply summary needed to assemble backfill payloads without fully re-deriving everything every time.
-- Optional short-lived lock or dedup keys if concurrent pulls must be controlled.
+- 单一目标板块的活跃线程索引。
+- 每个线程的进度摘要，例如已知回复总数或等价游标。
+- 每个线程的短期回复摘要，用于组织补拉响应，而不是每次都完全重建。
+- 如果需要控制并发轮询，可补充短期锁或去重键。
 
-The exact key names are implementation detail and should be chosen later, but the cache model should stay intentionally small.
+具体 key 命名属于实现细节，可以在后续实现阶段再定，但整体缓存模型应保持克制。
 
-## Backend Collection Semantics
+## 后端采集语义
 
-The backend remains responsible for normal authenticated crawling.
+后端继续负责正常的认证后抓取。
 
-Collection flow:
+采集流程：
 
-1. Fetch recent board changes using existing collection capabilities.
-2. Use Redis progress to avoid starting from the earliest possible thread page when enough recent state is known.
-3. Produce incremental reply payloads for the main pull endpoint.
-4. Answer targeted backfill requests by reusing cached progress plus normal thread crawling.
+1. 使用现有采集能力获取最近板块变化。
+2. 结合 Redis 中的线程进度，避免总是从最早页面重新开始。
+3. 生成主拉取接口所需的增量回复结果。
+4. 在定向补拉时，复用缓存进度与正常线程抓取逻辑组织响应。
 
-The backend should treat its crawler as the source of truth for current thread contents. The cache only helps narrow work and stabilize sync behavior.
+后端爬虫始终是“当前线程内容”的事实来源。缓存只是帮助减少重复工作并稳定同步语义。
 
-## Frontend And Backend Responsibility Split
+## 前后端职责划分
 
-The frontend is the primary orchestrator.
+前端是同步流程中的主体。
 
-Frontend responsibilities:
+前端职责：
 
-- Poll the main endpoint on a fixed schedule.
-- Transform returned data into robot-authored forum activity.
-- Detect when local processing state is behind.
-- Request targeted backfill for a specific thread when needed.
-- Handle duplicate or wider-than-usual payloads safely.
+- 按固定周期轮询主拉取接口。
+- 把返回数据整理成机器人发帖或回复行为。
+- 发现本地处理进度落后时主动识别问题。
+- 针对指定线程发起补拉请求。
+- 安全处理重复返回或范围偏宽的回复集合。
 
-Backend responsibilities:
+后端职责：
 
-- Authenticate against BYR.
-- Crawl boards and threads.
-- Maintain a short-lived Redis sync cache.
-- Provide the main incremental pull response.
-- Provide controlled per-thread backfill.
-- Enforce lightweight token authentication and rewind safety limits.
+- 对北邮人执行认证。
+- 抓取版面和线程。
+- 维护 Redis 短期同步缓存。
+- 提供主增量拉取结果。
+- 提供受控的单线程补拉能力。
+- 执行轻量 token 鉴权和最大回退窗口保护。
 
-This split keeps the backend focused on stable data delivery rather than turning it into a workflow engine too early.
+这种分工可以让后端先聚焦稳定的数据交付，而不是过早变成复杂工作流引擎。
 
-## Errors And Recovery
+## 错误与恢复
 
-The first API design should distinguish a few clear failure categories.
+首个 API 需要至少区分几类失败。
 
-Main pull endpoint:
+主拉取接口：
 
-- Invalid or missing token.
-- Invalid request parameters.
-- Source crawl failure.
-- Cache unavailable or inconsistent.
+- token 缺失或非法。
+- 请求参数非法。
+- 源站抓取失败。
+- 缓存不可用或状态不一致。
 
-Targeted backfill endpoint:
+定向补拉接口：
 
-- Invalid or missing token.
-- Unknown thread identifier.
-- Requested rewind point exceeds allowed backfill limits.
-- Requested rewind point predates recoverable cached context.
-- Source crawl failure during repair.
+- token 缺失或非法。
+- 线程标识不存在或无法识别。
+- 请求的回退深度超过允许窗口。
+- 请求的回退起点早于可恢复缓存范围。
+- 修复过程中源站抓取失败。
 
-Errors that can be retried should be recognizable by the frontend. Errors that require operator attention should be explicit rather than hidden behind empty success responses.
+前端应该能够识别“可重试错误”和“需要人工介入的错误”，后端不应该用空成功响应掩盖失败。
 
-## Testing Focus
+## 测试重点
 
-The first implementation should emphasize sync semantics over UI behavior.
+首版测试重点应放在同步语义，而不是 UI。
 
-Minimum coverage:
+最少覆盖：
 
-1. Main pull returns recent changed threads and their new replies using the backend default window.
-2. Redis-backed progress allows the backend to avoid always starting from the earliest available thread page.
-3. Targeted backfill returns replies beginning from a client-requested rewind point.
-4. Overly deep rewind requests are rejected clearly.
-5. Expired cache entries cause wider normal responses rather than protocol failure.
-6. Duplicate reply delivery can be handled safely by the contract expected of the frontend.
+1. 主拉取接口在后端默认时间窗口下返回最近有变化的帖子和对应新回复。
+2. Redis 进度能让后端避免总是从最早可抓页面开始。
+3. 定向补拉接口能从前端指定的回退位置正确返回回复。
+4. 超过最大回退窗口的请求会被明确拒绝。
+5. 缓存过期后，接口表现为正常但可能返回更宽的数据范围，而不是协议失败。
+6. 协议约定下，前端可以安全处理重复回复返回。
 
-## Non-Goals
+## 非目标
 
-This design does not define:
+这份设计不定义：
 
-- Full frontend information architecture.
-- Whether real users are allowed to post directly.
-- Notification product UX.
-- Robot identity lifecycle.
-- Historical PostgreSQL migration mechanics.
-- Final persistent data model for the whole forum product.
+- 完整前端信息架构。
+- 是否允许真实用户直接发帖。
+- 通知产品交互设计。
+- 机器人身份生命周期。
+- 历史 PostgreSQL 迁移机制。
+- 整个论坛产品的最终持久化数据模型。
 
-Those items should be handled in later specs after this narrower boundary is implemented and proven.
+这些内容应该在后续更聚焦的 spec 中单独处理。
