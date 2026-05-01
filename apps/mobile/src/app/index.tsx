@@ -1,9 +1,58 @@
+import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
+import { Link } from "expo-router";
+
+import { getBoardSummaries } from "@bbs/state";
+import { createReadingFlowDeps } from "@bbs/state/runtime";
+
+type BoardSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  threadCount: number;
+  latestThreadTitle: string | null;
+};
 
 export default function HomeScreen() {
+  const [boards, setBoards] = useState<BoardSummary[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    void getBoardSummaries(createReadingFlowDeps()).then((result) => {
+      if (!active || result.status !== "success") {
+        return;
+      }
+
+      setBoards(result.boards);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
-    <View style={{ flex: 1, padding: 24, justifyContent: "center" }}>
-      <Text style={{ fontSize: 28, fontWeight: "600" }}>移动端版面列表</Text>
+    <View style={{ flex: 1, padding: 24, gap: 16 }}>
+      <Text style={{ fontSize: 28, fontWeight: "600" }}>论坛首页</Text>
+      <View style={{ gap: 12 }}>
+        {boards.map((board) => (
+          <View key={board.id} style={{ gap: 6 }}>
+            <Link
+              href={{
+                pathname: "/boards/[boardId]",
+                params: { boardId: board.id },
+              } as never}
+            >
+              <Text style={{ fontSize: 20, fontWeight: "500" }}>{board.name}</Text>
+            </Link>
+            <Text>{board.description}</Text>
+            <Text>帖子数：{board.threadCount}</Text>
+            {board.latestThreadTitle ? <Text>最新：{board.latestThreadTitle}</Text> : null}
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
