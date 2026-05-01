@@ -58,21 +58,21 @@ describe("getBoardSummaries", () => {
 
     expect(summaries).toEqual([
       {
-        boardId: "board-1",
-        boardName: "Tech",
-        description: "Development and tooling discussion",
+        boardId: "board:job",
+        boardName: "Jobs and Offers",
+        description: "Signals for roles, openings, and practical next steps.",
         threadCount: 2,
         replyCount: 3,
-        latestThreadTitle: "Frontend Sync Flow",
+        latestThreadTitle: "Reading path for mirrored posts",
         latestThreadAuthorName: "Alice",
       },
       {
-        boardId: "board-2",
-        boardName: "Life",
-        description: "Daily chat and sharing",
+        boardId: "board:hot",
+        boardName: "Hot Reading",
+        description: "Fast-moving threads and the replies that follow them.",
         threadCount: 1,
         replyCount: 0,
-        latestThreadTitle: "What to Eat Today",
+        latestThreadTitle: "Follow up on the hot thread",
         latestThreadAuthorName: "Robot 2",
       },
     ]);

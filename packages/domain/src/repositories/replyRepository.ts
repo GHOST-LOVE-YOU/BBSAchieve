@@ -3,6 +3,7 @@ export interface ReplyRecord {
   threadId: string;
   authorUserId: string;
   body: string;
+  publishedAt: string;
 }
 
 export interface ReplyRepository {

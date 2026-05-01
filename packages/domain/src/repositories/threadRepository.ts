@@ -4,6 +4,7 @@ export interface ThreadRecord {
   authorUserId: string;
   title: string;
   body: string;
+  publishedAt: string;
 }
 
 export interface ThreadRepository {

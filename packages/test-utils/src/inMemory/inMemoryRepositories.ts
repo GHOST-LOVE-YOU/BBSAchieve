@@ -22,6 +22,10 @@ export class InMemoryBoardRepository implements BoardRepository {
     return this.items.get(id) ?? null;
   }
 
+  async findBySlug(slug: string): Promise<BoardRecord | null> {
+    return [...this.items.values()].find((item) => item.slug === slug) ?? null;
+  }
+
   async list(): Promise<BoardRecord[]> {
     return [...this.items.values()];
   }
