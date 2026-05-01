@@ -54,6 +54,11 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@/global\\.css$": "<rootDir>/jest.styleMock.js",
+      "^@/assets/(.*)$": "<rootDir>/jest.assetMock.js",
+      "^@/(.*)$": "<rootDir>/src/$1"
+    },
     "setupFilesAfterEnv": ["<rootDir>/jest.setup.js"],
     "testMatch": ["<rootDir>/__tests__/**/*.test.ts", "<rootDir>/__tests__/**/*.test.tsx"]
   },
