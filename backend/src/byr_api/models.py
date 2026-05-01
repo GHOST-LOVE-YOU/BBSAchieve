@@ -7,7 +7,7 @@ from dataclasses import dataclass
 class SyncThreadResponse:
     article_id: str
     title: str
-    reply_count: int | None
+    reply_count: int
 
 
 @dataclass(slots=True)

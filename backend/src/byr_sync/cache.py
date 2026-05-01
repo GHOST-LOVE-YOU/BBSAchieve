@@ -7,7 +7,7 @@ THREAD_TTL_SECONDS = 3 * 24 * 60 * 60
 
 @dataclass(slots=True)
 class InMemorySyncCache:
-    thread_progress: dict[str, ThreadProgress] = field(default_factory=dict)
+    _thread_progress: dict[str, ThreadProgress] = field(default_factory=dict)
 
     def save_thread_progress(
         self,
@@ -24,5 +24,8 @@ class InMemorySyncCache:
             ttl_seconds=THREAD_TTL_SECONDS,
             recent_post_ids=copied_recent_post_ids,
         )
-        self.thread_progress[f"{board_name}:{article_id}"] = progress
+        self._thread_progress[f"{board_name}:{article_id}"] = progress
         return progress
+
+    def get_thread_progress(self, *, board_name: str, article_id: str) -> ThreadProgress | None:
+        return self._thread_progress.get(f"{board_name}:{article_id}")
