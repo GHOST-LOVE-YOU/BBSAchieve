@@ -40,6 +40,7 @@ export async function importForumData(
       authorUserId: author.id,
       title: thread.title,
       body: thread.body,
+      publishedAt: new Date().toISOString(),
     });
   }
 

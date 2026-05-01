@@ -27,12 +27,15 @@ export async function createBotAndThread(
     });
   }
 
+  const publishedAt = new Date().toISOString();
+
   const thread = await deps.threads.create({
     id: `thread:${input.title}`,
     boardId: input.boardId,
     authorUserId: author.id,
     title: input.title,
     body: input.body,
+    publishedAt,
   });
 
   return { author, thread };

@@ -49,6 +49,34 @@ describe("getBoardSummaries", () => {
     const threads = new InMemoryThreadRepository(fixture.threads);
     const users = new InMemoryUserRepository(fixture.users);
 
+    expect(await boards.findById("board:job")).toEqual({
+      id: "board:job",
+      slug: "job",
+      name: "Jobs and Offers",
+      description: "Signals for roles, openings, and practical next steps.",
+    });
+    expect(await boards.findBySlug("hot")).toEqual({
+      id: "board:hot",
+      slug: "hot",
+      name: "Hot Reading",
+      description: "Fast-moving threads and the replies that follow them.",
+    });
+    expect(await threads.findById("thread:first-offer")).toEqual({
+      id: "thread:first-offer",
+      boardId: "board:job",
+      authorUserId: "user:robot-1",
+      title: "First offer from the mirror",
+      body: "A new listing has been mirrored and is ready to read.",
+      publishedAt: "2026-05-01T08:00:00.000Z",
+    });
+    expect(await replies.findById("reply:first-offer-1")).toEqual({
+      id: "reply:first-offer-1",
+      threadId: "thread:first-offer",
+      authorUserId: "user:alice",
+      body: "This is the kind of post I want to read first.",
+      publishedAt: "2026-05-01T08:05:00.000Z",
+    });
+
     const summaries = await getBoardSummaries({
       boards,
       replies,
