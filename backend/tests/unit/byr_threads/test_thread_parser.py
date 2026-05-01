@@ -170,3 +170,48 @@ def test_parse_thread_page_handles_missing_optional_sections() -> None:
     assert len(result.posts) == 1
     assert result.posts[0].anonymous_id == 1
     assert result.posts[0].body == "正文第一行\n正文第二行"
+
+
+def test_parse_thread_page_preserves_re_prefix_when_thread_title_is_missing() -> None:
+    html = """
+    <html>
+      <body>
+        <div class="b-content">
+          <table class="article">
+            <tr class="a-head">
+              <td class="a-left"><span class="a-u-name">IWhisper#2</span></td>
+              <td>
+                <ul class="a-func">
+                  <li><a class="a-post" href="/article/IWhisper/post/200">回复</a></li>
+                </ul>
+                <span class="a-pos">第12楼</span>
+              </td>
+            </tr>
+            <tr class="a-body">
+              <td></td>
+              <td class="a-content"><div class="a-content-wrap">
+发信人: IWhisper#2 (test), 信区: IWhisper
+标  题: Re: 原帖已删除后的异常标题
+发信站: 北邮人论坛 (Fri Apr 25 18:07:24 2026), 站内
+
+正文
+--
+              </div></td>
+            </tr>
+          </table>
+        </div>
+      </body>
+    </html>
+    """
+
+    result = parse_thread_page(
+        html=html,
+        board_name="IWhisper",
+        article_id="100",
+        page=2,
+        user_id="fixture-user",
+        reused_cookies=False,
+        requested_url="https://bbs.byr.cn/article/IWhisper/100?p=2&_uid=fixture-user",
+    )
+
+    assert result.thread_title == "Re: 原帖已删除后的异常标题"

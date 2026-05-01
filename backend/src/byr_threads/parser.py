@@ -47,7 +47,7 @@ def parse_thread_page(
     if posts and posts[0].is_original_post and len(posts[0].title) >= len(thread_title):
         thread_title = posts[0].title
     if not thread_title and posts:
-        thread_title = _strip_reply_prefix(posts[0].title)
+        thread_title = posts[0].title
 
     return ThreadPageResult(
         board_name=board_name,
@@ -180,12 +180,6 @@ def _search_int(pattern: str, text: str) -> int | None:
     if match is None:
         return None
     return int(match.group(1))
-
-
-def _strip_reply_prefix(title: str) -> str:
-    return re.sub(r"^(?:Re:\s*)+", "", title).strip()
-
-
 def _normalize_line(text: str) -> str:
     return re.sub(r"\s+", " ", text.replace("\xa0", " ")).strip()
 
