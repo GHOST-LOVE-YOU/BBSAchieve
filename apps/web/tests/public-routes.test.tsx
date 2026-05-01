@@ -7,10 +7,21 @@ vi.mock("next/link", () => ({
   },
 }));
 
-const notFound = vi.hoisted(() => vi.fn());
+const nextNavigation = vi.hoisted(() => {
+  const error = Object.assign(new Error("NEXT_NOT_FOUND"), {
+    digest: "NEXT_NOT_FOUND",
+  });
+
+  return {
+    error,
+    notFound: vi.fn(() => {
+      throw error;
+    }),
+  };
+});
 
 vi.mock("next/navigation", () => ({
-  notFound,
+  notFound: nextNavigation.notFound,
 }));
 
 import BoardPage from "../app/boards/[boardId]/page";
@@ -43,15 +54,20 @@ describe("web public routes", () => {
   });
 
   it("calls notFound for missing board or thread", async () => {
-    notFound.mockClear();
+    nextNavigation.notFound.mockClear();
 
-    await BoardPage({
-      params: Promise.resolve({ boardId: "missing-board" }),
-    });
-    await ThreadPage({
-      params: Promise.resolve({ threadId: "missing-thread" }),
-    });
+    await expect(
+      BoardPage({
+        params: Promise.resolve({ boardId: "missing-board" }),
+      }),
+    ).rejects.toThrow(nextNavigation.error);
 
-    expect(notFound).toHaveBeenCalledTimes(2);
+    await expect(
+      ThreadPage({
+        params: Promise.resolve({ threadId: "missing-thread" }),
+      }),
+    ).rejects.toThrow(nextNavigation.error);
+
+    expect(nextNavigation.notFound).toHaveBeenCalledTimes(2);
   });
 });
