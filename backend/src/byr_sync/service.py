@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Protocol
-
-from byr_threads.models import ThreadPost
 
 from .models import SyncPost
 
@@ -25,7 +24,14 @@ class BoardPageLike(Protocol):
 
 
 class ThreadPageLike(Protocol):
-    posts: list[ThreadPost]
+    posts: list["ThreadPostLike"]
+
+
+class ThreadPostLike(Protocol):
+    post_id: str
+    floor_label: str
+    author_display_name: str
+    body: str
 
 
 class ThreadProgressLike(Protocol):
@@ -95,15 +101,10 @@ class SyncService:
                     article_id=thread.article_id,
                     page=page,
                 )
-                posts = [
-                    SyncPost(
-                        post_id=post.post_id,
-                        floor_label=post.floor_label,
-                        author_display_name=post.author_display_name,
-                        body=post.body,
-                    )
-                    for post in thread_page.posts
-                ]
+                posts = self._build_posts(
+                    thread_page.posts,
+                    cached_reply_count=cached_reply_count,
+                )
             self.cache.save_thread_progress(
                 board_name=board_name,
                 article_id=thread.article_id,
@@ -137,3 +138,31 @@ class SyncService:
             reply_count=reply_count,
             posts=posts,
         )
+
+    @staticmethod
+    def _build_posts(
+        thread_posts: list[ThreadPostLike],
+        *,
+        cached_reply_count: int,
+    ) -> list[SyncPost]:
+        posts: list[SyncPost] = []
+        for post in thread_posts:
+            floor_number = SyncService._parse_floor_number(post.floor_label)
+            if floor_number is not None and floor_number <= cached_reply_count:
+                continue
+            posts.append(
+                SyncPost(
+                    post_id=post.post_id,
+                    floor_label=post.floor_label,
+                    author_display_name=post.author_display_name,
+                    body=post.body,
+                )
+            )
+        return posts
+
+    @staticmethod
+    def _parse_floor_number(floor_label: str) -> int | None:
+        match = re.search(r"(\d+)", floor_label)
+        if match is None:
+            return None
+        return int(match.group(1))

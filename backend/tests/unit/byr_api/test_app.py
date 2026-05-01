@@ -5,7 +5,8 @@ from fastapi.testclient import TestClient
 
 from byr_api.auth import _load_sync_token
 from byr_api.app import create_app
-from byr_sync.service import SyncThread, SyncUpdateResult
+from byr_sync.models import SyncPost, SyncThread
+from byr_sync.service import SyncUpdateResult
 
 
 class FakeSyncService:
@@ -13,7 +14,19 @@ class FakeSyncService:
         return SyncUpdateResult(
             board_name=board_name,
             threads=[
-                SyncThread(article_id="123", title="First thread", reply_count=4),
+                SyncThread(
+                    article_id="123",
+                    title="First thread",
+                    reply_count=4,
+                    posts=[
+                        SyncPost(
+                            post_id="p24",
+                            floor_label="24楼",
+                            author_display_name="alice",
+                            body="new reply",
+                        )
+                    ],
+                ),
             ],
         )
 
@@ -50,6 +63,14 @@ def test_sync_endpoint_returns_threads_with_valid_token(monkeypatch: pytest.Monk
                 "article_id": "123",
                 "title": "First thread",
                 "reply_count": 4,
+                "posts": [
+                    {
+                        "post_id": "p24",
+                        "floor_label": "24楼",
+                        "author_display_name": "alice",
+                        "body": "new reply",
+                    }
+                ],
             }
         ],
     }

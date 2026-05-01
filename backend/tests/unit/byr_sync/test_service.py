@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from byr_sync import InMemorySyncCache, THREAD_TTL_SECONDS
+from byr_sync.models import SyncPost
 from byr_sync.service import SyncService
 
 
@@ -148,4 +149,102 @@ def test_list_updates_includes_new_posts_after_cached_reply_count() -> None:
     assert thread_service.calls == [("test_board", "123", 3)]
     assert cache.get_thread_progress(board_name="test_board", article_id="123").recent_post_ids == [
         "p24"
+    ]
+
+
+def test_list_updates_filters_old_posts_from_thread_page() -> None:
+    thread = FakeThread(article_id="123", title="First thread", reply_count=24)
+    thread_page = FakeThreadPage(
+        posts=[
+            FakeThreadPost(
+                post_id="p20",
+                floor_label="20楼",
+                author_display_name="alice",
+                body="old reply",
+            ),
+            FakeThreadPost(
+                post_id="p21",
+                floor_label="21楼",
+                author_display_name="alice",
+                body="old reply",
+            ),
+            FakeThreadPost(
+                post_id="p22",
+                floor_label="22楼",
+                author_display_name="alice",
+                body="old reply",
+            ),
+            FakeThreadPost(
+                post_id="p23",
+                floor_label="23楼",
+                author_display_name="alice",
+                body="old reply",
+            ),
+            FakeThreadPost(
+                post_id="p24",
+                floor_label="24楼",
+                author_display_name="alice",
+                body="new reply",
+            ),
+        ]
+    )
+    board_service = FakeBoardService([thread])
+    thread_service = FakeThreadService(thread_page=thread_page)
+    cache = InMemorySyncCache()
+    cache.save_thread_progress(
+        board_name="test_board",
+        article_id="123",
+        reply_count=23,
+    )
+    service = SyncService(
+        board_service=board_service,
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    result = service.list_updates(board_name="test_board", limit=1)
+
+    assert [post.post_id for post in result.threads[0].posts] == ["p24"]
+    assert cache.get_thread_progress(board_name="test_board", article_id="123").recent_post_ids == [
+        "p24"
+    ]
+
+
+def test_list_updates_does_not_repeat_cached_boundary_floor() -> None:
+    thread = FakeThread(article_id="123", title="First thread", reply_count=21)
+    thread_page = FakeThreadPage(
+        posts=[
+            FakeThreadPost(
+                post_id="p20",
+                floor_label="20楼",
+                author_display_name="alice",
+                body="boundary reply",
+            ),
+            FakeThreadPost(
+                post_id="p21",
+                floor_label="21楼",
+                author_display_name="alice",
+                body="new reply",
+            ),
+        ]
+    )
+    board_service = FakeBoardService([thread])
+    thread_service = FakeThreadService(thread_page=thread_page)
+    cache = InMemorySyncCache()
+    cache.save_thread_progress(
+        board_name="test_board",
+        article_id="123",
+        reply_count=20,
+    )
+    service = SyncService(
+        board_service=board_service,
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    result = service.list_updates(board_name="test_board", limit=1)
+
+    assert [post.post_id for post in result.threads[0].posts] == ["p21"]
+    assert cache.get_thread_progress(board_name="test_board", article_id="123").recent_post_ids == [
+        "p21"
     ]

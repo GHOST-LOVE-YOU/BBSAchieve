@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import Depends, FastAPI
 
 from .auth import require_sync_token
-from .models import SyncThreadResponse, SyncUpdatesResponse
+from .models import SyncPostResponse, SyncThreadResponse, SyncUpdatesResponse
 from byr_auth import ByrAuthClient
 from byr_boards import BoardService
 from byr_sync import InMemorySyncCache
@@ -41,6 +41,15 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
                     article_id=thread.article_id,
                     title=thread.title,
                     reply_count=thread.reply_count,
+                    posts=[
+                        SyncPostResponse(
+                            post_id=post.post_id,
+                            floor_label=post.floor_label,
+                            author_display_name=post.author_display_name,
+                            body=post.body,
+                        )
+                        for post in thread.posts
+                    ],
                 )
                 for thread in result.threads
             ],
