@@ -23,6 +23,7 @@ byr-bbs = "byr_cli:main"
 byr-sync-api = "byr_api:main"
 
 [tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
 pythonpath = ["src"]
 testpaths = ["tests"]
 
