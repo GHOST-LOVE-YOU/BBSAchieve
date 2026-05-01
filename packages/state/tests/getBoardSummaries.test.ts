@@ -1,107 +1,33 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  InMemoryBoardRepository,
-  InMemoryReplyRepository,
-  InMemoryThreadRepository,
-  InMemoryUserRepository,
-  createForumFixture,
-} from "@bbs/test-utils";
-
-async function getBoardSummaries(deps: {
-  boards: InMemoryBoardRepository;
-  replies: InMemoryReplyRepository;
-  threads: InMemoryThreadRepository;
-  users: InMemoryUserRepository;
-}) {
-  const boards = await deps.boards.list();
-
-  return Promise.all(
-    boards.map(async (board) => {
-      const threads = await deps.threads.listByBoard(board.id);
-      const replies = await Promise.all(
-        threads.map((thread) => deps.replies.listByThread(thread.id)),
-      );
-      const replyCount = replies.reduce((total, items) => total + items.length, 0);
-      const latestThread = threads[threads.length - 1] ?? null;
-      const latestAuthor = latestThread
-        ? await deps.users.findById(latestThread.authorUserId)
-        : null;
-
-      return {
-        boardId: board.id,
-        boardName: board.name,
-        description: board.description,
-        threadCount: threads.length,
-        replyCount,
-        latestThreadTitle: latestThread?.title ?? null,
-        latestThreadAuthorName: latestAuthor?.displayName ?? null,
-      };
-    }),
-  );
-}
+import { getBoardSummaries } from "../src";
+import { readingFlowDeps } from "../src/fixtures/readingFlowDeps";
 
 describe("getBoardSummaries", () => {
-  it("reads board, thread, reply, and user data from shared fixtures", async () => {
-    const fixture = createForumFixture();
-    const boards = new InMemoryBoardRepository(fixture.boards);
-    const replies = new InMemoryReplyRepository(fixture.replies);
-    const threads = new InMemoryThreadRepository(fixture.threads);
-    const users = new InMemoryUserRepository(fixture.users);
+  it("returns shared forum fixture summaries", async () => {
+    const result = await getBoardSummaries(readingFlowDeps);
 
-    expect(await boards.findById("board:job")).toEqual({
-      id: "board:job",
-      slug: "job",
-      name: "Jobs and Offers",
-      description: "Signals for roles, openings, and practical next steps.",
-    });
-    expect(await boards.findBySlug("hot")).toEqual({
-      id: "board:hot",
-      slug: "hot",
-      name: "Hot Reading",
-      description: "Fast-moving threads and the replies that follow them.",
-    });
-    expect(await threads.findById("thread:first-offer")).toEqual({
-      id: "thread:first-offer",
-      boardId: "board:job",
-      authorUserId: "user:robot-1",
-      title: "First offer from the mirror",
-      body: "A new listing has been mirrored and is ready to read.",
-      publishedAt: "2026-05-01T08:00:00.000Z",
-    });
-    expect(await replies.findById("reply:first-offer-1")).toEqual({
-      id: "reply:first-offer-1",
-      threadId: "thread:first-offer",
-      authorUserId: "user:alice",
-      body: "This is the kind of post I want to read first.",
-      publishedAt: "2026-05-01T08:05:00.000Z",
-    });
+    expect(result.status).toBe("success");
+    if (result.status !== "success") {
+      throw new Error("expected success");
+    }
 
-    const summaries = await getBoardSummaries({
-      boards,
-      replies,
-      threads,
-      users,
-    });
-
-    expect(summaries).toEqual([
+    expect(result.boards).toEqual([
       {
-        boardId: "board:job",
-        boardName: "Jobs and Offers",
+        id: "board:job",
+        slug: "job",
+        name: "Jobs and Offers",
         description: "Signals for roles, openings, and practical next steps.",
         threadCount: 2,
-        replyCount: 3,
         latestThreadTitle: "Reading path for mirrored posts",
-        latestThreadAuthorName: "Alice",
       },
       {
-        boardId: "board:hot",
-        boardName: "Hot Reading",
+        id: "board:hot",
+        slug: "hot",
+        name: "Hot Reading",
         description: "Fast-moving threads and the replies that follow them.",
         threadCount: 1,
-        replyCount: 0,
         latestThreadTitle: "Follow up on the hot thread",
-        latestThreadAuthorName: "Robot 2",
       },
     ]);
   });
