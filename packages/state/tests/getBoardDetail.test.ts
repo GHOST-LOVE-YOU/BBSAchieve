@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { getBoardDetail } from "../src";
-import { readingFlowDeps } from "../src/fixtures/readingFlowDeps";
+import { createReadingFlowDeps } from "../src/fixtures/readingFlowDeps";
 
 describe("getBoardDetail", () => {
   it("returns board detail with threads", async () => {
-    const result = await getBoardDetail("board:job", readingFlowDeps);
+    const result = await getBoardDetail("board:job", createReadingFlowDeps());
 
     expect(result.status).toBe("success");
     if (result.status !== "success") {
@@ -25,7 +25,7 @@ describe("getBoardDetail", () => {
   });
 
   it("returns notFound for missing board", async () => {
-    const result = await getBoardDetail("missing-board", readingFlowDeps);
+    const result = await getBoardDetail("missing-board", createReadingFlowDeps());
 
     expect(result).toEqual({ status: "notFound" });
   });

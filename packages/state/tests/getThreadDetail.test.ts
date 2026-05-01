@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { getThreadDetail } from "../src";
-import { readingFlowDeps } from "../src/fixtures/readingFlowDeps";
+import { createReadingFlowDeps } from "../src/fixtures/readingFlowDeps";
 
 describe("getThreadDetail", () => {
   it("returns thread detail with ordered replies", async () => {
-    const result = await getThreadDetail("thread:first-offer", readingFlowDeps);
+    const result = await getThreadDetail("thread:first-offer", createReadingFlowDeps());
 
     expect(result.status).toBe("success");
     if (result.status !== "success") {
@@ -26,8 +26,22 @@ describe("getThreadDetail", () => {
   });
 
   it("returns notFound for missing thread", async () => {
-    const result = await getThreadDetail("missing-thread", readingFlowDeps);
+    const result = await getThreadDetail("missing-thread", createReadingFlowDeps());
 
     expect(result).toEqual({ status: "notFound" });
+  });
+
+  it("returns error when the thread board is missing", async () => {
+    const deps = createReadingFlowDeps();
+    deps.boards.findById = async () => null;
+
+    const result = await getThreadDetail("thread:first-offer", deps);
+
+    expect(result.status).toBe("error");
+    if (result.status !== "error") {
+      throw new Error("expected error");
+    }
+
+    expect(result.message).toContain("board not found");
   });
 });

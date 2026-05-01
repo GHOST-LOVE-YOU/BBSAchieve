@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { getBoardSummaries } from "../src";
-import { readingFlowDeps } from "../src/fixtures/readingFlowDeps";
+import { createReadingFlowDeps } from "../src/fixtures/readingFlowDeps";
 
 describe("getBoardSummaries", () => {
   it("returns shared forum fixture summaries", async () => {
-    const result = await getBoardSummaries(readingFlowDeps);
+    const result = await getBoardSummaries(createReadingFlowDeps());
 
     expect(result.status).toBe("success");
     if (result.status !== "success") {

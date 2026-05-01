@@ -41,6 +41,13 @@ export async function getThreadDetail(
     }
 
     const board = await deps.boards.findById(thread.boardId);
+    if (!board) {
+      return {
+        status: "error",
+        message: `board not found for thread ${thread.id}`,
+      };
+    }
+
     const author = await deps.users.findById(thread.authorUserId);
     const replies = await deps.replies.listByThread(thread.id);
     const replyItems = await Promise.all(
@@ -58,9 +65,9 @@ export async function getThreadDetail(
     return {
       status: "success",
       board: {
-        id: board?.id ?? "unknown-board",
-        slug: board?.slug ?? "unknown-board",
-        name: board?.name ?? "未知版面",
+        id: board.id,
+        slug: board.slug,
+        name: board.name,
       },
       thread: {
         id: thread.id,
