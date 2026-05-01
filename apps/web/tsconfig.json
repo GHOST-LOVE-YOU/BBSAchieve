@@ -24,6 +24,7 @@
       "@/*": ["./*"],
       "@bbs/domain": ["../../packages/domain/src/index.ts"],
       "@bbs/state": ["../../packages/state/src/index.ts"],
+      "@bbs/state/runtime": ["../../packages/state/src/runtime/index.ts"],
       "@bbs/ui-base": ["../../packages/ui-base/src/index.ts"],
       "@bbs/test-utils": ["../../packages/test-utils/src/index.ts"]
     }
