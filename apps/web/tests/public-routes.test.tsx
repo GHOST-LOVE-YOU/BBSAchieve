@@ -246,6 +246,62 @@ describe("web public routes", () => {
     expect(screen.getByText("The mirror keeps the reading flow stable.")).toBeTruthy();
   });
 
+  it("renders thread detail for prisma uuid route params", async () => {
+    readingMock.findThreadById.mockImplementation(async (threadId: string) => {
+      if (threadId !== "fd45468e-de16-48f2-82cd-8500aec9c7cd") {
+        return null;
+      }
+
+      return {
+        id: "fd45468e-de16-48f2-82cd-8500aec9c7cd",
+        boardId: "board:iwhisper",
+        authorUserId: "user:robot-1",
+        sourceThreadId: "8830220",
+        sourceBoardSlug: "iwhisper",
+        title: "Mirrored UUID thread",
+        body: "This thread is stored with a Prisma UUID id.",
+        publishedAt: "2026-05-01T08:00:00.000Z",
+        replyCount: 1,
+        lastReplyAt: "2026-05-01T08:10:00.000Z",
+      };
+    });
+    readingMock.findBoardById.mockResolvedValue({
+      id: "board:iwhisper",
+      slug: "iwhisper",
+      name: "IWhisper",
+      description: "Mirrored BYR content.",
+    });
+    readingMock.findUserById.mockResolvedValue({
+      id: "user:robot-1",
+      username: "robot-1",
+      displayName: "Robot 1",
+      userType: "bot",
+      status: "active",
+      mailboxKey: "mailbox-1",
+    });
+    readingMock.listRepliesByThread.mockResolvedValue([
+      {
+        id: "reply:uuid-thread-1",
+        threadId: "fd45468e-de16-48f2-82cd-8500aec9c7cd",
+        authorUserId: "user:robot-1",
+        replyIndex: 1,
+        body: "The UUID route works now.",
+        publishedAt: "2026-05-01T08:10:00.000Z",
+      },
+    ]);
+
+    const ui = await ThreadPage({
+      params: Promise.resolve({ threadId: "fd45468e-de16-48f2-82cd-8500aec9c7cd" }),
+    });
+    render(ui);
+
+    expect(screen.getByText("This thread is stored with a Prisma UUID id.")).toBeTruthy();
+    expect(screen.getByText("The UUID route works now.")).toBeTruthy();
+    expect(readingMock.findThreadById).toHaveBeenCalledWith(
+      "fd45468e-de16-48f2-82cd-8500aec9c7cd",
+    );
+  });
+
   it("calls notFound for missing board or thread", async () => {
     nextNavigation.notFound.mockClear();
     readingMock.findBoardById.mockResolvedValue(null);

@@ -35,8 +35,18 @@ export async function getThreadDetail(
   | { status: "error"; message: string }
 > {
   try {
-    const normalizedThreadId = threadId.startsWith("thread:") ? threadId : `thread:${threadId}`;
-    const thread = await deps.threads.findById(normalizedThreadId);
+    const candidateThreadIds = threadId.startsWith("thread:")
+      ? [threadId]
+      : [threadId, `thread:${threadId}`];
+    let thread = null;
+
+    for (const candidateThreadId of candidateThreadIds) {
+      thread = await deps.threads.findById(candidateThreadId);
+      if (thread) {
+        break;
+      }
+    }
+
     if (!thread) {
       return { status: "notFound" };
     }
