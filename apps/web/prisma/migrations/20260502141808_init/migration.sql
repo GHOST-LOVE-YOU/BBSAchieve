@@ -5,7 +5,19 @@ CREATE TYPE "UserType" AS ENUM ('human', 'bot');
 CREATE TYPE "ImportStatus" AS ENUM ('running', 'succeeded', 'failed', 'partial', 'pending');
 
 -- CreateEnum
-CREATE TYPE "ImportSourceType" AS ENUM ('byr_sync_api', 'legacy_postgres');
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'ImportSourceType'
+          AND n.nspname = CURRENT_SCHEMA()
+    ) THEN
+        CREATE TYPE "ImportSourceType" AS ENUM ('byr_sync_api', 'legacy_postgres');
+    END IF;
+END
+$$;
 
 -- CreateEnum
 CREATE TYPE "ProfileStatus" AS ENUM ('pending', 'active', 'disabled');
