@@ -68,6 +68,19 @@ export function markJobRunning(
   });
 }
 
+export function markJobPaused(
+  prisma: ImportJobStore,
+  jobId: string,
+) {
+  return prisma.importJob.update({
+    where: { id: jobId },
+    data: {
+      status: "paused",
+      finishedAt: new Date(),
+    },
+  });
+}
+
 export function updateJobProgress(
   prisma: ImportJobStore,
   jobId: string,

@@ -11,6 +11,7 @@ export type LegacyMigrationRunnerJob = {
 export type LegacyMigrationRunnerDeps = {
   findJobById: (jobId: string) => Promise<LegacyMigrationRunnerJob | null>;
   markJobRunning: (jobId: string, cursorThreadKey?: string | null) => Promise<unknown>;
+  markJobPaused?: (jobId: string) => Promise<unknown>;
   updateJobProgress: (
     jobId: string,
     progress: {
