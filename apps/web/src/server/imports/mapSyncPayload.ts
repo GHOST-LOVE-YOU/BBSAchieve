@@ -3,7 +3,7 @@ import type {
   NormalizedImportBatch,
 } from "./syncTypes";
 
-export function mapByrSyncPayload(
+export function mapSyncPayload(
   payload: ByrSyncPayload,
 ): NormalizedImportBatch {
   return {
@@ -22,3 +22,4 @@ export function mapByrSyncPayload(
   };
 }
 
+export const mapByrSyncPayload = mapSyncPayload;
