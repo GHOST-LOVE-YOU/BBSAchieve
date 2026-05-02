@@ -3,6 +3,9 @@
   "private": true,
   "packageManager": "pnpm@10.11.0",
   "scripts": {
+    "db:up": "docker compose -f docker-compose.dev.yml up -d postgres",
+    "db:down": "docker compose -f docker-compose.dev.yml down",
+    "db:logs": "docker compose -f docker-compose.dev.yml logs -f postgres",
     "test": "vitest run",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",

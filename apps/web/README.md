@@ -3,10 +3,18 @@
 ## 本地开发
 
 ```bash
-pnpm dev
+npx pnpm@10.11.0 db:up
+npx pnpm@10.11.0 --filter @bbs/web prisma:migrate
+npx pnpm@10.11.0 --filter @bbs/web dev
 ```
 
-开发服务器默认运行在本机 `3000` 端口。
+默认会连接 `apps/web/.env` 中的本地 PostgreSQL：
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5433/bbsachieve"
+```
+
+开发服务器默认运行在本机 `3000` 端口，本地 PostgreSQL 暴露在 `5433` 端口。
 
 ## Docker 构建
 

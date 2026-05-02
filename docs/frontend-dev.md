@@ -6,14 +6,30 @@
 npx pnpm@10.11.0 install
 ```
 
+## 本地数据库
+
+Web 本地开发默认使用 Docker 中的 PostgreSQL，不再默认直连云端库。
+
+```bash
+npx pnpm@10.11.0 db:up
+```
+
+默认连接串已经写在 `apps/web/.env`：
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5433/bbsachieve"
+```
+
+如果确实需要临时切回其他数据库，再手动覆盖 `DATABASE_URL` 即可。
+
 ## Prisma
 
 ```bash
 npx pnpm@10.11.0 --filter @bbs/web prisma:generate
-DATABASE_URL="$DATABASE_URL" npx pnpm@10.11.0 --filter @bbs/web prisma:migrate
+npx pnpm@10.11.0 --filter @bbs/web prisma:migrate
 ```
 
-`DATABASE_URL` 只需要在本地或 CI 环境里临时提供，不要写入文档或提交真实连接串。
+首次启动本地库后，先跑一次迁移把表建好。
 
 ## 启动
 
