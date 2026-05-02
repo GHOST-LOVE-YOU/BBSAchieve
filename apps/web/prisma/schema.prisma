@@ -20,6 +20,15 @@ enum ImportStatus {
   pending
 }
 
+enum ImportJobStatus {
+  pending
+  running
+  paused
+  failed
+  succeeded
+  cancelled
+}
+
 enum ImportSourceType {
   byr_sync_api
   legacy_postgres
@@ -38,33 +47,33 @@ enum BindingStatus {
 }
 
 model Board {
-  id          String    @id @default(uuid())
-  slug        String    @unique
+  id          String   @id @default(uuid())
+  slug        String   @unique
   name        String
   description String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   threads     Thread[]
 
   @@map("boards")
 }
 
 model Thread {
-  id               String   @id @default(uuid())
-  boardId          String
-  sourceBoardSlug  String
-  sourceThreadId   String
-  authorUserId     String
-  title            String
-  body             String
-  publishedAt      DateTime
-  lastReplyAt      DateTime?
-  replyCount       Int      @default(0)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  board            Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  author           User      @relation("ThreadAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
-  replies          Reply[]
+  id              String    @id @default(uuid())
+  boardId         String
+  sourceBoardSlug String
+  sourceThreadId  String
+  authorUserId    String
+  title           String
+  body            String
+  publishedAt     DateTime
+  lastReplyAt     DateTime?
+  replyCount      Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  board           Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  author          User      @relation("ThreadAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  replies         Reply[]
 
   @@unique([sourceBoardSlug, sourceThreadId])
   @@index([boardId, lastReplyAt])
@@ -106,8 +115,8 @@ model User {
   authoredReplies Reply[]          @relation("ReplyAuthor")
   humanProfile    HumanProfile?
   botProfile      BotProfile?
-  bindingsAsHuman UserBotBinding[]  @relation("BindingHuman")
-  bindingsAsBot   UserBotBinding[]  @relation("BindingBot")
+  bindingsAsHuman UserBotBinding[] @relation("BindingHuman")
+  bindingsAsBot   UserBotBinding[] @relation("BindingBot")
 
   @@index([username])
   @@map("users")
@@ -143,14 +152,14 @@ model BotProfile {
 }
 
 model UserBotBinding {
-  id            String       @id @default(uuid())
+  id            String        @id @default(uuid())
   humanUserId   String
   botUserId     String
   bindingStatus BindingStatus
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  humanUser     User         @relation("BindingHuman", fields: [humanUserId], references: [id], onDelete: Cascade)
-  botUser       User         @relation("BindingBot", fields: [botUserId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  humanUser     User          @relation("BindingHuman", fields: [humanUserId], references: [id], onDelete: Cascade)
+  botUser       User          @relation("BindingBot", fields: [botUserId], references: [id], onDelete: Cascade)
 
   @@unique([humanUserId, botUserId])
   @@index([botUserId])
@@ -158,21 +167,46 @@ model UserBotBinding {
 }
 
 model Import {
-  id              String            @id @default(uuid())
+  id              String           @id @default(uuid())
   sourceType      ImportSourceType
   sourceLabel     String
   status          ImportStatus
   startedAt       DateTime
   finishedAt      DateTime?
-  importedThreads Int               @default(0)
-  importedReplies Int               @default(0)
-  skippedReplies  Int               @default(0)
+  importedThreads Int              @default(0)
+  importedReplies Int              @default(0)
+  skippedReplies  Int              @default(0)
   errorMessage    String?
   metadataJson    Json?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@index([sourceType, sourceLabel])
   @@index([status, startedAt])
   @@map("imports")
+}
+
+model ImportJob {
+  id               String           @id @default(uuid())
+  jobType          String
+  sourceType       ImportSourceType
+  sourceLabel      String
+  status           ImportJobStatus  @default(pending)
+  cursorThreadKey  String?
+  lastProcessedAt  DateTime?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  processedThreads Int              @default(0)
+  processedReplies Int              @default(0)
+  skippedThreads   Int              @default(0)
+  skippedReplies   Int              @default(0)
+  errorMessage     String?
+  progressNote     String?
+  metadataJson     Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([sourceType, sourceLabel])
+  @@index([status, startedAt])
+  @@map("import_jobs")
 }
