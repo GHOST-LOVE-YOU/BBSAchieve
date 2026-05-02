@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { prisma } from "@/src/server/db/client";
+import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function AdminImportsPage() {
     orderBy: { createdAt: "desc" },
     take: 10,
   });
+  const recentActivity = await listRecentImportActivity(prisma);
 
   return (
     <main className="min-h-screen p-8">
@@ -41,6 +43,28 @@ export default async function AdminImportsPage() {
           </form>
         </div>
       </div>
+
+      <section className="mt-8 space-y-4">
+        <h2 className="text-lg font-medium">最近导入活动</h2>
+        {recentActivity.length === 0 ? (
+          <p className="text-sm text-zinc-500">暂无最近导入活动。</p>
+        ) : (
+          <div className="grid gap-3">
+            {recentActivity.slice(0, 6).map((item) => (
+              <article key={item.id} className="rounded-xl border border-zinc-200 p-4">
+                <p className="text-sm font-medium">
+                  {item.title} · {item.kind === "import" ? "导入" : "任务"}
+                </p>
+                <p className="mt-1 text-sm text-zinc-500">状态：{item.status}</p>
+                <p className="mt-1 text-sm text-zinc-500">时间：{item.happenedAt}</p>
+                {item.detail ? (
+                  <p className="mt-1 text-sm text-zinc-500">{item.detail}</p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="mt-8 space-y-4">
         <h2 className="text-lg font-medium">最近导入记录</h2>
