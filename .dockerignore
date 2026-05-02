@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/.turbo
+**/.cache
+**/.DS_Store
+.git
+.github
+.vscode
+.idea
+docs
+*.log
+Dockerfile
