@@ -2,6 +2,7 @@ export interface ReplyRecord {
   id: string;
   threadId: string;
   authorUserId: string;
+  replyIndex?: number;
   body: string;
   publishedAt: string;
 }

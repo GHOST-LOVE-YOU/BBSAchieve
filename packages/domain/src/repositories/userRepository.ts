@@ -5,6 +5,8 @@ export interface UserRecord {
   userType: "human" | "bot";
   status: "active" | "disabled";
   mailboxKey?: string;
+  sourceLabel?: string;
+  canPost?: boolean;
 }
 
 export interface UserRepository {
