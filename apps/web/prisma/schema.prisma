@@ -13,19 +13,32 @@ enum UserType {
 }
 
 enum ImportStatus {
-  pending
   running
   succeeded
   failed
+  partial
+  pending
 }
 
 enum ImportSourceType {
-  byr
-  manual
+  byr_sync_api
+  legacy_postgres
+}
+
+enum ProfileStatus {
+  pending
+  active
+  disabled
+}
+
+enum BindingStatus {
+  pending
+  active
+  revoked
 }
 
 model Board {
-  id          String    @id @default(cuid())
+  id          String    @id @default(uuid())
   slug        String    @unique
   name        String
   description String
@@ -37,20 +50,21 @@ model Board {
 }
 
 model Thread {
-  id                 String    @id @default(cuid())
-  boardId            String
-  sourceBoardSlug    String
-  sourceThreadId     String
-  authorUserId       String
-  title              String
-  body               String
-  publishedAt        DateTime
-  lastReplyAt        DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  board              Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  author             User      @relation("ThreadAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
-  replies            Reply[]
+  id               String   @id @default(uuid())
+  boardId          String
+  sourceBoardSlug  String
+  sourceThreadId   String
+  authorUserId     String
+  title            String
+  body             String
+  publishedAt      DateTime
+  lastReplyAt      DateTime?
+  replyCount       Int      @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  board            Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  author           User      @relation("ThreadAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  replies          Reply[]
 
   @@unique([sourceBoardSlug, sourceThreadId])
   @@index([boardId, lastReplyAt])
@@ -60,16 +74,16 @@ model Thread {
 }
 
 model Reply {
-  id           String    @id @default(cuid())
+  id           String   @id @default(uuid())
   threadId     String
   replyIndex   Int
   authorUserId String
   body         String
   publishedAt  DateTime
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  thread       Thread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  author       User      @relation("ReplyAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  thread       Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author       User     @relation("ReplyAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
 
   @@unique([threadId, replyIndex])
   @@index([threadId, publishedAt])
@@ -78,73 +92,85 @@ model Reply {
 }
 
 model User {
-  id                String          @id @default(cuid())
-  username          String
-  displayName       String
-  userType          UserType
-  status            String
-  mailboxKey        String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  authoredThreads   Thread[]        @relation("ThreadAuthor")
-  authoredReplies   Reply[]         @relation("ReplyAuthor")
-  humanProfile      HumanProfile?
-  botProfile        BotProfile?
-  bindingsAsUser    UserBotBinding[] @relation("BindingUser")
-  bindingsAsBot     UserBotBinding[] @relation("BindingBot")
+  id              String           @id @default(uuid())
+  username        String
+  displayName     String
+  avatarUrl       String?
+  bio             String?
+  userType        UserType
+  status          String
+  mailboxKey      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  authoredThreads Thread[]         @relation("ThreadAuthor")
+  authoredReplies Reply[]          @relation("ReplyAuthor")
+  humanProfile    HumanProfile?
+  botProfile      BotProfile?
+  bindingsAsHuman UserBotBinding[]  @relation("BindingHuman")
+  bindingsAsBot   UserBotBinding[]  @relation("BindingBot")
 
   @@index([username])
   @@map("users")
 }
 
 model HumanProfile {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String        @id @default(uuid())
+  userId        String        @unique
+  authProvider  String
+  authSubject   String
+  email         String?
+  profileStatus ProfileStatus
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("human_profiles")
 }
 
 model BotProfile {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String        @id @default(uuid())
+  userId         String        @unique
+  mailboxKey     String?
+  sourceLabel    String
+  canPost        Boolean       @default(false)
+  personaSummary String?
+  profileStatus  ProfileStatus
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("bot_profiles")
 }
 
 model UserBotBinding {
-  id           String   @id @default(cuid())
-  userId       String
-  botUserId    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  user         User     @relation("BindingUser", fields: [userId], references: [id], onDelete: Cascade)
-  bot          User     @relation("BindingBot", fields: [botUserId], references: [id], onDelete: Cascade)
+  id            String       @id @default(uuid())
+  humanUserId   String
+  botUserId     String
+  bindingStatus BindingStatus
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  humanUser     User         @relation("BindingHuman", fields: [humanUserId], references: [id], onDelete: Cascade)
+  botUser       User         @relation("BindingBot", fields: [botUserId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, botUserId])
+  @@unique([humanUserId, botUserId])
   @@index([botUserId])
   @@map("user_bot_bindings")
 }
 
 model Import {
-  id               String          @id @default(cuid())
-  sourceType       ImportSourceType
-  sourceLabel      String
-  status           ImportStatus
-  startedAt        DateTime
-  finishedAt       DateTime?
-  importedThreads  Int             @default(0)
-  importedReplies  Int             @default(0)
-  skippedReplies   Int             @default(0)
-  errorMessage     String?
-  metadataJson     Json?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id              String            @id @default(uuid())
+  sourceType      ImportSourceType
+  sourceLabel     String
+  status          ImportStatus
+  startedAt       DateTime
+  finishedAt      DateTime?
+  importedThreads Int               @default(0)
+  importedReplies Int               @default(0)
+  skippedReplies  Int               @default(0)
+  errorMessage    String?
+  metadataJson    Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([sourceType, sourceLabel])
   @@index([status, startedAt])
