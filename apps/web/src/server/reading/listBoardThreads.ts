@@ -10,7 +10,7 @@ export type ThreadCursor = {
 export type BoardThreadRow = {
   id: string;
   boardSlug: string;
-  title?: string;
+  title: string | null;
   lastReplyAt: string | Date | null;
 };
 
@@ -69,8 +69,14 @@ function getCursorSortKey(input: {
 }
 
 function compareThreadsDesc(a: BoardThreadRow, b: BoardThreadRow): number {
-  const left = getCursorSortKey(a);
-  const right = getCursorSortKey(b);
+  const left = getCursorSortKey({
+    lastReplyAt: a.lastReplyAt,
+    threadId: a.id,
+  });
+  const right = getCursorSortKey({
+    lastReplyAt: b.lastReplyAt,
+    threadId: b.id,
+  });
 
   if (left.lastReplyAtMs !== right.lastReplyAtMs) {
     return right.lastReplyAtMs - left.lastReplyAtMs;
