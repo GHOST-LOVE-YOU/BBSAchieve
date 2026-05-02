@@ -36,26 +36,20 @@ describe("fetchSyncUpdates", () => {
 
     const fetchMock = vi.fn(async () => {
       return Response.json({
-        sourceLabel: "IWhisper updates",
-        boards: [],
-        botUsers: [],
+        board_name: "IWhisper",
         threads: [],
-        replies: [],
       });
     });
     vi.stubGlobal("fetch", fetchMock);
 
     await fetchSyncUpdates();
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "https://sync.example.test/api/sync/updates",
-      {
-        cache: "no-store",
-        method: "GET",
-        headers: {
-          "X-Sync-Token": "secret-token",
-        },
+    expect(fetchMock).toHaveBeenCalledWith("https://sync.example.test/api/sync/updates", {
+      cache: "no-store",
+      method: "GET",
+      headers: {
+        "X-Sync-Token": "secret-token",
       },
-    );
+    });
   });
 });

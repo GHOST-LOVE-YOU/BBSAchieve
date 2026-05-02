@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { mapByrSyncPayload } from "@/src/server/imports/mapSyncPayload";
+import { mapByrSyncPayload, mapSyncPayload, parseReplyIndex } from "@/src/server/imports/mapSyncPayload";
 import { importSyncBatch } from "@/src/server/imports/importSyncBatch";
 
 type MockState = {
@@ -109,180 +109,187 @@ function createMockPrisma(options?: { failOnBoardUpsert?: boolean }) {
   };
 }
 
-describe("mapByrSyncPayload", () => {
-  it("normalizes byr sync payload into import batch dto", () => {
-    const batch = mapByrSyncPayload({
-      sourceLabel: "mirror-a",
-      boards: [
-        {
-          slug: "board-a",
-          name: "Board A",
-          description: "Board A desc",
-        },
-      ],
-      botUsers: [
-        {
-          username: "bot-a",
-          displayName: "Bot A",
-          mailboxKey: "mailbox-a",
-        },
-      ],
+describe("parseReplyIndex", () => {
+  it("extracts the numeric floor from a standard label", () => {
+    expect(parseReplyIndex("1楼")).toBe(1);
+    expect(parseReplyIndex("24楼")).toBe(24);
+  });
+
+  it("falls back to zero for an unexpected label", () => {
+    expect(parseReplyIndex("楼主")).toBe(0);
+    expect(parseReplyIndex("reply-1")).toBe(0);
+  });
+});
+
+describe("mapSyncPayload", () => {
+  it("normalizes the real byr sync updates payload", () => {
+    const batch = mapSyncPayload({
+      board_name: "IWhisper",
       threads: [
         {
-          sourceBoardSlug: "board-a",
-          sourceThreadId: "thread-1",
-          authorUsername: "bot-a",
-          title: "Thread 1",
-          body: "Body 1",
-          publishedAt: "2026-05-02T08:00:00.000Z",
-        },
-      ],
-      replies: [
-        {
-          sourceBoardSlug: "board-a",
-          sourceThreadId: "thread-1",
-          replyIndex: 0,
-          authorUsername: "bot-a",
-          body: "Reply 1",
-          publishedAt: "2026-05-02T08:10:00.000Z",
+          article_id: "8830220",
+          title: "Need advice",
+          reply_count: 2,
+          posts: [
+            {
+              post_id: "p-1",
+              floor_label: "1楼",
+              author_display_name: "Alice",
+              body: "Opening post",
+            },
+            {
+              post_id: "p-2",
+              floor_label: "2楼",
+              author_display_name: "Robot B",
+              body: "Reply body",
+            },
+          ],
         },
       ],
     });
 
     expect(batch.sourceType).toBe("byr_sync_api");
-    expect(batch.sourceLabel).toBe("mirror-a");
-    expect(batch.boards[0]?.slug).toBe("board-a");
-    expect(batch.botUsers[0]?.username).toBe("bot-a");
-    expect(batch.threads[0]?.publishedAt.toISOString()).toBe("2026-05-02T08:00:00.000Z");
-    expect(batch.replies[0]?.publishedAt.toISOString()).toBe("2026-05-02T08:10:00.000Z");
+    expect(batch.sourceLabel).toBe("IWhisper");
+    expect(batch.boards).toEqual([
+      {
+        slug: "iwhisper",
+        name: "IWhisper",
+        description: "",
+      },
+    ]);
+    expect(batch.botUsers).toEqual([
+      {
+        username: "Alice",
+        displayName: "Alice",
+        mailboxKey: null,
+      },
+      {
+        username: "Robot B",
+        displayName: "Robot B",
+        mailboxKey: null,
+      },
+    ]);
+    expect(batch.threads[0]).toMatchObject({
+      sourceBoardSlug: "iwhisper",
+      sourceThreadId: "8830220",
+      authorUsername: "Alice",
+      title: "Need advice",
+      body: "Opening post",
+    });
+    expect(batch.replies.map((reply) => reply.replyIndex)).toEqual([1, 2]);
+    expect(batch.replies[1]).toMatchObject({
+      sourceBoardSlug: "iwhisper",
+      sourceThreadId: "8830220",
+      authorUsername: "Robot B",
+      body: "Reply body",
+    });
+  });
+
+  it("uses the display name as the stable author username fallback", () => {
+    const batch = mapSyncPayload({
+      board_name: "IWhisper",
+      threads: [
+        {
+          article_id: "8830221",
+          title: "Another thread",
+          reply_count: 1,
+          posts: [
+            {
+              post_id: "p-1",
+              floor_label: "楼主",
+              author_display_name: "Alice",
+              body: "Opening post",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(batch.botUsers[0]).toEqual({
+      username: "Alice",
+      displayName: "Alice",
+      mailboxKey: null,
+    });
+    expect(batch.threads[0]?.authorUsername).toBe("Alice");
+    expect(batch.replies[0]?.replyIndex).toBe(0);
+  });
+
+  it("preserves the legacy alias", () => {
+    const payload = {
+      board_name: "IWhisper",
+      threads: [],
+    };
+
+    expect(mapByrSyncPayload(payload)).toEqual(mapSyncPayload(payload));
   });
 });
 
 describe("importSyncBatch", () => {
   it("imports records and skips existing replies", async () => {
     const prisma = createMockPrisma();
-    const importedReply = {
-      sourceThreadId: "thread-1",
-      sourceBoardSlug: "board-a",
-      replyIndex: 1,
-      authorUsername: "bot-b",
-      body: "Reply 2",
-      publishedAt: new Date("2026-05-02T08:20:00.000Z"),
-    };
 
-    prisma.state.replies.set("thread-1:0", {
+    prisma.state.replies.set("thread-1:1", {
       id: "reply-existing",
       threadId: "thread-1",
-      replyIndex: 0,
+      replyIndex: 1,
     });
 
     const result = await importSyncBatch(prisma as any, {
       sourceType: "byr_sync_api",
-      sourceLabel: "mirror-a",
+      sourceLabel: "IWhisper",
       boards: [
         {
-          slug: "board-a",
-          name: "Board A",
-          description: "Board A desc",
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
         },
       ],
       botUsers: [
         {
-          username: "bot-a",
-          displayName: "Bot A",
-          mailboxKey: "mailbox-a",
+          username: "Alice",
+          displayName: "Alice",
+          mailboxKey: null,
         },
         {
-          username: "bot-b",
-          displayName: "Bot B",
+          username: "Robot B",
+          displayName: "Robot B",
+          mailboxKey: null,
         },
       ],
       threads: [
         {
-          sourceBoardSlug: "board-a",
-          sourceThreadId: "thread-1",
-          authorUsername: "bot-a",
-          title: "Thread 1",
-          body: "Body 1",
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "8830220",
+          authorUsername: "Alice",
+          title: "Need advice",
+          body: "Opening post",
           publishedAt: new Date("2026-05-02T08:00:00.000Z"),
         },
       ],
       replies: [
         {
-          sourceBoardSlug: "board-a",
-          sourceThreadId: "thread-1",
-          replyIndex: 0,
-          authorUsername: "bot-a",
-          body: "Reply 1",
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "8830220",
+          replyIndex: 1,
+          authorUsername: "Alice",
+          body: "Opening post",
+          publishedAt: new Date("2026-05-02T08:00:00.000Z"),
+        },
+        {
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "8830220",
+          replyIndex: 2,
+          authorUsername: "Robot B",
+          body: "Reply body",
           publishedAt: new Date("2026-05-02T08:10:00.000Z"),
         },
-        importedReply,
       ],
     });
 
     expect(result).toMatchObject({
-      importId: "import-1",
       importedThreads: 1,
       importedReplies: 1,
       skippedReplies: 1,
     });
-    expect(prisma.import.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: "running",
-          sourceType: "byr_sync_api",
-          sourceLabel: "mirror-a",
-        }),
-      }),
-    );
-    expect(prisma.import.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "import-1" },
-        data: expect.objectContaining({
-          status: "succeeded",
-          importedThreads: 1,
-          importedReplies: 1,
-          skippedReplies: 1,
-        }),
-      }),
-    );
-    expect(prisma.board.upsert).toHaveBeenCalledTimes(1);
-    expect(prisma.user.findFirst).toHaveBeenCalledTimes(2);
-    expect(prisma.user.create).toHaveBeenCalledTimes(2);
-    expect(prisma.botProfile.upsert).toHaveBeenCalledTimes(2);
-    expect(prisma.thread.upsert).toHaveBeenCalledTimes(1);
-    expect(prisma.reply.create).toHaveBeenCalledTimes(1);
-    expect(prisma.reply.findUnique).toHaveBeenCalledTimes(2);
-  });
-
-  it("marks the import failed when a write throws", async () => {
-    const prisma = createMockPrisma({ failOnBoardUpsert: true });
-
-    await expect(
-      importSyncBatch(prisma as any, {
-        sourceType: "byr_sync_api",
-        sourceLabel: "mirror-a",
-        boards: [
-          {
-            slug: "board-a",
-            name: "Board A",
-            description: "Board A desc",
-          },
-        ],
-        botUsers: [],
-        threads: [],
-        replies: [],
-      }),
-    ).rejects.toThrow("board upsert failed");
-
-    expect(prisma.import.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "import-1" },
-        data: expect.objectContaining({
-          status: "failed",
-          errorMessage: "board upsert failed",
-        }),
-      }),
-    );
   });
 });

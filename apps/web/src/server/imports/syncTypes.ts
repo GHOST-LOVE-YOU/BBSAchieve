@@ -39,41 +39,23 @@ export type NormalizedImportBatch = {
   replies: SyncReplyDTO[];
 };
 
-export type ByrSyncBoardPayload = {
-  slug: string;
-  name: string;
-  description: string;
-};
-
-export type ByrSyncBotUserPayload = {
-  username: string;
-  displayName: string;
-  mailboxKey?: string | null;
+export type ByrSyncPostPayload = {
+  post_id: string;
+  floor_label: string;
+  author_display_name: string;
+  body: string;
 };
 
 export type ByrSyncThreadPayload = {
-  sourceBoardSlug: string;
-  sourceThreadId: string;
-  authorUsername: string;
+  article_id: string;
   title: string;
-  body: string;
-  publishedAt: string;
+  reply_count: number;
+  posts: ByrSyncPostPayload[];
 };
 
-export type ByrSyncReplyPayload = {
-  sourceBoardSlug: string;
-  sourceThreadId: string;
-  replyIndex: number;
-  authorUsername: string;
-  body: string;
-  publishedAt: string;
-};
-
-export type ByrSyncPayload = {
-  sourceLabel: string;
-  boards: ByrSyncBoardPayload[];
-  botUsers: ByrSyncBotUserPayload[];
+export type ByrSyncUpdatesPayload = {
+  board_name: string;
   threads: ByrSyncThreadPayload[];
-  replies: ByrSyncReplyPayload[];
 };
 
+export type ByrSyncPayload = ByrSyncUpdatesPayload;

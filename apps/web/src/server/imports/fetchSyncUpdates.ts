@@ -1,11 +1,11 @@
-import type { ByrSyncPayload } from "./syncTypes";
+import type { ByrSyncUpdatesPayload } from "./syncTypes";
 
 function getRequiredEnv(name: string): string | null {
   const value = process.env[name];
   return value && value.trim().length > 0 ? value : null;
 }
 
-export async function fetchSyncUpdates(): Promise<ByrSyncPayload> {
+export async function fetchSyncUpdates(): Promise<ByrSyncUpdatesPayload> {
   const baseUrl = getRequiredEnv("BYR_SYNC_API_BASE_URL");
   const token = getRequiredEnv("BYR_SYNC_API_TOKEN");
 
@@ -25,5 +25,5 @@ export async function fetchSyncUpdates(): Promise<ByrSyncPayload> {
     throw new Error(`Sync API request failed: ${response.status}`);
   }
 
-  return (await response.json()) as ByrSyncPayload;
+  return (await response.json()) as ByrSyncUpdatesPayload;
 }

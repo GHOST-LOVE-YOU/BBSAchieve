@@ -28,16 +28,19 @@ import { POST } from "../app/admin/api/imports/byr-sync/route";
 describe("admin byr sync route", () => {
   it("imports updates and returns json", async () => {
     routeMocks.fetchSyncUpdates.mockResolvedValue({
-      sourceLabel: "IWhisper updates",
-      boards: [],
-      botUsers: [],
+      board_name: "IWhisper",
       threads: [],
-      replies: [],
     });
     routeMocks.mapSyncPayload.mockReturnValue({
       sourceType: "byr_sync_api",
-      sourceLabel: "IWhisper updates",
-      boards: [],
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
       botUsers: [],
       threads: [],
       replies: [],
@@ -53,16 +56,19 @@ describe("admin byr sync route", () => {
 
     expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledTimes(1);
     expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
-      sourceLabel: "IWhisper updates",
-      boards: [],
-      botUsers: [],
+      board_name: "IWhisper",
       threads: [],
-      replies: [],
     });
     expect(routeMocks.importSyncBatch).toHaveBeenCalledWith(routeMocks.prisma, {
       sourceType: "byr_sync_api",
-      sourceLabel: "IWhisper updates",
-      boards: [],
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
       botUsers: [],
       threads: [],
       replies: [],
@@ -82,16 +88,19 @@ describe("admin byr sync route", () => {
 
   it("returns a 500 json response when the import fails", async () => {
     routeMocks.fetchSyncUpdates.mockResolvedValue({
-      sourceLabel: "IWhisper updates",
-      boards: [],
-      botUsers: [],
+      board_name: "IWhisper",
       threads: [],
-      replies: [],
     });
     routeMocks.mapSyncPayload.mockReturnValue({
       sourceType: "byr_sync_api",
-      sourceLabel: "IWhisper updates",
-      boards: [],
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
       botUsers: [],
       threads: [],
       replies: [],
