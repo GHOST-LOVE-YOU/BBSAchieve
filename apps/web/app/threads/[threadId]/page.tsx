@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { getThreadDetail } from "@bbs/state";
-import { createReadingFlowDeps } from "@bbs/state/runtime";
+import { createPrismaReadingFlowDeps } from "@bbs/state/runtime";
+
+import { createReadingRepository } from "@/src/server/reading/readingRepository";
 
 export default async function ThreadPage({
   params,
@@ -9,7 +11,10 @@ export default async function ThreadPage({
   params: Promise<{ threadId: string }>;
 }) {
   const { threadId } = await params;
-  const result = await getThreadDetail(threadId, createReadingFlowDeps());
+  const result = await getThreadDetail(
+    threadId,
+    createPrismaReadingFlowDeps(createReadingRepository()),
+  );
 
   if (result.status === "notFound") {
     notFound();

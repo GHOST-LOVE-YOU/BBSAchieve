@@ -1,10 +1,14 @@
 import Link from "next/link";
 
 import { getBoardSummaries } from "@bbs/state";
-import { createReadingFlowDeps } from "@bbs/state/runtime";
+import { createPrismaReadingFlowDeps } from "@bbs/state/runtime";
+
+import { createReadingRepository } from "@/src/server/reading/readingRepository";
 
 export default async function HomePage() {
-  const result = await getBoardSummaries(createReadingFlowDeps());
+  const result = await getBoardSummaries(
+    createPrismaReadingFlowDeps(createReadingRepository()),
+  );
 
   if (result.status !== "success") {
     return (

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getBoardDetail } from "@bbs/state";
-import { createReadingFlowDeps } from "@bbs/state/runtime";
+import { createPrismaReadingFlowDeps } from "@bbs/state/runtime";
+
+import { createReadingRepository } from "@/src/server/reading/readingRepository";
 
 export default async function BoardPage({
   params,
@@ -10,7 +12,10 @@ export default async function BoardPage({
   params: Promise<{ boardId: string }>;
 }) {
   const { boardId } = await params;
-  const result = await getBoardDetail(boardId, createReadingFlowDeps());
+  const result = await getBoardDetail(
+    boardId,
+    createPrismaReadingFlowDeps(createReadingRepository()),
+  );
 
   if (result.status === "notFound") {
     notFound();
