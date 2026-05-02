@@ -165,6 +165,66 @@ def test_list_updates_normalizes_missing_reply_count_to_zero() -> None:
     assert cache.get_thread_progress(board_name="test_board", article_id="123").reply_count == 0
 
 
+def test_list_updates_fetches_first_page_for_new_zero_reply_thread() -> None:
+    thread = FakeThread(article_id="123", title="Only opening post", reply_count=0)
+    thread_page = FakeThreadPage(
+        posts=[
+            FakeThreadPost(
+                post_id="123",
+                floor_label="楼主",
+                author_display_name="alice",
+                body="opening post",
+            )
+        ]
+    )
+    board_service = FakeBoardService([thread])
+    thread_service = FakeThreadService(thread_page=thread_page)
+    cache = InMemorySyncCache()
+    service = SyncService(
+        board_service=board_service,
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    result = service.list_updates(board_name="test_board", limit=1)
+
+    assert [post.post_id for post in result.threads[0].posts] == ["123"]
+    assert thread_service.calls == [("test_board", "123", 1)]
+
+
+def test_list_updates_refetches_zero_reply_thread_when_cached_posts_are_empty() -> None:
+    thread = FakeThread(article_id="123", title="Only opening post", reply_count=0)
+    thread_page = FakeThreadPage(
+        posts=[
+            FakeThreadPost(
+                post_id="123",
+                floor_label="楼主",
+                author_display_name="alice",
+                body="opening post",
+            )
+        ]
+    )
+    board_service = FakeBoardService([thread])
+    thread_service = FakeThreadService(thread_page=thread_page)
+    cache = InMemorySyncCache()
+    cache.save_thread_progress(
+        board_name="test_board",
+        article_id="123",
+        reply_count=0,
+        recent_post_ids=[],
+    )
+    service = SyncService(
+        board_service=board_service,
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    result = service.list_updates(board_name="test_board", limit=1)
+
+    assert [post.post_id for post in result.threads[0].posts] == ["123"]
+    assert thread_service.calls == [("test_board", "123", 1)]
+
+
 def test_list_updates_includes_new_posts_after_cached_reply_count() -> None:
     thread = FakeThread(article_id="123", title="First thread", reply_count=24)
     thread_page = FakeThreadPage(

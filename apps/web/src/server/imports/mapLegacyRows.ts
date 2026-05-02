@@ -56,6 +56,10 @@ function mapBotUsers(threadAuthors: string[], replyAuthors: string[]): SyncBotUs
   return botUsers;
 }
 
+function isNonEmptyString(value: string | null): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
 function mapThread(
   post: LegacyPostRow,
   comments: LegacyCommentRow[],
@@ -70,6 +74,7 @@ function mapThread(
     title: post.topic,
     body: getThreadBody(comments),
     publishedAt: post.createdAt,
+    replyCount: comments.length > 0 ? comments.length - 1 : 0,
   };
 }
 
@@ -105,7 +110,7 @@ export function mapLegacyRows(rows: LegacyImportRows): NormalizedImportBatch {
   });
 
   const botUsers = mapBotUsers(
-    threads.map((thread) => thread.authorUsername),
+    threads.map((thread) => thread.authorUsername).filter(isNonEmptyString),
     replies.map((reply) => reply.authorUsername),
   ).filter((botUser) => botUser.username.length > 0);
 

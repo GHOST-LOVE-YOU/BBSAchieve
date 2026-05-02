@@ -15,10 +15,11 @@ export type SyncBotUserDTO = {
 export type SyncThreadDTO = {
   sourceBoardSlug: string;
   sourceThreadId: string;
-  authorUsername: string;
+  authorUsername: string | null;
   title: string;
-  body: string;
-  publishedAt: Date;
+  body: string | null;
+  publishedAt: Date | null;
+  replyCount: number;
 };
 
 export type SyncReplyDTO = {
@@ -56,6 +57,12 @@ export type ByrSyncThreadPayload = {
 export type ByrSyncUpdatesPayload = {
   board_name: string;
   threads: ByrSyncThreadPayload[];
+};
+
+export type ByrSyncBackfillPayload = {
+  article_id: string;
+  start_floor: number;
+  posts: ByrSyncPostPayload[];
 };
 
 export type ByrSyncPayload = ByrSyncUpdatesPayload;

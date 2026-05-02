@@ -14,7 +14,7 @@ export type ImportSyncPrisma = {
   board: Pick<BoardDelegate, "upsert">;
   user: Pick<UserDelegate, "findFirst" | "create" | "update">;
   botProfile: Pick<BotProfileDelegate, "upsert">;
-  thread: Pick<ThreadDelegate, "upsert">;
+  thread: Pick<ThreadDelegate, "findUnique" | "upsert">;
   reply: Pick<ReplyDelegate, "findUnique" | "create">;
 };
 
@@ -29,6 +29,15 @@ type SyncAuthor = {
   username: string;
   displayName?: string;
   mailboxKey?: string | null;
+};
+
+type ExistingThreadRecord = {
+  id: string;
+  authorUserId: string;
+  body: string;
+  publishedAt: Date;
+  replyCount: number;
+  lastReplyAt: Date | null;
 };
 
 async function ensureBotUser(
@@ -75,6 +84,27 @@ async function ensureBotUser(
   });
 
   return user;
+}
+
+function resolveThreadAuthorId(
+  thread: NormalizedImportBatch["threads"][number],
+  existingThread: ExistingThreadRecord | null,
+  botUserRecords: Map<string, { id: string }>,
+): string {
+  if (thread.authorUsername) {
+    const author = botUserRecords.get(thread.authorUsername);
+    if (!author) {
+      throw new Error(`missing author ${thread.authorUsername}`);
+    }
+
+    return author.id;
+  }
+
+  if (existingThread) {
+    return existingThread.authorUserId;
+  }
+
+  throw new Error(`missing author for thread ${thread.sourceBoardSlug}:${thread.sourceThreadId}`);
 }
 
 export async function importSyncBatch(
@@ -125,6 +155,9 @@ export async function importSyncBatch(
 
     const referencedAuthors = new Map<string, SyncAuthor>();
     for (const thread of batch.threads) {
+      if (!thread.authorUsername) {
+        continue;
+      }
       referencedAuthors.set(thread.authorUsername, {
         username: thread.authorUsername,
         displayName: botUsersByUsername.get(thread.authorUsername)?.displayName,
@@ -153,16 +186,22 @@ export async function importSyncBatch(
 
     const threadRecords = new Map<string, { id: string }>();
     for (const thread of batch.threads) {
-      const author = botUserRecords.get(thread.authorUsername);
-      if (!author) {
-        throw new Error(`missing author ${thread.authorUsername}`);
-      }
-
       const threadReplies = batch.replies.filter(
         (reply) =>
           reply.sourceBoardSlug === thread.sourceBoardSlug &&
           reply.sourceThreadId === thread.sourceThreadId,
       );
+      const existingThread = (await prisma.thread.findUnique({
+        where: {
+          sourceBoardSlug_sourceThreadId: {
+            sourceBoardSlug: thread.sourceBoardSlug,
+            sourceThreadId: thread.sourceThreadId,
+          },
+        },
+      })) as ExistingThreadRecord | null;
+      const authorUserId = resolveThreadAuthorId(thread, existingThread, botUserRecords);
+      const persistedReplyCount = existingThread?.replyCount ?? 0;
+      const nextReplyCount = Math.max(persistedReplyCount, thread.replyCount, threadReplies.length);
       const lastReplyAt =
         threadReplies.length > 0
           ? new Date(
@@ -170,7 +209,9 @@ export async function importSyncBatch(
                 ...threadReplies.map((reply) => reply.publishedAt.getTime()),
               ),
             )
-          : null;
+          : existingThread?.lastReplyAt ?? null;
+      const body = thread.body ?? existingThread?.body ?? "";
+      const publishedAt = thread.publishedAt ?? existingThread?.publishedAt ?? new Date();
 
       const record = await prisma.thread.upsert({
         where: {
@@ -195,20 +236,20 @@ export async function importSyncBatch(
             ).id,
           sourceBoardSlug: thread.sourceBoardSlug,
           sourceThreadId: thread.sourceThreadId,
-          authorUserId: author.id,
+          authorUserId,
           title: thread.title,
-          body: thread.body,
-          publishedAt: thread.publishedAt,
+          body,
+          publishedAt,
           lastReplyAt,
-          replyCount: threadReplies.length,
+          replyCount: nextReplyCount,
         },
         update: {
-          authorUserId: author.id,
+          authorUserId,
           title: thread.title,
-          body: thread.body,
-          publishedAt: thread.publishedAt,
+          body,
+          publishedAt,
           lastReplyAt,
-          replyCount: threadReplies.length,
+          replyCount: nextReplyCount,
         },
       });
       threadRecords.set(`${thread.sourceBoardSlug}:${thread.sourceThreadId}`, {

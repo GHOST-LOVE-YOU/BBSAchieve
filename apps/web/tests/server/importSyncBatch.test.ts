@@ -86,6 +86,10 @@ function createMockPrisma(options?: { failOnBoardUpsert?: boolean }) {
       }),
     },
     thread: {
+      findUnique: vi.fn(async ({ where }: any) => {
+        const key = `${where.sourceBoardSlug_sourceThreadId.sourceBoardSlug}:${where.sourceBoardSlug_sourceThreadId.sourceThreadId}`;
+        return state.threads.get(key) ?? null;
+      }),
       upsert: vi.fn(async ({ where, create, update }: any) => {
         const key = `${where.sourceBoardSlug_sourceThreadId.sourceBoardSlug}:${where.sourceBoardSlug_sourceThreadId.sourceThreadId}`;
         const existing = state.threads.get(key);
@@ -113,9 +117,11 @@ describe("parseReplyIndex", () => {
   it("extracts the numeric floor from a standard label", () => {
     expect(parseReplyIndex("1楼")).toBe(1);
     expect(parseReplyIndex("24楼")).toBe(24);
+    expect(parseReplyIndex("第9楼")).toBe(9);
+    expect(parseReplyIndex("第10楼")).toBe(10);
   });
 
-  it("falls back to zero for an unexpected label", () => {
+  it("treats the original post as floor zero and falls back for unexpected labels", () => {
     expect(parseReplyIndex("楼主")).toBe(0);
     expect(parseReplyIndex("reply-1")).toBe(0);
   });
@@ -129,17 +135,17 @@ describe("mapSyncPayload", () => {
         {
           article_id: "8830220",
           title: "Need advice",
-          reply_count: 2,
+          reply_count: 1,
           posts: [
             {
-              post_id: "p-1",
-              floor_label: "1楼",
+              post_id: "8830220",
+              floor_label: "楼主",
               author_display_name: "Alice",
               body: "Opening post",
             },
             {
               post_id: "p-2",
-              floor_label: "2楼",
+              floor_label: "第1楼",
               author_display_name: "Robot B",
               body: "Reply body",
             },
@@ -175,9 +181,10 @@ describe("mapSyncPayload", () => {
       authorUsername: "Alice",
       title: "Need advice",
       body: "Opening post",
+      replyCount: 1,
     });
-    expect(batch.replies.map((reply) => reply.replyIndex)).toEqual([1, 2]);
-    expect(batch.replies[1]).toMatchObject({
+    expect(batch.replies.map((reply) => reply.replyIndex)).toEqual([1]);
+    expect(batch.replies[0]).toMatchObject({
       sourceBoardSlug: "iwhisper",
       sourceThreadId: "8830220",
       authorUsername: "Robot B",
@@ -211,7 +218,49 @@ describe("mapSyncPayload", () => {
       mailboxKey: null,
     });
     expect(batch.threads[0]?.authorUsername).toBe("Alice");
-    expect(batch.replies[0]?.replyIndex).toBe(0);
+    expect(batch.threads[0]?.body).toBe("Opening post");
+    expect(batch.threads[0]?.replyCount).toBe(1);
+    expect(batch.replies).toEqual([]);
+  });
+
+  it("maps real byr floor labels into original post plus replies", () => {
+    const batch = mapSyncPayload({
+      board_name: "IWhisper",
+      threads: [
+        {
+          article_id: "8830222",
+          title: "Real floor labels",
+          reply_count: 28,
+          posts: [
+            {
+              post_id: "8830222",
+              floor_label: "楼主",
+              author_display_name: "IWhisper#796",
+              body: "Opening body",
+            },
+            {
+              post_id: "8831211",
+              floor_label: "第9楼",
+              author_display_name: "IWhisper#897",
+              body: "Reply body",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(batch.threads[0]).toMatchObject({
+      authorUsername: "IWhisper#796",
+      body: "Opening body",
+      replyCount: 28,
+    });
+    expect(batch.replies).toEqual([
+      expect.objectContaining({
+        replyIndex: 9,
+        authorUsername: "IWhisper#897",
+        body: "Reply body",
+      }),
+    ]);
   });
 
   it("preserves the legacy alias", () => {
@@ -264,6 +313,7 @@ describe("importSyncBatch", () => {
           title: "Need advice",
           body: "Opening post",
           publishedAt: new Date("2026-05-02T08:00:00.000Z"),
+          replyCount: 1,
         },
       ],
       replies: [
@@ -290,6 +340,82 @@ describe("importSyncBatch", () => {
       importedThreads: 1,
       importedReplies: 1,
       skippedReplies: 1,
+    });
+  });
+
+  it("does not overwrite an existing thread body with a body-less incremental sync payload", async () => {
+    const prisma = createMockPrisma();
+
+    prisma.state.threads.set("iwhisper:8830220", {
+      id: "thread-1",
+      boardId: "board-1",
+      sourceBoardSlug: "iwhisper",
+      sourceThreadId: "8830220",
+      authorUserId: "user-1",
+      title: "Need advice",
+      body: "Opening post",
+      publishedAt: new Date("2026-05-02T08:00:00.000Z"),
+      lastReplyAt: null,
+      replyCount: 0,
+    });
+    prisma.state.users.set("Alice", {
+      id: "user-1",
+      username: "Alice",
+      displayName: "Alice",
+      userType: "bot",
+      status: "active",
+      mailboxKey: null,
+    });
+
+    const result = await importSyncBatch(prisma as any, {
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [
+        {
+          username: "Robot B",
+          displayName: "Robot B",
+          mailboxKey: null,
+        },
+      ],
+      threads: [
+        {
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "8830220",
+          authorUsername: null,
+          title: "Need advice",
+          body: null,
+          publishedAt: null,
+          replyCount: 1,
+        },
+      ],
+      replies: [
+        {
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "8830220",
+          replyIndex: 1,
+          authorUsername: "Robot B",
+          body: "Reply body",
+          publishedAt: new Date("2026-05-02T08:10:00.000Z"),
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      importedThreads: 1,
+      importedReplies: 1,
+      skippedReplies: 0,
+    });
+    expect(prisma.state.threads.get("iwhisper:8830220")).toMatchObject({
+      authorUserId: "user-1",
+      body: "Opening post",
+      replyCount: 1,
     });
   });
 });

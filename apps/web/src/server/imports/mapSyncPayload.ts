@@ -9,6 +9,27 @@ import type {
 const DEFAULT_BOARD_SLUG = "iwhisper";
 const DEFAULT_BOARD_NAME = "IWhisper";
 
+function isOriginalPostFloor(floorLabel: string): boolean {
+  const normalized = floorLabel.trim();
+  return normalized === "楼主" || normalized === "0楼";
+}
+
+function getNamedFloorIndex(floorLabel: string): number | null {
+  const normalized = floorLabel.trim();
+
+  if (normalized === "沙发") {
+    return 1;
+  }
+  if (normalized === "板凳") {
+    return 2;
+  }
+  if (normalized === "地板") {
+    return 3;
+  }
+
+  return null;
+}
+
 function normalizeBoardName(boardName: string): { slug: string; name: string } {
   const trimmed = boardName.trim();
   return {
@@ -18,7 +39,18 @@ function normalizeBoardName(boardName: string): { slug: string; name: string } {
 }
 
 function parseReplyIndex(floorLabel: string): number {
-  const match = floorLabel.trim().match(/^(\d+)\s*楼$/);
+  const normalized = floorLabel.trim();
+
+  if (isOriginalPostFloor(normalized)) {
+    return 0;
+  }
+
+  const namedFloorIndex = getNamedFloorIndex(normalized);
+  if (namedFloorIndex !== null) {
+    return namedFloorIndex;
+  }
+
+  const match = normalized.match(/^(?:第)?(\d+)\s*楼$/);
   if (match) {
     return Number.parseInt(match[1] ?? "0", 10);
   }
@@ -45,14 +77,16 @@ function mapThread(
   boardSlug: string,
   thread: ByrSyncPayload["threads"][number],
 ): SyncThreadDTO {
+  const originalPost = thread.posts.find((post) => isOriginalPostFloor(post.floor_label));
+
   return {
     sourceBoardSlug: boardSlug,
     sourceThreadId: thread.article_id,
-    authorUsername:
-      thread.posts[0]?.author_display_name ?? `thread:${thread.article_id}`,
+    authorUsername: originalPost?.author_display_name ?? null,
     title: thread.title,
-    body: thread.posts[0]?.body ?? "",
-    publishedAt: new Date(),
+    body: originalPost?.body ?? null,
+    publishedAt: null,
+    replyCount: thread.reply_count,
   };
 }
 
@@ -90,7 +124,9 @@ export function mapSyncPayload(payload: ByrSyncPayload): NormalizedImportBatch {
     botUsers: collectBotUsers(payload),
     threads: payload.threads.map((thread) => mapThread(board.slug, thread)),
     replies: payload.threads.flatMap((thread) =>
-      thread.posts.map((post) => mapThreadReply(board.slug, thread.article_id, post)),
+      thread.posts
+        .filter((post) => !isOriginalPostFloor(post.floor_label))
+        .map((post) => mapThreadReply(board.slug, thread.article_id, post)),
     ),
   };
 }

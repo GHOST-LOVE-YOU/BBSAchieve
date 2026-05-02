@@ -36,6 +36,7 @@ class ThreadPostLike(Protocol):
 
 class ThreadProgressLike(Protocol):
     reply_count: int
+    recent_post_ids: list[str]
 
 
 class BoardServiceLike(Protocol):
@@ -94,8 +95,16 @@ class SyncService:
             )
             cached_reply_count = cached.reply_count if cached else 0
             posts: list[SyncPost] = []
-            if self.thread_service is not None and reply_count > cached_reply_count:
-                page = max(1, ((cached_reply_count + 1) // 10) + 1)
+            should_fetch_thread_page = (
+                self.thread_service is not None
+                and (
+                    reply_count > cached_reply_count
+                    or (cached is None and reply_count == 0)
+                    or (cached is not None and reply_count == 0 and not cached.recent_post_ids)
+                )
+            )
+            if should_fetch_thread_page:
+                page = 1 if cached is None else max(1, ((cached_reply_count + 1) // 10) + 1)
                 thread_page = self.thread_service.fetch_page(
                     board_name=board_name,
                     article_id=thread.article_id,
