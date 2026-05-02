@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { mapByrSyncPayload, mapSyncPayload, parseReplyIndex } from "@/src/server/imports/mapSyncPayload";
+import {
+  mapByrSyncPayload,
+  mapSyncPayload,
+  parseByrPostedAt,
+  parseReplyIndex,
+} from "@/src/server/imports/mapSyncPayload";
 import { importSyncBatch } from "@/src/server/imports/importSyncBatch";
 
 type MockState = {
@@ -127,6 +132,18 @@ describe("parseReplyIndex", () => {
   });
 });
 
+describe("parseByrPostedAt", () => {
+  it("parses byr posted timestamps into real dates", () => {
+    expect(parseByrPostedAt("Sat Apr 25 18:07:24 2026")?.toISOString()).toBe(
+      "2026-04-25T10:07:24.000Z",
+    );
+  });
+
+  it("returns null for blank values", () => {
+    expect(parseByrPostedAt("")).toBeNull();
+  });
+});
+
 describe("mapSyncPayload", () => {
   it("normalizes the real byr sync updates payload", () => {
     const batch = mapSyncPayload({
@@ -141,12 +158,14 @@ describe("mapSyncPayload", () => {
               post_id: "8830220",
               floor_label: "楼主",
               author_display_name: "Alice",
+              posted_at: "Sat Apr 25 18:07:24 2026",
               body: "Opening post",
             },
             {
               post_id: "p-2",
               floor_label: "第1楼",
               author_display_name: "Robot B",
+              posted_at: "Sat Apr 25 18:10:00 2026",
               body: "Reply body",
             },
           ],
@@ -181,6 +200,7 @@ describe("mapSyncPayload", () => {
       authorUsername: "Alice",
       title: "Need advice",
       body: "Opening post",
+      publishedAt: new Date("2026-04-25T10:07:24.000Z"),
       replyCount: 1,
     });
     expect(batch.replies.map((reply) => reply.replyIndex)).toEqual([1]);
@@ -189,6 +209,7 @@ describe("mapSyncPayload", () => {
       sourceThreadId: "8830220",
       authorUsername: "Robot B",
       body: "Reply body",
+      publishedAt: new Date("2026-04-25T10:10:00.000Z"),
     });
   });
 
@@ -205,6 +226,7 @@ describe("mapSyncPayload", () => {
               post_id: "p-1",
               floor_label: "楼主",
               author_display_name: "Alice",
+              posted_at: "Sat Apr 25 18:07:24 2026",
               body: "Opening post",
             },
           ],
@@ -236,12 +258,14 @@ describe("mapSyncPayload", () => {
               post_id: "8830222",
               floor_label: "楼主",
               author_display_name: "IWhisper#796",
+              posted_at: "Sat Apr 25 18:07:24 2026",
               body: "Opening body",
             },
             {
               post_id: "8831211",
               floor_label: "第9楼",
               author_display_name: "IWhisper#897",
+              posted_at: "Sun Apr 26 13:25:36 2026",
               body: "Reply body",
             },
           ],
@@ -416,6 +440,66 @@ describe("importSyncBatch", () => {
       authorUserId: "user-1",
       body: "Opening post",
       replyCount: 1,
+    });
+  });
+
+  it("corrects an existing thread timestamp when the original post time is earlier", async () => {
+    const prisma = createMockPrisma();
+
+    prisma.state.threads.set("iwhisper:8830220", {
+      id: "thread-1",
+      boardId: "board-1",
+      sourceBoardSlug: "iwhisper",
+      sourceThreadId: "8830220",
+      authorUserId: "user-1",
+      title: "Need advice",
+      body: "Opening post",
+      publishedAt: new Date("2026-05-02T08:00:00.000Z"),
+      lastReplyAt: null,
+      replyCount: 0,
+    });
+    prisma.state.users.set("Alice", {
+      id: "user-1",
+      username: "Alice",
+      displayName: "Alice",
+      userType: "bot",
+      status: "active",
+      mailboxKey: null,
+    });
+
+    await importSyncBatch(prisma as any, {
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [
+        {
+          username: "Alice",
+          displayName: "Alice",
+          mailboxKey: null,
+        },
+      ],
+      threads: [
+        {
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "8830220",
+          authorUsername: "Alice",
+          title: "Need advice",
+          body: "Opening post",
+          publishedAt: new Date("2026-04-25T10:07:24.000Z"),
+          replyCount: 0,
+        },
+      ],
+      replies: [],
+    });
+
+    expect(prisma.state.threads.get("iwhisper:8830220")).toMatchObject({
+      publishedAt: new Date("2026-04-25T10:07:24.000Z"),
     });
   });
 });

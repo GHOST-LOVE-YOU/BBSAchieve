@@ -44,6 +44,7 @@ export type ByrSyncPostPayload = {
   post_id: string;
   floor_label: string;
   author_display_name: string;
+  posted_at: string;
   body: string;
 };
 

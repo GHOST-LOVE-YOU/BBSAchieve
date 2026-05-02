@@ -8,6 +8,7 @@ class SyncPostResponse:
     post_id: str
     floor_label: str
     author_display_name: str
+    posted_at: str
     body: str
 
 

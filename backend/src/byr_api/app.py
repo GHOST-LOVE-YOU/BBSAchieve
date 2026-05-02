@@ -51,6 +51,7 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
                             post_id=post.post_id,
                             floor_label=post.floor_label,
                             author_display_name=post.author_display_name,
+                            posted_at=post.posted_at,
                             body=post.body,
                         )
                         for post in thread.posts
@@ -85,6 +86,60 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
                     post_id=post.post_id,
                     floor_label=post.floor_label,
                     author_display_name=post.author_display_name,
+                    posted_at=post.posted_at,
+                    body=post.body,
+                )
+                for post in result.posts
+            ],
+        )
+
+    @app.get("/api/sync/thread-original-post")
+    def sync_thread_original_post(
+        board_name: str,
+        article_id: str,
+        _: str = Depends(require_sync_token),
+    ) -> SyncPostResponse:
+        try:
+            post = app.state.sync_service.fetch_original_post(
+                board_name=board_name,
+                article_id=article_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return SyncPostResponse(
+            post_id=post.post_id,
+            floor_label=post.floor_label,
+            author_display_name=post.author_display_name,
+            posted_at=post.posted_at,
+            body=post.body,
+        )
+
+    @app.get("/api/sync/thread-snapshot")
+    def sync_thread_snapshot(
+        board_name: str,
+        article_id: str,
+        start_floor: int = Query(default=1, ge=1),
+        _: str = Depends(require_sync_token),
+    ) -> SyncBackfillResponse:
+        try:
+            result = app.state.sync_service.fetch_thread_snapshot(
+                board_name=board_name,
+                article_id=article_id,
+                start_floor=start_floor,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return SyncBackfillResponse(
+            article_id=result.article_id,
+            start_floor=result.start_floor,
+            posts=[
+                SyncPostResponse(
+                    post_id=post.post_id,
+                    floor_label=post.floor_label,
+                    author_display_name=post.author_display_name,
+                    posted_at=post.posted_at,
                     body=post.body,
                 )
                 for post in result.posts

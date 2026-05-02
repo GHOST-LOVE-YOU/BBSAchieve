@@ -58,6 +58,20 @@ function parseReplyIndex(floorLabel: string): number {
   return 0;
 }
 
+function parseByrPostedAt(value: string): Date | null {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const parsed = new Date(`${trimmed} GMT+0800`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed;
+}
+
 function mapThreadReply(
   boardSlug: string,
   threadId: string,
@@ -69,7 +83,7 @@ function mapThreadReply(
     replyIndex: parseReplyIndex(post.floor_label),
     authorUsername: post.author_display_name,
     body: post.body,
-    publishedAt: new Date(),
+    publishedAt: parseByrPostedAt(post.posted_at) ?? new Date(),
   };
 }
 
@@ -85,7 +99,7 @@ function mapThread(
     authorUsername: originalPost?.author_display_name ?? null,
     title: thread.title,
     body: originalPost?.body ?? null,
-    publishedAt: null,
+    publishedAt: originalPost ? parseByrPostedAt(originalPost.posted_at) : null,
     replyCount: thread.reply_count,
   };
 }
@@ -132,4 +146,4 @@ export function mapSyncPayload(payload: ByrSyncPayload): NormalizedImportBatch {
 }
 
 export const mapByrSyncPayload = mapSyncPayload;
-export { parseReplyIndex };
+export { parseByrPostedAt, parseReplyIndex };

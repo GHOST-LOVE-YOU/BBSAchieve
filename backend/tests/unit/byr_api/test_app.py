@@ -24,9 +24,48 @@ class FakeSyncService:
                             post_id="p24",
                             floor_label="24楼",
                             author_display_name="alice",
+                            posted_at="Sat Apr 26 13:25:36 2026",
                             body="new reply",
                         )
                     ],
+                ),
+            ],
+        )
+
+    def fetch_original_post(self, *, board_name: str, article_id: str) -> SyncPost:
+        return SyncPost(
+            post_id=article_id,
+            floor_label="楼主",
+            author_display_name="alice",
+            posted_at="Sat Apr 25 18:07:24 2026",
+            body="opening post",
+        )
+
+    def fetch_thread_snapshot(
+        self,
+        *,
+        board_name: str,
+        article_id: str,
+        start_floor: int = 1,
+    ) -> BackfillResult:
+        return BackfillResult(
+            board_name=board_name,
+            article_id=article_id,
+            start_floor=start_floor,
+            posts=[
+                SyncPost(
+                    post_id="p2",
+                    floor_label="第2楼",
+                    author_display_name="alice",
+                    posted_at="Sat Apr 26 09:10:00 2026",
+                    body="new reply 2",
+                ),
+                SyncPost(
+                    post_id="p3",
+                    floor_label="第3楼",
+                    author_display_name="bob",
+                    posted_at="Sat Apr 26 09:15:00 2026",
+                    body="new reply 3",
                 ),
             ],
         )
@@ -106,6 +145,7 @@ def test_sync_endpoint_returns_threads_with_valid_token(monkeypatch: pytest.Monk
                         "post_id": "p24",
                         "floor_label": "24楼",
                         "author_display_name": "alice",
+                        "posted_at": "Sat Apr 26 13:25:36 2026",
                         "body": "new reply",
                     }
                 ],
@@ -124,30 +164,35 @@ def test_backfill_endpoint_returns_requested_thread_posts(monkeypatch: pytest.Mo
                     post_id="p20",
                     floor_label="20楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:00:00 2026",
                     body="old reply",
                 ),
                 SyncPost(
                     post_id="p21",
                     floor_label="21楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:05:00 2026",
                     body="old reply",
                 ),
                 SyncPost(
                     post_id="p22",
                     floor_label="22楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:10:00 2026",
                     body="new reply",
                 ),
                 SyncPost(
                     post_id="p23",
                     floor_label="23楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:15:00 2026",
                     body="new reply",
                 ),
                 SyncPost(
                     post_id="p24",
                     floor_label="24楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:20:00 2026",
                     body="new reply",
                 ),
             ]
@@ -171,18 +216,21 @@ def test_backfill_endpoint_returns_requested_thread_posts(monkeypatch: pytest.Mo
                 "post_id": "p22",
                 "floor_label": "22楼",
                 "author_display_name": "alice",
+                "posted_at": "Sat Apr 26 09:10:00 2026",
                 "body": "new reply",
             },
             {
                 "post_id": "p23",
                 "floor_label": "23楼",
                 "author_display_name": "alice",
+                "posted_at": "Sat Apr 26 09:15:00 2026",
                 "body": "new reply",
             },
             {
                 "post_id": "p24",
                 "floor_label": "24楼",
                 "author_display_name": "alice",
+                "posted_at": "Sat Apr 26 09:20:00 2026",
                 "body": "new reply",
             },
         ],
@@ -199,30 +247,35 @@ def test_backfill_endpoint_trims_posts_before_start_floor(monkeypatch: pytest.Mo
                     post_id="p20",
                     floor_label="20楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:00:00 2026",
                     body="old reply",
                 ),
                 SyncPost(
                     post_id="p21",
                     floor_label="21楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:05:00 2026",
                     body="old reply",
                 ),
                 SyncPost(
                     post_id="p22",
                     floor_label="22楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:10:00 2026",
                     body="new reply",
                 ),
                 SyncPost(
                     post_id="p23",
                     floor_label="23楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:15:00 2026",
                     body="new reply",
                 ),
                 SyncPost(
                     post_id="p24",
                     floor_label="24楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 09:20:00 2026",
                     body="new reply",
                 ),
             ]
@@ -246,19 +299,75 @@ def test_backfill_endpoint_trims_posts_before_start_floor(monkeypatch: pytest.Mo
                 "post_id": "p22",
                 "floor_label": "22楼",
                 "author_display_name": "alice",
+                "posted_at": "Sat Apr 26 09:10:00 2026",
                 "body": "new reply",
             },
             {
                 "post_id": "p23",
                 "floor_label": "23楼",
                 "author_display_name": "alice",
+                "posted_at": "Sat Apr 26 09:15:00 2026",
                 "body": "new reply",
             },
             {
                 "post_id": "p24",
                 "floor_label": "24楼",
                 "author_display_name": "alice",
+                "posted_at": "Sat Apr 26 09:20:00 2026",
                 "body": "new reply",
+            },
+        ],
+    }
+
+
+def test_thread_original_post_endpoint_returns_first_post(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    client = TestClient(create_app(sync_service=FakeSyncService()))
+
+    response = client.get(
+        "/api/sync/thread-original-post",
+        params={"board_name": "IWhisper", "article_id": "123"},
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "post_id": "123",
+        "floor_label": "楼主",
+        "author_display_name": "alice",
+        "posted_at": "Sat Apr 25 18:07:24 2026",
+        "body": "opening post",
+    }
+
+
+def test_thread_snapshot_endpoint_returns_full_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    client = TestClient(create_app(sync_service=FakeSyncService()))
+
+    response = client.get(
+        "/api/sync/thread-snapshot",
+        params={"board_name": "IWhisper", "article_id": "123", "start_floor": 2},
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "article_id": "123",
+        "start_floor": 2,
+        "posts": [
+            {
+                "post_id": "p2",
+                "floor_label": "第2楼",
+                "author_display_name": "alice",
+                "posted_at": "Sat Apr 26 09:10:00 2026",
+                "body": "new reply 2",
+            },
+            {
+                "post_id": "p3",
+                "floor_label": "第3楼",
+                "author_display_name": "bob",
+                "posted_at": "Sat Apr 26 09:15:00 2026",
+                "body": "new reply 3",
             },
         ],
     }

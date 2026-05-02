@@ -211,7 +211,12 @@ export async function importSyncBatch(
             )
           : existingThread?.lastReplyAt ?? null;
       const body = thread.body ?? existingThread?.body ?? "";
-      const publishedAt = thread.publishedAt ?? existingThread?.publishedAt ?? new Date();
+      const publishedAt =
+        existingThread && thread.publishedAt
+          ? thread.publishedAt < existingThread.publishedAt
+            ? thread.publishedAt
+            : existingThread.publishedAt
+          : thread.publishedAt ?? existingThread?.publishedAt ?? new Date();
 
       const record = await prisma.thread.upsert({
         where: {

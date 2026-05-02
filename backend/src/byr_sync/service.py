@@ -31,6 +31,7 @@ class ThreadPostLike(Protocol):
     post_id: str
     floor_label: str
     author_display_name: str
+    posted_at: str
     body: str
 
 
@@ -176,6 +177,68 @@ class SyncService:
             posts=posts,
         )
 
+    def fetch_original_post(
+        self,
+        *,
+        board_name: str,
+        article_id: str,
+    ) -> SyncPost:
+        if self.thread_service is None:
+            raise ValueError("Thread service is required for fetching original post")
+
+        thread_page = self.thread_service.fetch_page(
+            board_name=board_name,
+            article_id=article_id,
+            page=1,
+        )
+        for post in thread_page.posts:
+            if post.post_id == article_id or self._is_original_post_floor(post.floor_label):
+                return SyncPost(
+                    post_id=post.post_id,
+                    floor_label=post.floor_label,
+                    author_display_name=post.author_display_name,
+                    posted_at=post.posted_at,
+                    body=post.body,
+                )
+
+        raise ValueError("Original post not found")
+
+    def fetch_thread_snapshot(
+        self,
+        *,
+        board_name: str,
+        article_id: str,
+        start_floor: int = 1,
+    ) -> "BackfillResult":
+        from .models import BackfillResult
+
+        if self.thread_service is None:
+            raise ValueError("Thread service is required for thread snapshot")
+        if start_floor < 1:
+            raise ValueError("Start floor must be greater than or equal to 1")
+
+        first_page = self.thread_service.fetch_page(
+            board_name=board_name,
+            article_id=article_id,
+            page=1,
+        )
+        posts = list(first_page.posts)
+        total_pages = max(1, getattr(first_page, "total_pages", 1))
+        for page in range(2, total_pages + 1):
+            page_result = self.thread_service.fetch_page(
+                board_name=board_name,
+                article_id=article_id,
+                page=page,
+            )
+            posts.extend(page_result.posts)
+
+        return BackfillResult(
+            board_name=board_name,
+            article_id=article_id,
+            start_floor=start_floor,
+            posts=self._build_backfill_posts(posts, start_floor=start_floor),
+        )
+
     @staticmethod
     def _build_sync_thread(
         *,
@@ -209,6 +272,7 @@ class SyncService:
                     post_id=post.post_id,
                     floor_label=post.floor_label,
                     author_display_name=post.author_display_name,
+                    posted_at=post.posted_at,
                     body=post.body,
                 )
             )
@@ -222,6 +286,11 @@ class SyncService:
     ) -> list[SyncPost]:
         posts: list[SyncPost] = []
         for post in thread_posts:
+            if (
+                start_floor > 1
+                and (post.post_id == "" or SyncService._is_original_post_floor(post.floor_label))
+            ):
+                continue
             floor_number = SyncService._parse_floor_number(post.floor_label)
             if floor_number is not None and floor_number < start_floor:
                 continue
@@ -230,6 +299,7 @@ class SyncService:
                     post_id=post.post_id,
                     floor_label=post.floor_label,
                     author_display_name=post.author_display_name,
+                    posted_at=post.posted_at,
                     body=post.body,
                 )
             )
@@ -252,3 +322,8 @@ class SyncService:
         if match is None:
             return None
         return int(match.group(1))
+
+    @staticmethod
+    def _is_original_post_floor(floor_label: str) -> bool:
+        normalized = floor_label.strip()
+        return normalized == "楼主" or normalized == "0楼"

@@ -1,11 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const routeMocks = vi.hoisted(() => ({
-  fetchSyncBackfill: vi.fn(),
+  fetchSyncOriginalPost: vi.fn(),
+  fetchSyncThreadSnapshot: vi.fn(),
   fetchSyncUpdates: vi.fn(),
   mapSyncPayload: vi.fn(),
   importSyncBatch: vi.fn(),
-  prisma: {},
+  prisma: {
+    thread: {
+      findUnique: vi.fn(),
+    },
+  },
 }));
 
 vi.mock("@/src/server/db/client", () => ({
@@ -16,8 +21,12 @@ vi.mock("@/src/server/imports/fetchSyncUpdates", () => ({
   fetchSyncUpdates: routeMocks.fetchSyncUpdates,
 }));
 
-vi.mock("@/src/server/imports/fetchSyncBackfill", () => ({
-  fetchSyncBackfill: routeMocks.fetchSyncBackfill,
+vi.mock("@/src/server/imports/fetchSyncOriginalPost", () => ({
+  fetchSyncOriginalPost: routeMocks.fetchSyncOriginalPost,
+}));
+
+vi.mock("@/src/server/imports/fetchSyncThreadSnapshot", () => ({
+  fetchSyncThreadSnapshot: routeMocks.fetchSyncThreadSnapshot,
 }));
 
 vi.mock("@/src/server/imports/mapSyncPayload", () => ({
@@ -31,12 +40,21 @@ vi.mock("@/src/server/imports/importSyncBatch", () => ({
 import { POST } from "../app/admin/api/imports/byr-sync/route";
 
 describe("admin byr sync route", () => {
+  beforeEach(() => {
+    routeMocks.fetchSyncOriginalPost.mockReset();
+    routeMocks.fetchSyncThreadSnapshot.mockReset();
+    routeMocks.fetchSyncUpdates.mockReset();
+    routeMocks.mapSyncPayload.mockReset();
+    routeMocks.importSyncBatch.mockReset();
+    routeMocks.prisma.thread.findUnique.mockReset();
+  });
+
   it("imports updates and returns json", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
       threads: [],
     });
-    routeMocks.fetchSyncBackfill.mockReset();
     routeMocks.mapSyncPayload.mockReturnValue({
       sourceType: "byr_sync_api",
       sourceLabel: "IWhisper",
@@ -61,7 +79,8 @@ describe("admin byr sync route", () => {
     const response = await POST();
 
     expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledTimes(1);
-    expect(routeMocks.fetchSyncBackfill).not.toHaveBeenCalled();
+    expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
+    expect(routeMocks.fetchSyncThreadSnapshot).not.toHaveBeenCalled();
     expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
       board_name: "IWhisper",
       threads: [],
@@ -94,11 +113,11 @@ describe("admin byr sync route", () => {
   });
 
   it("returns a 500 json response when the import fails", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
       threads: [],
     });
-    routeMocks.fetchSyncBackfill.mockReset();
     routeMocks.mapSyncPayload.mockReturnValue({
       sourceType: "byr_sync_api",
       sourceLabel: "IWhisper",
@@ -124,7 +143,12 @@ describe("admin byr sync route", () => {
     });
   });
 
-  it("backfills threads whose updates payload has no posts before importing", async () => {
+  it("fills in the original post when incremental updates only include replies", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue({
+      id: "thread-1",
+      body: "",
+      replyCount: 0,
+    });
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
       threads: [
@@ -132,27 +156,24 @@ describe("admin byr sync route", () => {
           article_id: "8843752",
           title: "括号院盲审还有没出的吗",
           reply_count: 1,
-          posts: [],
+          posts: [
+            {
+              post_id: "8843768",
+              floor_label: "沙发",
+              author_display_name: "IWhisper#129",
+              posted_at: "Sun Apr 26 10:00:00 2026",
+              body: "身边只有一个**的室友没出",
+            },
+          ],
         },
       ],
     });
-    routeMocks.fetchSyncBackfill.mockResolvedValue({
-      article_id: "8843752",
-      start_floor: 1,
-      posts: [
-        {
-          post_id: "8843752",
-          floor_label: "楼主",
-          author_display_name: "IWhisper#935",
-          body: "一个盲审意见都没有",
-        },
-        {
-          post_id: "8843768",
-          floor_label: "沙发",
-          author_display_name: "IWhisper#129",
-          body: "身边只有一个**的室友没出",
-        },
-      ],
+    routeMocks.fetchSyncOriginalPost.mockResolvedValue({
+      post_id: "8843752",
+      floor_label: "楼主",
+      author_display_name: "IWhisper#935",
+      posted_at: "Sun Apr 26 09:55:00 2026",
+      body: "一个盲审意见都没有",
     });
     routeMocks.mapSyncPayload.mockReturnValue({
       sourceType: "byr_sync_api",
@@ -177,10 +198,9 @@ describe("admin byr sync route", () => {
 
     const response = await POST();
 
-    expect(routeMocks.fetchSyncBackfill).toHaveBeenCalledWith({
+    expect(routeMocks.fetchSyncOriginalPost).toHaveBeenCalledWith({
       boardName: "IWhisper",
       articleId: "8843752",
-      startFloor: 1,
     });
     expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
       board_name: "IWhisper",
@@ -194,18 +214,343 @@ describe("admin byr sync route", () => {
               post_id: "8843752",
               floor_label: "楼主",
               author_display_name: "IWhisper#935",
+              posted_at: "Sun Apr 26 09:55:00 2026",
               body: "一个盲审意见都没有",
             },
             {
               post_id: "8843768",
               floor_label: "沙发",
               author_display_name: "IWhisper#129",
+              posted_at: "Sun Apr 26 10:00:00 2026",
               body: "身边只有一个**的室友没出",
             },
           ],
         },
       ],
     });
+    expect(response.status).toBe(200);
+  });
+
+  it("fills in the original post when updates are empty and the local thread is missing", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "IWhisper",
+      threads: [
+        {
+          article_id: "8843752",
+          title: "括号院盲审还有没出的吗",
+          reply_count: 0,
+          posts: [],
+        },
+      ],
+    });
+    routeMocks.fetchSyncOriginalPost.mockResolvedValue({
+      post_id: "8843752",
+      floor_label: "楼主",
+      author_display_name: "IWhisper#935",
+      posted_at: "Sun Apr 26 09:55:00 2026",
+      body: "一个盲审意见都没有",
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-3",
+      importedThreads: 1,
+      importedReplies: 0,
+      skippedReplies: 0,
+    });
+
+    const response = await POST();
+
+    expect(routeMocks.fetchSyncOriginalPost).toHaveBeenCalledWith({
+      boardName: "IWhisper",
+      articleId: "8843752",
+    });
+    expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
+      board_name: "IWhisper",
+      threads: [
+        {
+          article_id: "8843752",
+          title: "括号院盲审还有没出的吗",
+          reply_count: 0,
+          posts: [
+            {
+              post_id: "8843752",
+              floor_label: "楼主",
+              author_display_name: "IWhisper#935",
+              posted_at: "Sun Apr 26 09:55:00 2026",
+              body: "一个盲审意见都没有",
+            },
+          ],
+        },
+      ],
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("backfills missing reply gap when incoming floors start after the next expected floor", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue({
+      id: "thread-1",
+      body: "已有主贴正文",
+      replyCount: 2,
+    });
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "IWhisper",
+      threads: [
+        {
+          article_id: "8843915",
+          title: "缺口补拉测试",
+          reply_count: 6,
+          posts: [
+            {
+              post_id: "p5",
+              floor_label: "第5楼",
+              author_display_name: "IWhisper#555",
+              posted_at: "Sun May 3 00:10:00 2026",
+              body: "reply 5",
+            },
+            {
+              post_id: "p6",
+              floor_label: "第6楼",
+              author_display_name: "IWhisper#666",
+              posted_at: "Sun May 3 00:11:00 2026",
+              body: "reply 6",
+            },
+          ],
+        },
+      ],
+    });
+    routeMocks.fetchSyncThreadSnapshot.mockResolvedValue({
+      article_id: "8843915",
+      start_floor: 3,
+      posts: [
+        {
+          post_id: "p3",
+          floor_label: "第3楼",
+          author_display_name: "IWhisper#333",
+          posted_at: "Sun May 3 00:08:00 2026",
+          body: "reply 3",
+        },
+        {
+          post_id: "p4",
+          floor_label: "第4楼",
+          author_display_name: "IWhisper#444",
+          posted_at: "Sun May 3 00:09:00 2026",
+          body: "reply 4",
+        },
+        {
+          post_id: "p5",
+          floor_label: "第5楼",
+          author_display_name: "IWhisper#555",
+          posted_at: "Sun May 3 00:10:00 2026",
+          body: "reply 5",
+        },
+        {
+          post_id: "p6",
+          floor_label: "第6楼",
+          author_display_name: "IWhisper#666",
+          posted_at: "Sun May 3 00:11:00 2026",
+          body: "reply 6",
+        },
+      ],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-4",
+      importedThreads: 1,
+      importedReplies: 3,
+      skippedReplies: 0,
+    });
+
+    const response = await POST();
+
+    expect(routeMocks.fetchSyncThreadSnapshot).toHaveBeenCalledWith({
+      boardName: "IWhisper",
+      articleId: "8843915",
+      startFloor: 3,
+    });
+    expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
+    expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
+      board_name: "IWhisper",
+      threads: [
+        {
+          article_id: "8843915",
+          title: "缺口补拉测试",
+          reply_count: 6,
+          posts: [
+            {
+              post_id: "p3",
+              floor_label: "第3楼",
+              author_display_name: "IWhisper#333",
+              posted_at: "Sun May 3 00:08:00 2026",
+              body: "reply 3",
+            },
+            {
+              post_id: "p4",
+              floor_label: "第4楼",
+              author_display_name: "IWhisper#444",
+              posted_at: "Sun May 3 00:09:00 2026",
+              body: "reply 4",
+            },
+            {
+              post_id: "p5",
+              floor_label: "第5楼",
+              author_display_name: "IWhisper#555",
+              posted_at: "Sun May 3 00:10:00 2026",
+              body: "reply 5",
+            },
+            {
+              post_id: "p6",
+              floor_label: "第6楼",
+              author_display_name: "IWhisper#666",
+              posted_at: "Sun May 3 00:11:00 2026",
+              body: "reply 6",
+            },
+          ],
+        },
+      ],
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("does not backfill when updates contain no posts but local reply count is already caught up", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue({
+      id: "thread-1",
+      body: "已有主贴正文",
+      replyCount: 3,
+    });
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "IWhisper",
+      threads: [
+        {
+          article_id: "8843915",
+          title: "工程硕博真的性价比高",
+          reply_count: 3,
+          posts: [],
+        },
+      ],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-5",
+      importedThreads: 1,
+      importedReplies: 0,
+      skippedReplies: 0,
+    });
+
+    const response = await POST();
+
+    expect(routeMocks.fetchSyncThreadSnapshot).not.toHaveBeenCalled();
+    expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
+    expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
+      board_name: "IWhisper",
+      threads: [
+        {
+          article_id: "8843915",
+          title: "工程硕博真的性价比高",
+          reply_count: 3,
+          posts: [],
+        },
+      ],
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("does not backfill when incoming floors continue exactly from the next expected floor", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue({
+      id: "thread-1",
+      body: "已有主贴正文",
+      replyCount: 2,
+    });
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "IWhisper",
+      threads: [
+        {
+          article_id: "8843915",
+          title: "连续楼层测试",
+          reply_count: 4,
+          posts: [
+            {
+              post_id: "p3",
+              floor_label: "第3楼",
+              author_display_name: "IWhisper#333",
+              posted_at: "Sun May 3 00:08:00 2026",
+              body: "reply 3",
+            },
+            {
+              post_id: "p4",
+              floor_label: "第4楼",
+              author_display_name: "IWhisper#444",
+              posted_at: "Sun May 3 00:09:00 2026",
+              body: "reply 4",
+            },
+          ],
+        },
+      ],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-6",
+      importedThreads: 1,
+      importedReplies: 2,
+      skippedReplies: 0,
+    });
+
+    const response = await POST();
+
+    expect(routeMocks.fetchSyncThreadSnapshot).not.toHaveBeenCalled();
+    expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
   });
 });

@@ -37,17 +37,24 @@ class FakeThreadPost:
     post_id: str
     floor_label: str
     author_display_name: str
+    posted_at: str
     body: str
 
 
 @dataclass(slots=True)
 class FakeThreadPage:
     posts: list[FakeThreadPost]
+    total_pages: int = 1
 
 
 class FakeThreadService:
-    def __init__(self, thread_page: FakeThreadPage | None = None) -> None:
+    def __init__(
+        self,
+        thread_page: FakeThreadPage | None = None,
+        thread_pages: dict[int, FakeThreadPage] | None = None,
+    ) -> None:
         self.thread_page = thread_page or FakeThreadPage(posts=[])
+        self.thread_pages = thread_pages or {}
         self.calls: list[tuple[str, str, int]] = []
 
     def fetch_page(
@@ -58,7 +65,7 @@ class FakeThreadService:
         page: int = 1,
     ) -> FakeThreadPage:
         self.calls.append((board_name, article_id, page))
-        return self.thread_page
+        return self.thread_pages.get(page, self.thread_page)
 
 
 class FakeRedis:
@@ -173,6 +180,7 @@ def test_list_updates_fetches_first_page_for_new_zero_reply_thread() -> None:
                 post_id="123",
                 floor_label="楼主",
                 author_display_name="alice",
+                posted_at="Sat Apr 25 18:07:24 2026",
                 body="opening post",
             )
         ]
@@ -200,6 +208,7 @@ def test_list_updates_refetches_zero_reply_thread_when_cached_posts_are_empty() 
                 post_id="123",
                 floor_label="楼主",
                 author_display_name="alice",
+                posted_at="Sat Apr 25 18:07:24 2026",
                 body="opening post",
             )
         ]
@@ -233,6 +242,7 @@ def test_list_updates_includes_new_posts_after_cached_reply_count() -> None:
                 post_id="p24",
                 floor_label="24楼",
                 author_display_name="alice",
+                posted_at="Sat Apr 26 13:25:36 2026",
                 body="new reply",
             )
         ]
@@ -268,30 +278,35 @@ def test_list_updates_filters_old_posts_from_thread_page() -> None:
                 post_id="p20",
                 floor_label="20楼",
                 author_display_name="alice",
+                posted_at="Sat Apr 26 13:05:36 2026",
                 body="old reply",
             ),
             FakeThreadPost(
                 post_id="p21",
                 floor_label="21楼",
                 author_display_name="alice",
+                posted_at="Sat Apr 26 13:10:36 2026",
                 body="old reply",
             ),
             FakeThreadPost(
                 post_id="p22",
                 floor_label="22楼",
                 author_display_name="alice",
+                posted_at="Sat Apr 26 13:15:36 2026",
                 body="old reply",
             ),
             FakeThreadPost(
                 post_id="p23",
                 floor_label="23楼",
                 author_display_name="alice",
+                posted_at="Sat Apr 26 13:20:36 2026",
                 body="old reply",
             ),
             FakeThreadPost(
                 post_id="p24",
                 floor_label="24楼",
                 author_display_name="alice",
+                posted_at="Sat Apr 26 13:25:36 2026",
                 body="new reply",
             ),
         ]
@@ -318,6 +333,106 @@ def test_list_updates_filters_old_posts_from_thread_page() -> None:
     ]
 
 
+def test_fetch_original_post_returns_the_first_floor() -> None:
+    board_service = FakeBoardService([])
+    thread_service = FakeThreadService(
+        thread_page=FakeThreadPage(
+            posts=[
+                FakeThreadPost(
+                    post_id="123",
+                    floor_label="楼主",
+                    author_display_name="alice",
+                    posted_at="Sat Apr 25 18:07:24 2026",
+                    body="opening post",
+                ),
+                FakeThreadPost(
+                    post_id="p1",
+                    floor_label="第1楼",
+                    author_display_name="bob",
+                    posted_at="Sat Apr 25 18:10:00 2026",
+                    body="reply",
+                ),
+            ]
+        )
+    )
+    service = SyncService(
+        board_service=board_service,
+        thread_service=thread_service,
+        cache=InMemorySyncCache(),
+    )
+
+    result = service.fetch_original_post(board_name="test_board", article_id="123")
+
+    assert result == SyncPost(
+        post_id="123",
+        floor_label="楼主",
+        author_display_name="alice",
+        posted_at="Sat Apr 25 18:07:24 2026",
+        body="opening post",
+    )
+    assert thread_service.calls == [("test_board", "123", 1)]
+
+
+def test_fetch_thread_snapshot_collects_all_pages_from_start_floor() -> None:
+    board_service = FakeBoardService([])
+    thread_service = FakeThreadService(
+        thread_pages={
+            1: FakeThreadPage(
+                total_pages=2,
+                posts=[
+                    FakeThreadPost(
+                        post_id="123",
+                        floor_label="楼主",
+                        author_display_name="alice",
+                        posted_at="Sat Apr 25 18:07:24 2026",
+                        body="opening post",
+                    ),
+                    FakeThreadPost(
+                        post_id="p1",
+                        floor_label="第1楼",
+                        author_display_name="bob",
+                        posted_at="Sat Apr 25 18:10:00 2026",
+                        body="reply 1",
+                    ),
+                ],
+            ),
+            2: FakeThreadPage(
+                total_pages=2,
+                posts=[
+                    FakeThreadPost(
+                        post_id="p2",
+                        floor_label="第2楼",
+                        author_display_name="carol",
+                        posted_at="Sat Apr 25 18:11:00 2026",
+                        body="reply 2",
+                    ),
+                    FakeThreadPost(
+                        post_id="p3",
+                        floor_label="第3楼",
+                        author_display_name="dave",
+                        posted_at="Sat Apr 25 18:12:00 2026",
+                        body="reply 3",
+                    ),
+                ],
+            ),
+        }
+    )
+    service = SyncService(
+        board_service=board_service,
+        thread_service=thread_service,
+        cache=InMemorySyncCache(),
+    )
+
+    result = service.fetch_thread_snapshot(
+        board_name="test_board",
+        article_id="123",
+        start_floor=2,
+    )
+
+    assert [post.post_id for post in result.posts] == ["p2", "p3"]
+    assert thread_service.calls == [("test_board", "123", 1), ("test_board", "123", 2)]
+
+
 def test_list_updates_does_not_repeat_cached_boundary_floor() -> None:
     thread = FakeThread(article_id="123", title="First thread", reply_count=21)
     thread_page = FakeThreadPage(
@@ -326,12 +441,14 @@ def test_list_updates_does_not_repeat_cached_boundary_floor() -> None:
                 post_id="p20",
                 floor_label="20楼",
                 author_display_name="alice",
+                posted_at="Sat Apr 26 13:20:36 2026",
                 body="boundary reply",
             ),
             FakeThreadPost(
                 post_id="p21",
                 floor_label="21楼",
                 author_display_name="alice",
+                posted_at="Sat Apr 26 13:25:36 2026",
                 body="new reply",
             ),
         ]
@@ -366,6 +483,7 @@ def test_backfill_thread_rejects_rewind_beyond_limit() -> None:
                     post_id="p31",
                     floor_label="31楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 13:25:36 2026",
                     body="new reply",
                 )
             ]
@@ -417,6 +535,7 @@ def test_backfill_thread_allows_cache_miss_when_page_stays_within_window() -> No
                     post_id="p22",
                     floor_label="22楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 13:25:36 2026",
                     body="new reply",
                 )
             ]
@@ -448,6 +567,7 @@ def test_backfill_thread_rejects_cache_miss_when_observed_page_exceeds_window() 
                     post_id="p40",
                     floor_label="40楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 13:25:36 2026",
                     body="new reply",
                 )
             ]
@@ -477,30 +597,35 @@ def test_backfill_thread_trims_posts_before_start_floor() -> None:
                     post_id="p20",
                     floor_label="20楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 13:05:36 2026",
                     body="old reply",
                 ),
                 FakeThreadPost(
                     post_id="p21",
                     floor_label="21楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 13:10:36 2026",
                     body="old reply",
                 ),
                 FakeThreadPost(
                     post_id="p22",
                     floor_label="22楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 13:15:36 2026",
                     body="new reply",
                 ),
                 FakeThreadPost(
                     post_id="p23",
                     floor_label="23楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 13:20:36 2026",
                     body="new reply",
                 ),
                 FakeThreadPost(
                     post_id="p24",
                     floor_label="24楼",
                     author_display_name="alice",
+                    posted_at="Sat Apr 26 13:25:36 2026",
                     body="new reply",
                 ),
             ]
