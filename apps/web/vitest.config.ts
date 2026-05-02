@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 export default defineConfig({
   resolve: {
     alias: {
+      "@": resolve(__dirname, "."),
       "@bbs/state/runtime": resolve(
         __dirname,
         "../../packages/state/src/runtime/index.ts",
