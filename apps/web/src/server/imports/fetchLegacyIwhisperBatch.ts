@@ -13,7 +13,7 @@ export type LegacyIwhisperBatch = {
   nextCursor: string | null;
 };
 
-type QueryLegacyDatabase = (sql: string, params: readonly unknown[]) => Promise<LegacyDatabaseQueryResult>;
+type QueryLegacyDatabase = (sql: string, params: unknown[]) => Promise<LegacyDatabaseQueryResult>;
 
 export type FetchLegacyIwhisperBatchOptions = {
   limit: number;
@@ -100,7 +100,7 @@ async function createLegacyConnection(): Promise<LegacyConnection> {
   await client.connect();
 
   return {
-    query: async (sql, params) => client.query(sql, params),
+    query: async (sql, params) => client.query({ text: sql, values: params }),
     close: async () => {
       await client.end();
     },
