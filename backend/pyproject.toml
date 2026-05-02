@@ -20,6 +20,7 @@ dev = [
 [project.scripts]
 byr-auth = "byr_cli:main"
 byr-bbs = "byr_cli:main"
+byr-sync-cache = "byr_cli:clear_sync_cache_main"
 byr-sync-api = "byr_api:main"
 
 [tool.pytest.ini_options]

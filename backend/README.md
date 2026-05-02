@@ -27,6 +27,7 @@ uv run pytest -q
 uv run byr-bbs login
 uv run byr-bbs board --name IWhisper --page 1
 uv run byr-bbs thread --board IWhisper --article-id 8830220 --page 2
+uv run byr-sync-cache
 ```
 
 旧的 `byr-auth` 命令仍然可用，但共享 CLI 已迁移到 `byr_cli/`。
@@ -56,11 +57,39 @@ uv run byr-bbs thread --board IWhisper --article-id 8830220 --page 2
 
 4. 访问接口：
 
-   - `GET /healthz`
-   - `GET /api/sync/updates`
-   - `GET /api/sync/backfill`
+  - `GET /healthz`
+  - `GET /api/sync/updates`
+  - `GET /api/sync/backfill`
 
 同步接口会复用本地北邮人账号登录态，因此 `BBS_USERNAME` 和 `BBS_PASSWORD` 仍然需要在 `backend/.env` 中配置。`BYR_SYNC_API_TOKEN` 用于保护同步接口，`BYR_SYNC_REDIS_URL` 需要指向可用的 Redis 连接地址。
+
+## 清理同步缓存
+
+在 `backend/` 目录下可以直接使用快捷命令：
+
+```bash
+uv run byr-sync-cache
+```
+
+默认只会清理同步缓存前缀 `sync:thread:*`，不会直接清空整个 Redis。
+
+如果只想清理某个版面的同步缓存：
+
+```bash
+uv run byr-sync-cache --board IWhisper
+```
+
+如果确认要清空当前 Redis db：
+
+```bash
+uv run byr-sync-cache --all
+```
+
+同样的能力也可以通过共享 CLI 使用：
+
+```bash
+uv run byr-bbs clear-sync-cache
+```
 
 ## Docker 构建
 
