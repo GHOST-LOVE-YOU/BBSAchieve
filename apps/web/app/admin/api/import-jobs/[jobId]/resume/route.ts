@@ -20,12 +20,16 @@ function scheduleLegacyMigration(jobId: string) {
       void Promise.resolve(
         runLegacyMigrationJob(
           {
-            findJobById,
-            markJobRunning,
-            markJobPaused,
-            updateJobProgress,
-            markJobFailed,
-            markJobSucceeded,
+            findJobById: (scheduledJobId) => findJobById(prisma, scheduledJobId),
+            markJobRunning: (scheduledJobId, cursorThreadKey) =>
+              markJobRunning(prisma, scheduledJobId, cursorThreadKey),
+            markJobPaused: (scheduledJobId) => markJobPaused(prisma, scheduledJobId),
+            updateJobProgress: (scheduledJobId, progress) =>
+              updateJobProgress(prisma, scheduledJobId, progress),
+            markJobFailed: (scheduledJobId, errorMessage) =>
+              markJobFailed(prisma, scheduledJobId, errorMessage),
+            markJobSucceeded: (scheduledJobId) =>
+              markJobSucceeded(prisma, scheduledJobId),
             fetchBatch: (options) => fetchLegacyIwhisperBatch(options),
             importBatch: (batch) => importSyncBatch(prisma, batch),
             mapRows: mapLegacyRows,

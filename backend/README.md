@@ -44,8 +44,8 @@ uv run byr-bbs thread --board IWhisper --article-id 8830220 --page 2
 2. 在 `backend/.env` 中补充同步 API 需要的配置：
 
    ```env
-   BYR_SYNC_API_TOKEN=your-sync-api-token
-   BYR_SYNC_REDIS_URL=redis://localhost:6379/0
+   BYR_SYNC_API_TOKEN=__ASK_USER_BEFORE_RUNNING__
+   BYR_SYNC_REDIS_URL=__ASK_USER_BEFORE_RUNNING__
    ```
 
 3. 启动同步 API：
@@ -60,4 +60,27 @@ uv run byr-bbs thread --board IWhisper --article-id 8830220 --page 2
    - `GET /api/sync/updates`
    - `GET /api/sync/backfill`
 
-同步接口会复用本地北邮人账号登录态，因此 `BBS_USERNAME` 和 `BBS_PASSWORD` 仍然需要在 `backend/.env` 中配置。`BYR_SYNC_API_TOKEN` 用于保护同步接口，`BYR_SYNC_REDIS_URL` 默认指向 `redis://127.0.0.1:6379/0`。
+同步接口会复用本地北邮人账号登录态，因此 `BBS_USERNAME` 和 `BBS_PASSWORD` 仍然需要在 `backend/.env` 中配置。`BYR_SYNC_API_TOKEN` 用于保护同步接口，`BYR_SYNC_REDIS_URL` 需要指向可用的 Redis 连接地址。
+
+## Docker 构建
+
+在仓库根目录执行：
+
+```bash
+docker build -f backend/Dockerfile -t bbs-sync-api:local .
+```
+
+## Docker 运行
+
+运行前请准备好所需环境变量，例如 `BBS_USERNAME`、`BBS_PASSWORD`、`BYR_SYNC_API_TOKEN`、`BYR_SYNC_REDIS_URL`。
+
+```bash
+docker run --rm -p 8000:8000 \
+  -e BBS_USERNAME=__ASK_USER_BEFORE_RUNNING__ \
+  -e BBS_PASSWORD=__ASK_USER_BEFORE_RUNNING__ \
+  -e BYR_SYNC_API_TOKEN=__ASK_USER_BEFORE_RUNNING__ \
+  -e BYR_SYNC_REDIS_URL=__ASK_USER_BEFORE_RUNNING__ \
+  bbs-sync-api:local
+```
+
+容器启动后，默认在 `127.0.0.1:8000` 提供同步 API。
