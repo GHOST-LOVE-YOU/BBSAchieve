@@ -37,7 +37,7 @@ describe("web public routes", () => {
 
   it("renders board detail and thread summaries", async () => {
     const ui = await BoardPage({
-      params: Promise.resolve({ boardId: "board:job" }),
+      params: Promise.resolve({ boardId: "job" }),
     });
     render(ui);
     expect(screen.getByText("First offer from the mirror")).toBeTruthy();
@@ -46,7 +46,7 @@ describe("web public routes", () => {
 
   it("renders thread detail and replies", async () => {
     const ui = await ThreadPage({
-      params: Promise.resolve({ threadId: "thread:first-offer" }),
+      params: Promise.resolve({ threadId: "first-offer" }),
     });
     render(ui);
     expect(screen.getByText("A new listing has been mirrored and is ready to read.")).toBeTruthy();

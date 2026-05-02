@@ -62,7 +62,7 @@ export default function HomeScreen() {
             <Link
               href={{
                 pathname: "/boards/[boardId]",
-                params: { boardId: board.id },
+                params: { boardId: board.slug },
               }}
             >
               <Text style={{ fontSize: 20, fontWeight: "500" }}>{board.name}</Text>

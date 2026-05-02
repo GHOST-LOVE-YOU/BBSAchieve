@@ -25,6 +25,17 @@ describe("getThreadDetail", () => {
     ]);
   });
 
+  it("accepts a url-safe thread segment", async () => {
+    const result = await getThreadDetail("first-offer", createReadingFlowDeps());
+
+    expect(result.status).toBe("success");
+    if (result.status !== "success") {
+      throw new Error("expected success");
+    }
+
+    expect(result.thread.id).toBe("thread:first-offer");
+  });
+
   it("returns notFound for missing thread", async () => {
     const result = await getThreadDetail("missing-thread", createReadingFlowDeps());
 

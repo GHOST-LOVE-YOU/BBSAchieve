@@ -21,7 +21,7 @@ export default async function HomePage() {
       <div className="mt-6 space-y-4">
         {result.boards.map((board) => (
           <section key={board.id} className="rounded-xl border border-zinc-200 p-4">
-            <Link className="text-xl font-medium" href={`/boards/${board.id}`}>
+            <Link className="text-xl font-medium" href={`/boards/${board.slug}`}>
               {board.name}
             </Link>
             <p className="mt-2 text-sm text-zinc-700">{board.description}</p>

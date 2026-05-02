@@ -97,7 +97,7 @@ export default function BoardPage() {
             <Link
               href={{
                 pathname: "/threads/[threadId]",
-                params: { threadId: thread.id },
+                params: { threadId: thread.id.replace(/^thread:/, "") },
               }}
             >
               <Text style={{ fontSize: 18, fontWeight: "500" }}>{thread.title}</Text>

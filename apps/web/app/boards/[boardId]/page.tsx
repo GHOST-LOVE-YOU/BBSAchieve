@@ -32,7 +32,10 @@ export default async function BoardPage({
       <div className="mt-6 space-y-4">
         {result.threads.map((thread) => (
           <section key={thread.id} className="rounded-xl border border-zinc-200 p-4">
-            <Link className="text-lg font-medium" href={`/threads/${thread.id}`}>
+            <Link
+              className="text-lg font-medium"
+              href={`/threads/${thread.id.replace(/^thread:/, "")}`}
+            >
               {thread.title}
             </Link>
             <p className="mt-2 text-sm text-zinc-500">{thread.authorName}</p>

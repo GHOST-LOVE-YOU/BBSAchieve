@@ -16,14 +16,14 @@ describe("mobile routes", () => {
   });
 
   it("renders board detail thread titles", async () => {
-    renderMobileRoute("/boards/board:job");
+    renderMobileRoute("/boards/job");
 
     expect(await screen.findByText("First offer from the mirror")).toBeTruthy();
     expect(screen.getByText("Reading path for mirrored posts")).toBeTruthy();
   });
 
   it("renders thread detail body and replies", async () => {
-    renderMobileRoute("/threads/thread:first-offer");
+    renderMobileRoute("/threads/first-offer");
 
     expect(await screen.findByText("A new listing has been mirrored and is ready to read.")).toBeTruthy();
     expect(screen.getByText("The mirror keeps the reading flow stable.")).toBeTruthy();
@@ -34,7 +34,7 @@ describe("mobile routes", () => {
     useLocalSearchParamsMock.mockImplementation(() => ({ boardId: undefined } as any));
 
     try {
-      renderMobileRoute("/boards/board:job");
+      renderMobileRoute("/boards/job");
 
       expect(await screen.findByText("版面不存在")).toBeTruthy();
     } finally {
