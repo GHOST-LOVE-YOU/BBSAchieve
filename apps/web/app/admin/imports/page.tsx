@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { prisma } from "@/src/server/db/client";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminImportsPage() {
   const imports = await prisma.import.findMany({
     orderBy: { startedAt: "desc" },

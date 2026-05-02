@@ -5,6 +5,8 @@ import { createPrismaReadingFlowDeps } from "@bbs/state/runtime";
 
 import { createReadingRepository } from "@/src/server/reading/readingRepository";
 
+export const dynamic = "force-dynamic";
+
 export default async function ThreadPage({
   params,
 }: {
