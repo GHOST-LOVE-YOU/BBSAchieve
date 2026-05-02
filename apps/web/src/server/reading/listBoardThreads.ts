@@ -10,6 +10,7 @@ export type ThreadCursor = {
 export type BoardThreadRow = {
   id: string;
   boardSlug: string;
+  title?: string;
   lastReplyAt: string | Date | null;
 };
 
@@ -23,6 +24,7 @@ export type ListBoardThreadsResult = {
   threads: Array<{
     id: string;
     boardSlug: string;
+    title: string | null;
     lastReplyAt: string | null;
   }>;
   nextCursor: string | null;
@@ -148,6 +150,7 @@ async function defaultFetchBoardThreads(
     },
     select: {
       id: true,
+      title: true,
       lastReplyAt: true,
       board: {
         select: {
@@ -160,6 +163,7 @@ async function defaultFetchBoardThreads(
   return threads.map((thread) => ({
     id: thread.id,
     boardSlug: thread.board.slug,
+    title: thread.title,
     lastReplyAt: normalizeDate(thread.lastReplyAt),
   }));
 }
@@ -176,6 +180,7 @@ export async function listBoardThreads(
     .filter((thread) => thread.boardSlug === input.boardSlug)
     .map((thread) => ({
       ...thread,
+      title: thread.title ?? null,
       lastReplyAt: normalizeDate(thread.lastReplyAt),
     }))
     .sort(compareThreadsDesc);

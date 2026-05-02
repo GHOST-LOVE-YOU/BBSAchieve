@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getBoardDetail } from "@bbs/state";
-import { createPrismaReadingFlowDeps } from "@bbs/state/runtime";
-
+import { listBoardThreads } from "@/src/server/reading/listBoardThreads";
 import { createReadingRepository } from "@/src/server/reading/readingRepository";
 
 export const dynamic = "force-dynamic";
@@ -14,16 +12,41 @@ export default async function BoardPage({
   params: Promise<{ boardId: string }>;
 }) {
   const { boardId } = await params;
-  const result = await getBoardDetail(
-    boardId,
-    createPrismaReadingFlowDeps(createReadingRepository()),
-  );
+  const readingRepository = createReadingRepository();
+  const board =
+    (await readingRepository.findBoardById(boardId)) ??
+    (await readingRepository.findBoardBySlug(boardId));
 
-  if (result.status === "notFound") {
+  if (!board) {
     notFound();
   }
 
-  if (result.status !== "success") {
+  try {
+    const result = await listBoardThreads({
+      boardSlug: board.slug,
+      limit: 20,
+    });
+
+    return (
+      <main className="min-h-screen p-8">
+        <h1 className="text-3xl font-semibold">{board.name}</h1>
+        <p className="mt-4 text-base text-zinc-700">{board.description}</p>
+        <div className="mt-6 space-y-4">
+          {result.threads.map((thread) => (
+            <section key={thread.id} className="rounded-xl border border-zinc-200 p-4">
+              <Link
+                className="text-lg font-medium"
+                href={`/threads/${thread.id.replace(/^thread:/, "")}`}
+              >
+                {thread.title ?? thread.id}
+              </Link>
+              <p className="mt-2 text-sm text-zinc-500">{thread.lastReplyAt ?? "暂无回复"}</p>
+            </section>
+          ))}
+        </div>
+      </main>
+    );
+  } catch {
     return (
       <main className="min-h-screen p-8">
         <h1 className="text-3xl font-semibold">版面帖子</h1>
@@ -31,24 +54,4 @@ export default async function BoardPage({
       </main>
     );
   }
-
-  return (
-    <main className="min-h-screen p-8">
-      <h1 className="text-3xl font-semibold">{result.board.name}</h1>
-      <p className="mt-4 text-base text-zinc-700">{result.board.description}</p>
-      <div className="mt-6 space-y-4">
-        {result.threads.map((thread) => (
-          <section key={thread.id} className="rounded-xl border border-zinc-200 p-4">
-            <Link
-              className="text-lg font-medium"
-              href={`/threads/${thread.id.replace(/^thread:/, "")}`}
-            >
-              {thread.title}
-            </Link>
-            <p className="mt-2 text-sm text-zinc-500">{thread.authorName}</p>
-          </section>
-        ))}
-      </div>
-    </main>
-  );
 }

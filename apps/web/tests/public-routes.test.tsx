@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const readingMock = vi.hoisted(() => ({
@@ -13,6 +13,10 @@ const readingMock = vi.hoisted(() => ({
   findUserByUsername: vi.fn(),
 }));
 
+const listBoardThreadsMock = vi.hoisted(() => ({
+  listBoardThreads: vi.fn(),
+}));
+
 vi.mock("@/src/server/reading/readingRepository", () => ({
   createReadingRepository: () => ({
     findBoardById: readingMock.findBoardById,
@@ -25,6 +29,10 @@ vi.mock("@/src/server/reading/readingRepository", () => ({
     findUserById: readingMock.findUserById,
     findUserByUsername: readingMock.findUserByUsername,
   }),
+}));
+
+vi.mock("@/src/server/reading/listBoardThreads", () => ({
+  listBoardThreads: listBoardThreadsMock.listBoardThreads,
 }));
 
 vi.mock("next/link", () => ({
@@ -142,48 +150,34 @@ describe("web public routes", () => {
       name: "Jobs and Offers",
       description: "Signals for roles, openings, and practical next steps.",
     });
-    readingMock.listThreadsByBoard.mockResolvedValue([
-      {
-        id: "thread:first-offer",
-        boardId: "board:job",
-        authorUserId: "user:robot-1",
-        sourceThreadId: "source-thread-1",
-        sourceBoardSlug: "job",
-        title: "First offer from the mirror",
-        body: "A new listing has been mirrored and is ready to read.",
-        publishedAt: "2026-05-01T08:00:00.000Z",
-        replyCount: 2,
-        lastReplyAt: "2026-05-01T08:10:00.000Z",
-      },
-      {
-        id: "thread:read-path",
-        boardId: "board:job",
-        authorUserId: "user:alice",
-        sourceThreadId: "source-thread-2",
-        sourceBoardSlug: "job",
-        title: "Reading path for mirrored posts",
-        body: "This thread keeps the reading chain easy to trace.",
-        publishedAt: "2026-05-01T09:00:00.000Z",
-        replyCount: 1,
-        lastReplyAt: "2026-05-01T09:05:00.000Z",
-      },
-    ]);
-    readingMock.findUserById.mockResolvedValue({
-      id: "user:robot-1",
-      username: "robot-1",
-      displayName: "Robot 1",
-      userType: "bot",
-      status: "active",
-      mailboxKey: "mailbox-1",
+    listBoardThreadsMock.listBoardThreads.mockResolvedValue({
+      threads: [
+        {
+          id: "thread:newest",
+          boardSlug: "job",
+          title: "Newest active thread",
+          lastReplyAt: "2026-05-01T09:05:00.000Z",
+        },
+        {
+          id: "thread:older",
+          boardSlug: "job",
+          title: "Older active thread",
+          lastReplyAt: "2026-05-01T08:10:00.000Z",
+        },
+      ],
+      nextCursor: null,
     });
-    readingMock.listRepliesByThread.mockResolvedValue([]);
 
     const ui = await BoardPage({
       params: Promise.resolve({ boardId: "job" }),
     });
-    render(ui);
-    expect(screen.getByText("First offer from the mirror")).toBeTruthy();
-    expect(screen.getByText("Reading path for mirrored posts")).toBeTruthy();
+    const { container } = render(ui);
+    const links = within(container).getAllByRole("link").map((node) => node.textContent);
+    expect(links).toEqual(["Newest active thread", "Older active thread"]);
+    expect(listBoardThreadsMock.listBoardThreads).toHaveBeenCalledWith({
+      boardSlug: "job",
+      limit: 20,
+    });
   });
 
   it("renders thread detail and replies", async () => {
@@ -257,6 +251,7 @@ describe("web public routes", () => {
     readingMock.findBoardById.mockResolvedValue(null);
     readingMock.findBoardBySlug.mockResolvedValue(null);
     readingMock.findThreadById.mockResolvedValue(null);
+    listBoardThreadsMock.listBoardThreads.mockReset();
 
     await expect(
       BoardPage({
