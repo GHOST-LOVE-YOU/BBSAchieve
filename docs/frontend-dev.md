@@ -6,6 +6,15 @@
 npx pnpm@10.11.0 install
 ```
 
+## Prisma
+
+```bash
+npx pnpm@10.11.0 --filter @bbs/web prisma:generate
+DATABASE_URL="$DATABASE_URL" npx pnpm@10.11.0 --filter @bbs/web prisma:migrate
+```
+
+`DATABASE_URL` 只需要在本地或 CI 环境里临时提供，不要写入文档或提交真实连接串。
+
 ## 启动
 
 ```bash
@@ -14,6 +23,14 @@ npx pnpm@10.11.0 --filter @bbs/mobile start
 ```
 
 ## 校验
+
+```bash
+npx pnpm@10.11.0 vitest run apps/web/tests/server/importSyncBatch.test.ts apps/web/tests/server/fetchSyncUpdates.test.ts
+npx pnpm@10.11.0 vitest run apps/web/tests/admin-imports-route.test.ts apps/web/tests/admin-imports-page.test.tsx apps/web/tests/public-routes.test.tsx apps/web/tests/admin-create-bot-and-thread.test.tsx
+npx pnpm@10.11.0 --filter @bbs/web typecheck
+```
+
+Web 侧真实数据导入相关的常用验证顺序是先跑 Prisma 生成/迁移，再跑导入与路由测试，最后做类型检查。
 
 ```bash
 npx pnpm@10.11.0 vitest run packages/domain/tests/entities.test.ts

@@ -1,7 +1,11 @@
 import type {
   BoardRepository,
+  BoardRecord,
+  ReplyRecord,
   ReplyRepository,
+  ThreadRecord,
   ThreadRepository,
+  UserRecord,
   UserRepository,
 } from "@bbs/domain";
 
@@ -13,65 +17,15 @@ type ReadingFlowDeps = {
 };
 
 type PrismaReadingRepository = {
-  findBoardById(id: string): Promise<{ id: string; slug: string; name: string; description: string } | null>;
-  findBoardBySlug(slug: string): Promise<{ id: string; slug: string; name: string; description: string } | null>;
-  listBoards(): Promise<Array<{ id: string; slug: string; name: string; description: string }>>;
-  findThreadById(id: string): Promise<{
-    id: string;
-    boardId: string;
-    authorUserId: string;
-    sourceThreadId: string;
-    sourceBoardSlug: string;
-    title: string;
-    body: string;
-    publishedAt: string;
-    replyCount?: number;
-    lastReplyAt?: string | null;
-  } | null>;
-  listThreadsByBoard(boardId: string): Promise<Array<{
-    id: string;
-    boardId: string;
-    authorUserId: string;
-    sourceThreadId: string;
-    sourceBoardSlug: string;
-    title: string;
-    body: string;
-    publishedAt: string;
-    replyCount?: number;
-    lastReplyAt?: string | null;
-  }>>;
-  findReplyById(id: string): Promise<{
-    id: string;
-    threadId: string;
-    authorUserId: string;
-    replyIndex?: number;
-    body: string;
-    publishedAt: string;
-  } | null>;
-  listRepliesByThread(threadId: string): Promise<Array<{
-    id: string;
-    threadId: string;
-    authorUserId: string;
-    replyIndex?: number;
-    body: string;
-    publishedAt: string;
-  }>>;
-  findUserById(id: string): Promise<{
-    id: string;
-    username: string;
-    displayName: string;
-    userType: "human" | "bot";
-    status: "active" | "disabled";
-    mailboxKey?: string;
-  } | null>;
-  findUserByUsername(username: string): Promise<{
-    id: string;
-    username: string;
-    displayName: string;
-    userType: "human" | "bot";
-    status: "active" | "disabled";
-    mailboxKey?: string;
-  } | null>;
+  findBoardById(id: string): Promise<BoardRecord | null>;
+  findBoardBySlug(slug: string): Promise<BoardRecord | null>;
+  listBoards(): Promise<BoardRecord[]>;
+  findThreadById(id: string): Promise<ThreadRecord | null>;
+  listThreadsByBoard(boardId: string): Promise<ThreadRecord[]>;
+  findReplyById(id: string): Promise<ReplyRecord | null>;
+  listRepliesByThread(threadId: string): Promise<ReplyRecord[]>;
+  findUserById(id: string): Promise<UserRecord | null>;
+  findUserByUsername(username: string): Promise<UserRecord | null>;
 };
 
 function createReadonlyUserRepository(reader: PrismaReadingRepository): UserRepository {
