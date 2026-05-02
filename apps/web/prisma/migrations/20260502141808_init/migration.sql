@@ -2,10 +2,16 @@
 CREATE TYPE "UserType" AS ENUM ('human', 'bot');
 
 -- CreateEnum
-CREATE TYPE "ImportStatus" AS ENUM ('pending', 'running', 'succeeded', 'failed');
+CREATE TYPE "ImportStatus" AS ENUM ('running', 'succeeded', 'failed', 'partial', 'pending');
 
 -- CreateEnum
-CREATE TYPE "ImportSourceType" AS ENUM ('byr', 'manual');
+CREATE TYPE "ImportSourceType" AS ENUM ('byr_sync_api', 'legacy_postgres');
+
+-- CreateEnum
+CREATE TYPE "ProfileStatus" AS ENUM ('pending', 'active', 'disabled');
+
+-- CreateEnum
+CREATE TYPE "BindingStatus" AS ENUM ('pending', 'active', 'revoked');
 
 -- CreateTable
 CREATE TABLE "boards" (
@@ -30,6 +36,7 @@ CREATE TABLE "threads" (
     "body" TEXT NOT NULL,
     "publishedAt" TIMESTAMP(3) NOT NULL,
     "lastReplyAt" TIMESTAMP(3),
+    "replyCount" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -55,6 +62,8 @@ CREATE TABLE "users" (
     "id" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "displayName" TEXT NOT NULL,
+    "avatarUrl" TEXT,
+    "bio" TEXT,
     "userType" "UserType" NOT NULL,
     "status" TEXT NOT NULL,
     "mailboxKey" TEXT,
@@ -68,6 +77,10 @@ CREATE TABLE "users" (
 CREATE TABLE "human_profiles" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
+    "authProvider" TEXT NOT NULL,
+    "authSubject" TEXT NOT NULL,
+    "email" TEXT,
+    "profileStatus" "ProfileStatus" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -78,6 +91,11 @@ CREATE TABLE "human_profiles" (
 CREATE TABLE "bot_profiles" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
+    "mailboxKey" TEXT,
+    "sourceLabel" TEXT NOT NULL,
+    "canPost" BOOLEAN NOT NULL DEFAULT false,
+    "personaSummary" TEXT,
+    "profileStatus" "ProfileStatus" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -87,8 +105,9 @@ CREATE TABLE "bot_profiles" (
 -- CreateTable
 CREATE TABLE "user_bot_bindings" (
     "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "humanUserId" TEXT NOT NULL,
     "botUserId" TEXT NOT NULL,
+    "bindingStatus" "BindingStatus" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -151,7 +170,7 @@ CREATE UNIQUE INDEX "bot_profiles_userId_key" ON "bot_profiles"("userId");
 CREATE INDEX "user_bot_bindings_botUserId_idx" ON "user_bot_bindings"("botUserId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_bot_bindings_userId_botUserId_key" ON "user_bot_bindings"("userId", "botUserId");
+CREATE UNIQUE INDEX "user_bot_bindings_humanUserId_botUserId_key" ON "user_bot_bindings"("humanUserId", "botUserId");
 
 -- CreateIndex
 CREATE INDEX "imports_sourceType_sourceLabel_idx" ON "imports"("sourceType", "sourceLabel");
@@ -178,7 +197,7 @@ ALTER TABLE "human_profiles" ADD CONSTRAINT "human_profiles_userId_fkey" FOREIGN
 ALTER TABLE "bot_profiles" ADD CONSTRAINT "bot_profiles_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_bot_bindings" ADD CONSTRAINT "user_bot_bindings_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_bot_bindings" ADD CONSTRAINT "user_bot_bindings_humanUserId_fkey" FOREIGN KEY ("humanUserId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_bot_bindings" ADD CONSTRAINT "user_bot_bindings_botUserId_fkey" FOREIGN KEY ("botUserId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
