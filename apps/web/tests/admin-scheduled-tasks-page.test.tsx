@@ -55,6 +55,7 @@ describe("admin scheduled tasks page", () => {
     expect(screen.getByText("IWhisper 最近内容同步")).toBeTruthy();
     expect(screen.getByText("20 分钟")).toBeTruthy();
     expect(screen.getByText("30 分钟")).toBeTruthy();
+    expect(screen.getByText("最近状态：succeeded")).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "立即执行一次" }),
     ).toBeTruthy();
