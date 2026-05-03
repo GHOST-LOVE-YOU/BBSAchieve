@@ -93,11 +93,21 @@ uv run byr-bbs clear-sync-cache
 
 ## Docker 构建
 
-在仓库根目录执行：
+当前 `backend/Dockerfile` 以 `backend/` 目录本身作为构建上下文。
+
+如果你在仓库根目录执行：
 
 ```bash
-docker build -f backend/Dockerfile -t bbs-sync-api:local .
+docker build -f backend/Dockerfile -t bbs-sync-api:local backend
 ```
+
+如果你已经进入 `backend/` 目录执行：
+
+```bash
+docker build -t bbs-sync-api:local .
+```
+
+如果你在 Dokploy 或其他平台上单独部署后端服务，请把 `Build Context` 设置为 `backend`；如果平台要求单独填写 Dockerfile 路径，则使用 `backend/Dockerfile` 或上下文内的 `Dockerfile`，两者都要和 `backend` 这个上下文保持一致。
 
 ## Docker 运行
 

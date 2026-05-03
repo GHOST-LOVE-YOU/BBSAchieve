@@ -1,0 +1,10 @@
+.env
+.env.*
+.venv
+.pytest_cache
+.state
+tests
+scripts
+__pycache__
+*.pyc
+AGENTS.md
