@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 import pytest
 
@@ -20,6 +21,7 @@ class FakeThread:
 @dataclass(slots=True)
 class FakeBoardPage:
     threads: list[FakeThread]
+    has_next_page: bool = False
 
 
 class FakeBoardService:
@@ -30,6 +32,25 @@ class FakeBoardService:
     def fetch_page(self, *, board_name: str, page: int = 1) -> FakeBoardPage:
         self.calls.append((board_name, page))
         return FakeBoardPage(threads=self.threads)
+
+
+@dataclass(slots=True)
+class FakeBoardThread:
+    article_id: str
+    title: str
+    reply_count: int | None
+    post_time: str
+    latest_reply_time: str
+
+
+class FakePagedBoardService:
+    def __init__(self, pages: dict[int, FakeBoardPage]) -> None:
+        self.pages = pages
+        self.calls: list[tuple[str, int]] = []
+
+    def fetch_page(self, *, board_name: str, page: int = 1) -> FakeBoardPage:
+        self.calls.append((board_name, page))
+        return self.pages[page]
 
 
 @dataclass(slots=True)
@@ -473,6 +494,108 @@ def test_list_updates_does_not_repeat_cached_boundary_floor() -> None:
     assert cache.get_thread_progress(board_name="test_board", article_id="123").recent_post_ids == [
         "p21"
     ]
+
+
+def test_parse_board_time_treats_clock_time_as_today(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reference_now = datetime(2026, 5, 3, 22, 10, 0)
+
+    parsed = SyncService._parse_board_time("22:03:42", now=reference_now)
+
+    assert parsed == datetime(2026, 5, 3, 22, 3, 42)
+
+
+def test_parse_board_time_treats_date_only_as_end_of_day() -> None:
+    parsed = SyncService._parse_board_time(
+        "2026-05-02",
+        now=datetime(2026, 5, 3, 22, 10, 0),
+    )
+
+    assert parsed == datetime(2026, 5, 2, 23, 59, 59)
+
+
+def test_list_updates_scans_until_first_page_with_out_of_window_thread() -> None:
+    page_1 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id="a1",
+                title="in window",
+                reply_count=0,
+                post_time="21:50:00",
+                latest_reply_time="22:05:00",
+            ),
+        ],
+        has_next_page=True,
+    )
+    page_2 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id="a2",
+                title="boundary in window",
+                reply_count=0,
+                post_time="21:20:00",
+                latest_reply_time="21:45:00",
+            ),
+            FakeBoardThread(
+                article_id="a3",
+                title="out of window",
+                reply_count=0,
+                post_time="20:00:00",
+                latest_reply_time="20:10:00",
+            ),
+        ],
+        has_next_page=True,
+    )
+    board_service = FakePagedBoardService({1: page_1, 2: page_2})
+    service = SyncService(
+        board_service=board_service,
+        thread_service=FakeThreadService(),
+        cache=InMemorySyncCache(),
+    )
+
+    result = service.list_updates(
+        board_name="IWhisper",
+        limit=20,
+        window_minutes=30,
+        now=datetime(2026, 5, 3, 22, 10, 0),
+    )
+
+    assert [thread.article_id for thread in result.threads] == ["a1", "a2"]
+    assert board_service.calls == [("IWhisper", 1), ("IWhisper", 2)]
+
+
+def test_list_updates_uses_post_time_when_reply_time_is_empty() -> None:
+    board_service = FakePagedBoardService(
+        {
+            1: FakeBoardPage(
+                threads=[
+                    FakeBoardThread(
+                        article_id="a1",
+                        title="new post",
+                        reply_count=0,
+                        post_time="22:00:00",
+                        latest_reply_time="",
+                    ),
+                ],
+                has_next_page=False,
+            )
+        }
+    )
+    service = SyncService(
+        board_service=board_service,
+        thread_service=FakeThreadService(),
+        cache=InMemorySyncCache(),
+    )
+
+    result = service.list_updates(
+        board_name="IWhisper",
+        limit=20,
+        window_minutes=30,
+        now=datetime(2026, 5, 3, 22, 10, 0),
+    )
+
+    assert [thread.article_id for thread in result.threads] == ["a1"]
 
 
 def test_backfill_thread_rejects_rewind_beyond_limit() -> None:
