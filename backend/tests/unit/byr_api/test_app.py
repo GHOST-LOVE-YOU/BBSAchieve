@@ -187,12 +187,14 @@ def test_sync_endpoint_passes_board_name_and_window_minutes(
 
     response = client.get(
         "/api/sync/updates",
-        params={"board_name": "IWhisper", "window_minutes": 30},
+        params={"board_name": "TestBoard", "window_minutes": 15},
         headers={"X-Sync-Token": "secret-token"},
     )
 
     assert response.status_code == 200
-    assert service.calls == [("IWhisper", 20, 30)]
+    assert service.calls == [("TestBoard", 20, 15)]
+    assert response.json()["board_name"] == "TestBoard"
+    assert response.json()["window_minutes"] == 15
 
 
 def test_sync_endpoint_returns_window_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -201,11 +203,12 @@ def test_sync_endpoint_returns_window_metadata(monkeypatch: pytest.MonkeyPatch) 
 
     response = client.get(
         "/api/sync/updates",
-        params={"board_name": "IWhisper", "window_minutes": 30},
+        params={"board_name": "TestBoard", "window_minutes": 15},
         headers={"X-Sync-Token": "secret-token"},
     )
 
-    assert response.json()["window_minutes"] == 30
+    assert response.json()["board_name"] == "TestBoard"
+    assert response.json()["window_minutes"] == 15
     assert response.json()["scanned_pages"] == 2
     assert response.json()["cutoff_at"] == "2026-05-03T21:40:00"
 

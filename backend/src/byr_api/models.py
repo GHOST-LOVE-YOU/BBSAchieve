@@ -24,7 +24,7 @@ class SyncThreadResponse:
 class SyncUpdatesResponse:
     board_name: str
     threads: list[SyncThreadResponse]
-    window_minutes: int | None = None
+    window_minutes: int
     scanned_pages: int = 1
     cutoff_at: str | None = None
 
