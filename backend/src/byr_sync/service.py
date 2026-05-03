@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime, time, timedelta
 from typing import Protocol
 
 from .models import SyncPost
@@ -11,16 +12,22 @@ from .models import SyncPost
 class SyncUpdateResult:
     board_name: str
     threads: list["SyncThread"]
+    window_minutes: int | None = None
+    scanned_pages: int = 1
+    cutoff_at: datetime | None = None
 
 
 class BoardThreadLike(Protocol):
     article_id: str
     title: str
     reply_count: int | None
+    post_time: str
+    latest_reply_time: str
 
 
 class BoardPageLike(Protocol):
     threads: list[BoardThreadLike]
+    has_next_page: bool
 
 
 class ThreadPageLike(Protocol):
@@ -83,12 +90,26 @@ class SyncService:
         self.board_service = board_service
         self.thread_service = thread_service
         self.cache = cache
+        self._last_scanned_pages = 0
 
-    def list_updates(self, *, board_name: str, limit: int) -> SyncUpdateResult:
-        board_page = self.board_service.fetch_page(board_name=board_name, page=1)
+    def list_updates(
+        self,
+        *,
+        board_name: str,
+        limit: int,
+        window_minutes: int | None = None,
+        now: datetime | None = None,
+    ) -> SyncUpdateResult:
+        reference_now = now or datetime.now()
+        candidate_threads = self._collect_candidate_threads(
+            board_name=board_name,
+            limit=limit,
+            window_minutes=window_minutes,
+            now=reference_now,
+        )
         threads: list[SyncThread] = []
 
-        for thread in board_page.threads[:limit]:
+        for thread in candidate_threads:
             reply_count = thread.reply_count or 0
             cached = self.cache.get_thread_progress(
                 board_name=board_name,
@@ -130,7 +151,17 @@ class SyncService:
                 )
             )
 
-        return SyncUpdateResult(board_name=board_name, threads=threads)
+        return SyncUpdateResult(
+            board_name=board_name,
+            threads=threads,
+            window_minutes=window_minutes,
+            scanned_pages=self._last_scanned_pages,
+            cutoff_at=(
+                reference_now - timedelta(minutes=window_minutes)
+                if window_minutes is not None
+                else None
+            ),
+        )
 
     def backfill_thread(
         self,
@@ -256,6 +287,41 @@ class SyncService:
             posts=posts,
         )
 
+    def _collect_candidate_threads(
+        self,
+        *,
+        board_name: str,
+        limit: int,
+        window_minutes: int | None,
+        now: datetime,
+    ) -> list[BoardThreadLike]:
+        if window_minutes is None:
+            self._last_scanned_pages = 1
+            board_page = self.board_service.fetch_page(board_name=board_name, page=1)
+            return board_page.threads[:limit]
+
+        cutoff = now - timedelta(minutes=window_minutes)
+        collected: list[BoardThreadLike] = []
+        page = 1
+        reached_out_of_window = False
+
+        while len(collected) < limit:
+            board_page = self.board_service.fetch_page(board_name=board_name, page=page)
+            self._last_scanned_pages = page
+            for thread in board_page.threads:
+                observed_time = self._resolve_thread_observed_time(thread, now=now)
+                if observed_time >= cutoff:
+                    collected.append(thread)
+                    if len(collected) >= limit:
+                        return collected
+                else:
+                    reached_out_of_window = True
+            if reached_out_of_window or not board_page.has_next_page:
+                break
+            page += 1
+
+        return collected
+
     @staticmethod
     def _build_posts(
         thread_posts: list[ThreadPostLike],
@@ -327,3 +393,21 @@ class SyncService:
     def _is_original_post_floor(floor_label: str) -> bool:
         normalized = floor_label.strip()
         return normalized == "楼主" or normalized == "0楼"
+
+    @staticmethod
+    def _resolve_thread_observed_time(thread: BoardThreadLike, *, now: datetime) -> datetime:
+        latest_reply_time = thread.latest_reply_time.strip()
+        if latest_reply_time:
+            return SyncService._parse_board_time(latest_reply_time, now=now)
+        return SyncService._parse_board_time(thread.post_time, now=now)
+
+    @staticmethod
+    def _parse_board_time(raw_time: str, *, now: datetime) -> datetime:
+        normalized = raw_time.strip()
+        if re.fullmatch(r"\d{2}:\d{2}:\d{2}", normalized):
+            clock_time = datetime.strptime(normalized, "%H:%M:%S").time()
+            return datetime.combine(now.date(), clock_time)
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", normalized):
+            parsed_date = datetime.strptime(normalized, "%Y-%m-%d").date()
+            return datetime.combine(parsed_date, time(23, 59, 59))
+        raise ValueError(f"Unsupported board time format: {raw_time}")

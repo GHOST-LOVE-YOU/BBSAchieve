@@ -582,7 +582,7 @@ def test_list_updates_uses_post_time_when_reply_time_is_empty() -> None:
                         title="old thread",
                         reply_count=0,
                         post_time="21:00:00",
-                        latest_reply_time="21:50:00",
+                        latest_reply_time="21:30:00",
                     ),
                 ],
                 has_next_page=False,
