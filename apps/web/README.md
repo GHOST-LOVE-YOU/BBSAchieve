@@ -24,6 +24,14 @@ DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5433/bbsachieve"
 docker build -f apps/web/Dockerfile -t bbs-web:local .
 ```
 
+如果你在 Dokploy 部署这个前端：
+
+- 构建方式请选择 `Dockerfile`，不要使用 `Nixpacks`
+- `Dockerfile` 路径填写 `apps/web/Dockerfile`
+- 构建上下文使用仓库根目录 `.`
+
+原因是当前仓库使用 `pnpm workspace`。`Nixpacks` 默认会在仓库根目录执行 `npm i`，会因为 `workspace:*` 依赖直接失败。
+
 ## Docker 运行
 
 运行前请准备好运行时依赖的环境变量，例如 `BYR_SYNC_API_BASE_URL`、`BYR_SYNC_API_TOKEN`、`LEGACY_DATABASE_URL`、`DATABASE_URL`。
@@ -38,3 +46,5 @@ docker run --rm -p 3000:3000 \
 ```
 
 容器启动后可通过本机 `3000` 端口访问应用。
+
+当前镜像采用 Next.js `standalone` 运行方式，容器启动命令由 `apps/web/Dockerfile` 内部处理，不需要再额外改成 `next start`。

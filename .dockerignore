@@ -4,6 +4,8 @@
 **/coverage
 **/.turbo
 **/.cache
+**/.env
+**/.env.*
 **/.DS_Store
 .git
 .github
@@ -11,4 +13,3 @@
 .idea
 docs
 *.log
-Dockerfile
