@@ -10,6 +10,8 @@ from byr_sync.cache import RedisSyncCache
 from byr_sync.models import SyncPost
 from byr_sync.service import SyncService
 
+type FakeBoardThreadLike = FakeThread | FakeBoardThread
+
 
 @dataclass(slots=True)
 class FakeThread:
@@ -20,7 +22,7 @@ class FakeThread:
 
 @dataclass(slots=True)
 class FakeBoardPage:
-    threads: list[FakeThread]
+    threads: list[FakeBoardThreadLike]
     has_next_page: bool = False
 
 
@@ -496,9 +498,7 @@ def test_list_updates_does_not_repeat_cached_boundary_floor() -> None:
     ]
 
 
-def test_parse_board_time_treats_clock_time_as_today(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_parse_board_time_treats_clock_time_as_today() -> None:
     reference_now = datetime(2026, 5, 3, 22, 10, 0)
 
     parsed = SyncService._parse_board_time("22:03:42", now=reference_now)
@@ -576,6 +576,13 @@ def test_list_updates_uses_post_time_when_reply_time_is_empty() -> None:
                         reply_count=0,
                         post_time="22:00:00",
                         latest_reply_time="",
+                    ),
+                    FakeBoardThread(
+                        article_id="a2",
+                        title="old thread",
+                        reply_count=0,
+                        post_time="21:00:00",
+                        latest_reply_time="21:50:00",
                     ),
                 ],
                 has_next_page=False,
