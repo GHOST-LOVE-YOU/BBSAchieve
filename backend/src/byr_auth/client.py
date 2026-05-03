@@ -141,6 +141,6 @@ class ByrAuthClient:
             attempted_encodings.append(encoding)
             try:
                 return response.content.decode(encoding)
-            except UnicodeDecodeError:
+            except (LookupError, UnicodeDecodeError):
                 continue
         return response.content.decode("utf-8", errors="replace")

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from pathlib import Path
 
 from byr_auth.client import ByrAuthClient
 from byr_auth.models import AuthError
@@ -35,6 +34,17 @@ def test_parse_json_falls_back_when_response_encoding_is_wrong() -> None:
     response = make_response(
         content='{"ajax_msg":"登录成功"}'.encode("gbk"),
         encoding="utf-8",
+    )
+
+    payload = ByrAuthClient._parse_json(response)
+
+    assert payload["ajax_msg"] == "登录成功"
+
+
+def test_parse_json_falls_back_when_response_encoding_is_invalid() -> None:
+    response = make_response(
+        content='{"ajax_msg":"登录成功"}'.encode("gbk"),
+        encoding="definitely-not-a-real-codec",
     )
 
     payload = ByrAuthClient._parse_json(response)
