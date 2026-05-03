@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "bbs-mobile-template",
-    "slug": "bbs-mobile-template",
+    "name": "BYRAchieve",
+    "slug": "byrachieve",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "bbsmobiletemplate",
+    "scheme": "byrachieve",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.orlco"
     },
     "web": {
       "output": "static",
@@ -39,6 +40,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "055670c5-bb3f-4fc4-92d7-ae1ee587a5d1"
+      }
+    },
+    "owner": "yinyra"
   }
 }
