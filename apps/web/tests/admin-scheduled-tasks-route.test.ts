@@ -88,7 +88,7 @@ describe("admin scheduled tasks run route", () => {
 
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe(
-      "http://localhost/admin/scheduled-tasks?runTaskKey=iwhisper_recent_sync&runStatus=succeeded",
+      "/admin/scheduled-tasks?runTaskKey=iwhisper_recent_sync&runStatus=succeeded",
     );
   });
 });

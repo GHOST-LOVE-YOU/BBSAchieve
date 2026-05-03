@@ -25,7 +25,6 @@ async function readRedirectTo(request: Request) {
 }
 
 function buildRedirectUrl(
-  request: Request,
   redirectTo: string,
   input: {
     taskKey: string;
@@ -33,13 +32,13 @@ function buildRedirectUrl(
     errorMessage?: string | null;
   },
 ) {
-  const url = new URL(redirectTo, request.url);
+  const url = new URL(redirectTo, "http://localhost");
   url.searchParams.set("runTaskKey", input.taskKey);
   url.searchParams.set("runStatus", input.status);
   if (input.errorMessage) {
     url.searchParams.set("runMessage", input.errorMessage);
   }
-  return url;
+  return `${url.pathname}${url.search}`;
 }
 
 export async function POST(
@@ -62,14 +61,16 @@ export async function POST(
     });
 
     if (redirectTo) {
-      return NextResponse.redirect(
-        buildRedirectUrl(request, redirectTo, {
+      return new NextResponse(null, {
+        status: 303,
+        headers: {
+          location: buildRedirectUrl(redirectTo, {
           taskKey,
           status: run.status,
           errorMessage: run.status === "failed" ? run.errorMessage : null,
-        }),
-        { status: 303 },
-      );
+          }),
+        },
+      });
     }
 
     if (run.status === "failed") {
