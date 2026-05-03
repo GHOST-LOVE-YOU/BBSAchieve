@@ -3,7 +3,27 @@ import { prisma } from "@/src/server/db/client";
 import { runScheduledTask } from "./runScheduledTask";
 import { scheduledTasks, type ScheduledTaskDefinition } from "./taskRegistry";
 
-let schedulerStarted = false;
+type SchedulerIntervalHandle = ReturnType<typeof setInterval>;
+
+type WebSchedulerState = {
+  started: boolean;
+  intervalHandles: SchedulerIntervalHandle[];
+};
+
+const globalForWebScheduler = globalThis as typeof globalThis & {
+  __bbsWebSchedulerState__?: WebSchedulerState;
+};
+
+function getSchedulerState(): WebSchedulerState {
+  if (!globalForWebScheduler.__bbsWebSchedulerState__) {
+    globalForWebScheduler.__bbsWebSchedulerState__ = {
+      started: false,
+      intervalHandles: [],
+    };
+  }
+
+  return globalForWebScheduler.__bbsWebSchedulerState__;
+}
 
 function readEnabledFlag() {
   const value = process.env.WEB_SCHEDULER_ENABLED?.trim().toLowerCase();
@@ -31,29 +51,46 @@ async function runTask(task: ScheduledTaskDefinition) {
 }
 
 function defaultScheduleTaskLoop(task: ScheduledTaskDefinition) {
+  const state = getSchedulerState();
+
   if (readRunOnBootFlag()) {
     void runTask(task);
   }
 
   const intervalMs = task.intervalMinutes * 60 * 1000;
-  setInterval(() => {
+  const intervalHandle = setInterval(() => {
     void runTask(task);
   }, intervalMs);
+
+  if (typeof intervalHandle.unref === "function") {
+    intervalHandle.unref();
+  }
+
+  state.intervalHandles.push(intervalHandle);
 }
 
 export async function startWebScheduler(deps?: {
   scheduleTaskLoop?: (task: ScheduledTaskDefinition) => void;
 }) {
-  if (schedulerStarted || !readEnabledFlag()) {
+  const state = getSchedulerState();
+
+  if (state.started || !readEnabledFlag()) {
     return;
   }
-  schedulerStarted = true;
 
   const scheduleTaskLoop = deps?.scheduleTaskLoop ?? defaultScheduleTaskLoop;
-  for (const task of scheduledTasks) {
-    if (!task.enabled) {
-      continue;
+
+  try {
+    for (const task of scheduledTasks) {
+      if (!task.enabled) {
+        continue;
+      }
+      scheduleTaskLoop(task);
     }
-    scheduleTaskLoop(task);
+
+    state.started = true;
+  } catch (error) {
+    state.started = false;
+    throw error;
   }
 }
