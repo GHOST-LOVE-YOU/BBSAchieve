@@ -21,16 +21,17 @@ DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5433/bbsachieve"
 在仓库根目录执行：
 
 ```bash
-docker build -f apps/web/Dockerfile -t bbs-web:local .
+docker build -f Dockerfile.web -t bbs-web:local .
 ```
 
 如果你在 Dokploy 部署这个前端：
 
+- Git Provider 里的 `Build Path` 保持仓库根目录，使用 `.` 或留空，不要填 `apps/web`
 - 构建方式请选择 `Dockerfile`，不要使用 `Nixpacks`
-- `Dockerfile` 路径填写 `apps/web/Dockerfile`
-- 构建上下文使用仓库根目录 `.`
+- `Dockerfile` 路径优先填写仓库根目录的 `Dockerfile.web`
+- `Docker Context Path` 明确填写 `.`
 
-原因是当前仓库使用 `pnpm workspace`。`Nixpacks` 默认会在仓库根目录执行 `npm i`，会因为 `workspace:*` 依赖直接失败。
+原因是当前仓库使用 `pnpm workspace`。`Nixpacks` 默认会在仓库根目录执行 `npm i`，会因为 `workspace:*` 依赖直接失败；而如果 `Build Path` 填成 `apps/web`，或者 `Docker Context Path` 没有明确指到根目录，Docker 构建上下文里又会丢失根目录的 `pnpm-workspace.yaml` 和共享包清单，同样无法构建。
 
 ## Docker 运行
 
