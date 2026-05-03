@@ -53,6 +53,9 @@ describe("admin byr sync route", () => {
     routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 0,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [],
     });
     routeMocks.mapSyncPayload.mockReturnValue({
@@ -78,11 +81,17 @@ describe("admin byr sync route", () => {
 
     const response = await POST();
 
-    expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledTimes(1);
+    expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledWith({
+      boardName: "IWhisper",
+      windowMinutes: 30,
+    });
     expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
     expect(routeMocks.fetchSyncThreadSnapshot).not.toHaveBeenCalled();
     expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 0,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [],
     });
     expect(routeMocks.importSyncBatch).toHaveBeenCalledWith(routeMocks.prisma, {
@@ -116,6 +125,9 @@ describe("admin byr sync route", () => {
     routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 0,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [],
     });
     routeMocks.mapSyncPayload.mockReturnValue({
@@ -151,6 +163,9 @@ describe("admin byr sync route", () => {
     });
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [
         {
           article_id: "8843752",
@@ -204,6 +219,9 @@ describe("admin byr sync route", () => {
     });
     expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [
         {
           article_id: "8843752",
@@ -235,6 +253,9 @@ describe("admin byr sync route", () => {
     routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [
         {
           article_id: "8843752",
@@ -280,6 +301,9 @@ describe("admin byr sync route", () => {
     });
     expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [
         {
           article_id: "8843752",
@@ -308,6 +332,9 @@ describe("admin byr sync route", () => {
     });
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [
         {
           article_id: "8843915",
@@ -397,6 +424,9 @@ describe("admin byr sync route", () => {
     expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
     expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [
         {
           article_id: "8843915",
@@ -446,6 +476,9 @@ describe("admin byr sync route", () => {
     });
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [
         {
           article_id: "8843915",
@@ -482,6 +515,9 @@ describe("admin byr sync route", () => {
     expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
     expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [
         {
           article_id: "8843915",
@@ -502,6 +538,9 @@ describe("admin byr sync route", () => {
     });
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [
         {
           article_id: "8843915",

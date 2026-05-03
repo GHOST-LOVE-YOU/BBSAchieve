@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server";
+import type { PrismaClient } from "@prisma/client";
 
 import { prisma } from "@/src/server/db/client";
 import { fetchSyncOriginalPost } from "@/src/server/imports/fetchSyncOriginalPost";
 import { fetchSyncThreadSnapshot } from "@/src/server/imports/fetchSyncThreadSnapshot";
 import { fetchSyncUpdates } from "@/src/server/imports/fetchSyncUpdates";
-import { importSyncBatch } from "@/src/server/imports/importSyncBatch";
+import {
+  importSyncBatch,
+  type ImportSyncPrisma,
+} from "@/src/server/imports/importSyncBatch";
 import { mapSyncPayload } from "@/src/server/imports/mapSyncPayload";
 
-function hasOriginalPost(
-  thread: Awaited<ReturnType<typeof fetchSyncUpdates>>["threads"][number],
-): boolean {
-  return thread.posts.some((post) => {
-    const normalized = post.floor_label.trim();
-    return normalized === "楼主" || normalized === "0楼";
-  });
-}
+export type ByrSyncImportPrisma = Pick<PrismaClient, "thread"> & ImportSyncPrisma;
 
 function parseFloorIndex(floorLabel: string): number | null {
   const normalized = floorLabel.trim();
@@ -34,10 +31,13 @@ function parseFloorIndex(floorLabel: string): number | null {
   return match ? Number.parseInt(match[1] ?? "", 10) : null;
 }
 
-async function enrichThreadsWithSourceData(payload: Awaited<ReturnType<typeof fetchSyncUpdates>>) {
+async function enrichThreadsWithSourceData(
+  prismaClient: Pick<PrismaClient, "thread">,
+  payload: Awaited<ReturnType<typeof fetchSyncUpdates>>,
+) {
   const threads = await Promise.all(
     payload.threads.map(async (thread) => {
-      const existingThread = await prisma.thread.findUnique({
+      const existingThread = await prismaClient.thread.findUnique({
         where: {
           sourceBoardSlug_sourceThreadId: {
             sourceBoardSlug: "iwhisper",
@@ -107,12 +107,27 @@ async function enrichThreadsWithSourceData(payload: Awaited<ReturnType<typeof fe
   };
 }
 
+export async function runByrSyncImport(input: {
+  prisma: ByrSyncImportPrisma;
+  boardName: string;
+  windowMinutes: number;
+}) {
+  const payload = await fetchSyncUpdates({
+    boardName: input.boardName,
+    windowMinutes: input.windowMinutes,
+  });
+  const enrichedPayload = await enrichThreadsWithSourceData(input.prisma, payload);
+  const batch = mapSyncPayload(enrichedPayload);
+  return importSyncBatch(input.prisma, batch);
+}
+
 export async function POST() {
   try {
-    const payload = await fetchSyncUpdates();
-    const enrichedPayload = await enrichThreadsWithSourceData(payload);
-    const batch = mapSyncPayload(enrichedPayload);
-    const result = await importSyncBatch(prisma, batch);
+    const result = await runByrSyncImport({
+      prisma,
+      boardName: "IWhisper",
+      windowMinutes: 30,
+    });
 
     return NextResponse.json({ ok: true, result });
   } catch (error) {
