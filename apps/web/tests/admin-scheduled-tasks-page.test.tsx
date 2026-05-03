@@ -23,10 +23,16 @@ vi.mock("next/link", () => ({
   },
 }));
 
-import AdminScheduledTasksPage from "../app/admin/scheduled-tasks/page";
+import AdminScheduledTasksPage, {
+  dynamic,
+} from "../app/admin/scheduled-tasks/page";
 import { listScheduledTasks } from "@/src/server/admin/listScheduledTasks";
 
 describe("admin scheduled tasks page", () => {
+  it("marks the page as dynamic so build-time prerender does not require DATABASE_URL", () => {
+    expect(dynamic).toBe("force-dynamic");
+  });
+
   it("renders scheduled tasks and latest run summaries", async () => {
     vi.mocked(listScheduledTasks).mockResolvedValue([
       {

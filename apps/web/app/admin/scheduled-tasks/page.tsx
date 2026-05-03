@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { listScheduledTasks } from "@/src/server/admin/listScheduledTasks";
 
+export const dynamic = "force-dynamic";
+
 type AdminScheduledTasksPageProps = {
   searchParams?: Promise<{
     runTaskKey?: string;
