@@ -61,6 +61,12 @@ uv run byr-sync-cache
   - `GET /api/sync/updates`
   - `GET /api/sync/backfill`
 
+示例：
+
+- `GET /api/sync/updates?board_name=IWhisper&window_minutes=30`
+
+`/api/sync/updates` 会从第 1 页开始按最近活动顺序翻页，并在遇到窗口外主题后停止继续翻页。版面列表中的 `HH:MM:SS` 按当天时间解析，`YYYY-MM-DD` 按当日 `23:59:59` 解析。
+
 同步接口会复用本地北邮人账号登录态，因此 `BBS_USERNAME` 和 `BBS_PASSWORD` 仍然需要在 `backend/.env` 中配置。`BYR_SYNC_API_TOKEN` 用于保护同步接口，`BYR_SYNC_REDIS_URL` 需要指向可用的 Redis 连接地址。
 
 ## 清理同步缓存

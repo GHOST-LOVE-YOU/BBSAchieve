@@ -35,7 +35,12 @@ docker build -f Dockerfile.web -t bbs-web:local .
 
 ## Docker 运行
 
-运行前请准备好运行时依赖的环境变量，例如 `BYR_SYNC_API_BASE_URL`、`BYR_SYNC_API_TOKEN`、`LEGACY_DATABASE_URL`、`DATABASE_URL`。
+运行前请准备好运行时依赖的环境变量，例如 `BYR_SYNC_API_BASE_URL`、`BYR_SYNC_API_TOKEN`、`LEGACY_DATABASE_URL`、`DATABASE_URL`、`WEB_SCHEDULER_ENABLED`、`WEB_SCHEDULER_RUN_ON_BOOT`。
+
+其中：
+
+- `WEB_SCHEDULER_ENABLED=false` 可用于本地禁用定时任务
+- `WEB_SCHEDULER_RUN_ON_BOOT=true` 控制进程启动后是否立即执行一次
 
 ```bash
 docker run --rm -p 3000:3000 \
@@ -43,9 +48,15 @@ docker run --rm -p 3000:3000 \
   -e BYR_SYNC_API_TOKEN=__ASK_USER_BEFORE_RUNNING__ \
   -e LEGACY_DATABASE_URL=__ASK_USER_BEFORE_RUNNING__ \
   -e DATABASE_URL=__ASK_USER_BEFORE_RUNNING__ \
+  -e WEB_SCHEDULER_ENABLED=true \
+  -e WEB_SCHEDULER_RUN_ON_BOOT=false \
   bbs-web:local
 ```
 
 容器启动后可通过本机 `3000` 端口访问应用。
 
 当前镜像采用 Next.js `standalone` 运行方式，容器启动命令由 `apps/web/Dockerfile` 内部处理，不需要再额外改成 `next start`。
+
+## 管理入口
+
+管理员可以通过 `/admin/scheduled-tasks` 页面查看当前硬编码定时任务、最近执行状态，并手动触发“立即执行一次”。该页面也可以从 `/admin` 总览入口进入。

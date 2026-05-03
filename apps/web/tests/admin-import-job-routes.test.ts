@@ -29,6 +29,8 @@ import { POST as resumePOST } from "../app/admin/api/import-jobs/[jobId]/resume/
 import { POST as stopPOST } from "../app/admin/api/import-jobs/[jobId]/stop/route";
 
 describe("admin import job routes", () => {
+  const request = new Request("http://localhost/admin/api/import-jobs");
+
   it("starts a legacy iwhisper migration job and kicks off the runner", async () => {
     routeMocks.createLegacyImportJob.mockResolvedValue({ id: "job-1" });
 
@@ -50,7 +52,9 @@ describe("admin import job routes", () => {
     });
     routeMocks.markJobRunning.mockResolvedValue({});
 
-    const response = await resumePOST({}, { params: Promise.resolve({ jobId: "job-2" }) } as any);
+    const response = await resumePOST(request, {
+      params: Promise.resolve({ jobId: "job-2" }),
+    });
 
     expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-2");
     expect(routeMocks.markJobRunning).toHaveBeenCalledWith(routeMocks.prisma, "job-2", "cursor-2");
@@ -69,7 +73,9 @@ describe("admin import job routes", () => {
     });
     routeMocks.markJobPaused.mockResolvedValue({});
 
-    const response = await stopPOST({}, { params: Promise.resolve({ jobId: "job-3" }) } as any);
+    const response = await stopPOST(request, {
+      params: Promise.resolve({ jobId: "job-3" }),
+    });
 
     expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-3");
     expect(routeMocks.markJobPaused).toHaveBeenCalledWith(routeMocks.prisma, "job-3");

@@ -148,6 +148,9 @@ describe("mapSyncPayload", () => {
   it("normalizes the real byr sync updates payload", () => {
     const batch = mapSyncPayload({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-04-25T18:37:24+08:00",
       threads: [
         {
           article_id: "8830220",
@@ -216,6 +219,9 @@ describe("mapSyncPayload", () => {
   it("uses the display name as the stable author username fallback", () => {
     const batch = mapSyncPayload({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-04-25T18:37:24+08:00",
       threads: [
         {
           article_id: "8830221",
@@ -248,6 +254,9 @@ describe("mapSyncPayload", () => {
   it("maps real byr floor labels into original post plus replies", () => {
     const batch = mapSyncPayload({
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-04-26T13:55:36+08:00",
       threads: [
         {
           article_id: "8830222",
@@ -290,6 +299,9 @@ describe("mapSyncPayload", () => {
   it("preserves the legacy alias", () => {
     const payload = {
       board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 0,
+      cutoff_at: "2026-05-03T21:40:00",
       threads: [],
     };
 
