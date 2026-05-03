@@ -8,10 +8,13 @@ export const dynamic = "force-dynamic";
 
 export default async function BoardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ boardId: string }>;
+  searchParams?: Promise<{ page?: string }>;
 }) {
   const { boardId } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const readingRepository = createReadingRepository();
   const board =
     (await readingRepository.findBoardById(boardId)) ??
@@ -22,15 +25,23 @@ export default async function BoardPage({
   }
 
   try {
+    const pageParam = resolvedSearchParams?.page;
+    const parsedPage =
+      pageParam == null || pageParam === "" ? 1 : Number.parseInt(pageParam, 10);
     const result = await listBoardThreads({
+      boardId: board.id,
       boardSlug: board.slug,
       limit: 20,
+      page: parsedPage,
     });
 
     return (
       <main className="min-h-screen p-8">
         <h1 className="text-3xl font-semibold">{board.name}</h1>
         <p className="mt-4 text-base text-zinc-700">{board.description}</p>
+        <p className="mt-2 text-sm text-zinc-500">
+          第 {result.page} 页，共 {result.totalPages} 页 · {result.totalCount} 个帖子
+        </p>
         <div className="mt-6 space-y-4">
           {result.threads.map((thread) => (
             <section key={thread.id} className="rounded-xl border border-zinc-200 p-4">
@@ -43,6 +54,28 @@ export default async function BoardPage({
               <p className="mt-2 text-sm text-zinc-500">{thread.lastReplyAt ?? "暂无回复"}</p>
             </section>
           ))}
+        </div>
+        <div className="mt-6 flex gap-3">
+          {result.hasPreviousPage ? (
+            <Link
+              className="inline-flex rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700"
+              href={
+                result.page - 1 === 1
+                  ? `/boards/${board.slug}`
+                  : `/boards/${board.slug}?page=${result.page - 1}`
+              }
+            >
+              上一页
+            </Link>
+          ) : null}
+          {result.hasNextPage ? (
+            <Link
+              className="inline-flex rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700"
+              href={`/boards/${board.slug}?page=${result.page + 1}`}
+            >
+              下一页
+            </Link>
+          ) : null}
         </div>
       </main>
     );

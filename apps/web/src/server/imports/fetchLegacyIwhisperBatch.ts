@@ -114,18 +114,18 @@ async function readPosts(
 ): Promise<LegacyPostRow[]> {
   const { updatedAt, postId } = parseCursorThreadKey(cursorThreadKey);
   const params: unknown[] = [limit];
-  const whereParts = [`area = 'IWhisper'`];
+  const whereParts = [`"area" = 'IWhisper'`];
 
   if (updatedAt && postId) {
-    params.unshift(updatedAt.toISOString(), postId);
-    whereParts.push(`(updatedAt < $2 OR (updatedAt = $2 AND id < $3))`);
+    params.push(updatedAt.toISOString(), postId);
+    whereParts.push(`("updatedAt" < $2 OR ("updatedAt" = $2 AND "id" < $3))`);
   }
 
   const sql = `
-    SELECT id, byr_id, topic, area, createdAt, updatedAt, userId
+    SELECT "id", "byr_id", "topic", "area", "createdAt", "updatedAt", "userId"
     FROM "Post"
     WHERE ${whereParts.join(" AND ")}
-    ORDER BY updatedAt DESC, id DESC
+    ORDER BY "updatedAt" DESC, "id" DESC
     LIMIT $1
   `;
 
@@ -142,10 +142,10 @@ async function readComments(
   }
 
   const sql = `
-    SELECT id, sequence, content, time, postId, userId
+    SELECT "id", "sequence", "content", "time", "postId", "userId"
     FROM "Comment"
-    WHERE postId = ANY($1)
-    ORDER BY postId DESC, sequence ASC
+    WHERE "postId" = ANY($1)
+    ORDER BY "postId" DESC, "sequence" ASC
   `;
 
   const result = await queryLegacyDatabase(sql, [postIds]);
@@ -161,9 +161,9 @@ async function readUsers(
   }
 
   const sql = `
-    SELECT id, name, tag
+    SELECT "id", "name", "tag"
     FROM "User"
-    WHERE id = ANY($1)
+    WHERE "id" = ANY($1)
   `;
 
   const result = await queryLegacyDatabase(sql, [userIds]);

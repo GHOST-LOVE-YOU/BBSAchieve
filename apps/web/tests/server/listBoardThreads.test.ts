@@ -1,85 +1,154 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  decodeThreadCursor,
-  encodeThreadCursor,
-  listBoardThreads,
-} from "@/src/server/reading/listBoardThreads";
-
-describe("thread cursor helpers", () => {
-  it("round-trips a cursor token", () => {
-    const cursor = {
-      lastReplyAt: "2026-05-01T09:05:00.000Z",
-      threadId: "thread:read-path",
-    };
-
-    expect(decodeThreadCursor(encodeThreadCursor(cursor))).toEqual(cursor);
-  });
-
-  it("returns null for invalid cursor tokens", () => {
-    expect(decodeThreadCursor("")).toBeNull();
-    expect(decodeThreadCursor("not-a-cursor")).toBeNull();
-    expect(decodeThreadCursor(Buffer.from("{\"bad\":true}").toString("base64url"))).toBeNull();
-  });
-});
+import { listBoardThreads } from "@/src/server/reading/listBoardThreads";
 
 describe("listBoardThreads", () => {
-  it("sorts by lastReplyAt desc and thread id as a stable tiebreaker", async () => {
-    const fetchBoardThreads = vi.fn(async (boardSlug: string) => {
-      expect(boardSlug).toBe("job");
+  it("queries prisma with page-based pagination ordered by lastReplyAt desc and id desc", async () => {
+    const count = vi.fn().mockResolvedValue(45);
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "thread:21",
+        title: "Page 2 thread 1",
+        lastReplyAt: new Date("2026-05-01T09:05:00.000Z"),
+      },
+      {
+        id: "thread:22",
+        title: "Page 2 thread 2",
+        lastReplyAt: new Date("2026-05-01T08:10:00.000Z"),
+      },
+    ]);
+    const client = {
+      thread: {
+        count,
+        findMany,
+      },
+    } as any;
 
-      return [
+    const result = await listBoardThreads(
+      { boardId: "board:job", boardSlug: "job", limit: 20, page: 2 },
+      { client },
+    );
+
+    expect(count).toHaveBeenCalledWith({
+      where: {
+        boardId: "board:job",
+      },
+    });
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        boardId: "board:job",
+      },
+      orderBy: [
         {
-          id: "thread:later",
-          boardSlug: "job",
-          lastReplyAt: "2026-05-01T09:05:00.000Z",
+          lastReplyAt: {
+            sort: "desc",
+            nulls: "last",
+          },
         },
         {
-          id: "thread:tie-b",
-          boardSlug: "job",
-          lastReplyAt: "2026-05-01T08:10:00.000Z",
+          id: "desc",
         },
+      ],
+      skip: 20,
+      take: 20,
+      select: {
+        id: true,
+        title: true,
+        lastReplyAt: true,
+      },
+    });
+    expect(result.threads.map((thread) => thread.id)).toEqual(["thread:21", "thread:22"]);
+    expect(result.page).toBe(2);
+    expect(result.totalPages).toBe(3);
+    expect(result.totalCount).toBe(45);
+    expect(result.hasPreviousPage).toBe(true);
+    expect(result.hasNextPage).toBe(true);
+  });
+
+  it("clamps oversized page numbers to the last existing page", async () => {
+    const count = vi.fn().mockResolvedValue(21);
+    const findMany = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
         {
-          id: "thread:tie-a",
-          boardSlug: "job",
-          lastReplyAt: "2026-05-01T08:10:00.000Z",
-        },
-        {
-          id: "thread:none",
-          boardSlug: "job",
+          id: "thread:last",
+          title: "Last page thread",
           lastReplyAt: null,
         },
-        {
-          id: "thread:other-board",
-          boardSlug: "hot",
-          lastReplyAt: "2026-05-01T11:00:00.000Z",
-        },
-      ];
-    });
-
-    const firstPage = await listBoardThreads(
-      { boardSlug: "job", limit: 2 },
-      { fetchBoardThreads },
-    );
-
-    expect(firstPage.threads.map((thread) => thread.id)).toEqual([
-      "thread:later",
-      "thread:tie-b",
-    ]);
-    expect(firstPage.nextCursor).toBeTruthy();
-
-    const secondPage = await listBoardThreads(
-      {
-        boardSlug: "job",
-        limit: 2,
-        cursor: firstPage.nextCursor,
+      ]);
+    const client = {
+      thread: {
+        count,
+        findMany,
       },
-      { fetchBoardThreads },
+    } as any;
+
+    const result = await listBoardThreads(
+      { boardId: "board:job", boardSlug: "job", limit: 20, page: 99 },
+      { client },
     );
 
-    expect(secondPage.threads.map((thread) => thread.id)).toEqual([
-      "thread:tie-a",
-      "thread:none",
-    ]);
+    expect(findMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        boardId: "board:job",
+      },
+      orderBy: [
+        {
+          lastReplyAt: {
+            sort: "desc",
+            nulls: "last",
+          },
+        },
+        {
+          id: "desc",
+        },
+      ],
+      skip: 1960,
+      take: 20,
+      select: {
+        id: true,
+        title: true,
+        lastReplyAt: true,
+      },
+    });
+    expect(findMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        boardId: "board:job",
+      },
+      orderBy: [
+        {
+          lastReplyAt: {
+            sort: "desc",
+            nulls: "last",
+          },
+        },
+        {
+          id: "desc",
+        },
+      ],
+      skip: 20,
+      take: 20,
+      select: {
+        id: true,
+        title: true,
+        lastReplyAt: true,
+      },
+    });
+    expect(result.page).toBe(2);
+    expect(result.totalPages).toBe(2);
+    expect(result.hasPreviousPage).toBe(true);
+    expect(result.hasNextPage).toBe(false);
+  });
+
+  it("rejects invalid page values", async () => {
+    await expect(
+      listBoardThreads({
+        boardId: "board:job",
+        boardSlug: "job",
+        limit: 20,
+        page: 0,
+      }),
+    ).rejects.toThrow("Invalid thread page");
   });
 });

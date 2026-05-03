@@ -1,11 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 
 import { prisma } from "../db/client";
-
-export type ThreadCursor = {
-  lastReplyAt: string | null;
-  threadId: string;
-};
 
 export type BoardThreadRow = {
   id: string;
@@ -15,9 +10,10 @@ export type BoardThreadRow = {
 };
 
 export type ListBoardThreadsInput = {
+  boardId: string;
   boardSlug: string;
   limit: number;
-  cursor?: string | null;
+  page?: number;
 };
 
 export type ListBoardThreadsResult = {
@@ -27,11 +23,15 @@ export type ListBoardThreadsResult = {
     title: string | null;
     lastReplyAt: string | null;
   }>;
-  nextCursor: string | null;
+  page: number;
+  totalPages: number;
+  totalCount: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 };
 
 export type ListBoardThreadsDeps = {
-  fetchBoardThreads?: (boardSlug: string) => Promise<BoardThreadRow[]>;
+  client?: PrismaThreadClient;
 };
 
 type PrismaThreadClient = Pick<PrismaClient, "thread">;
@@ -44,175 +44,109 @@ function normalizeDate(value: string | Date | null): string | null {
   return value instanceof Date ? value.toISOString() : value;
 }
 
-function encodeBase64UrlJson(value: unknown): string {
-  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
-}
-
-function decodeBase64UrlJson(value: string): unknown | null {
-  try {
-    const raw = Buffer.from(value, "base64url").toString("utf8");
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
-}
-
-function getCursorSortKey(input: {
-  lastReplyAt: string | Date | null;
-  threadId: string;
-}): { lastReplyAtMs: number; threadId: string } {
-  return {
-    lastReplyAtMs:
-      input.lastReplyAt == null ? Number.NEGATIVE_INFINITY : new Date(input.lastReplyAt).getTime(),
-    threadId: input.threadId,
-  };
-}
-
-function compareThreadsDesc(a: BoardThreadRow, b: BoardThreadRow): number {
-  const left = getCursorSortKey({
-    lastReplyAt: a.lastReplyAt,
-    threadId: a.id,
-  });
-  const right = getCursorSortKey({
-    lastReplyAt: b.lastReplyAt,
-    threadId: b.id,
-  });
-
-  if (left.lastReplyAtMs !== right.lastReplyAtMs) {
-    return right.lastReplyAtMs - left.lastReplyAtMs;
+function normalizePage(page: number | undefined): number {
+  if (page == null) {
+    return 1;
   }
 
-  if (left.threadId === right.threadId) {
-    return 0;
+  if (!Number.isInteger(page) || page < 1) {
+    throw new Error("Invalid thread page");
   }
 
-  return left.threadId > right.threadId ? -1 : 1;
-}
-
-function isAfterCursor(row: BoardThreadRow, cursor: ThreadCursor): boolean {
-  const rowReplyAt = row.lastReplyAt == null ? null : new Date(row.lastReplyAt).getTime();
-  const cursorReplyAt =
-    cursor.lastReplyAt == null ? null : new Date(cursor.lastReplyAt).getTime();
-
-  if (rowReplyAt !== cursorReplyAt) {
-    if (cursorReplyAt == null) {
-      return false;
-    }
-
-    if (rowReplyAt == null) {
-      return true;
-    }
-
-    return rowReplyAt < cursorReplyAt;
-  }
-
-  return row.id < cursor.threadId;
-}
-
-export function encodeThreadCursor(input: ThreadCursor): string {
-  return encodeBase64UrlJson(input);
-}
-
-export function decodeThreadCursor(token: string): ThreadCursor | null {
-  const parsed = decodeBase64UrlJson(token);
-
-  if (
-    !parsed ||
-    typeof parsed !== "object" ||
-    !("threadId" in parsed) ||
-    !("lastReplyAt" in parsed)
-  ) {
-    return null;
-  }
-
-  const { threadId, lastReplyAt } = parsed as {
-    threadId: unknown;
-    lastReplyAt: unknown;
-  };
-
-  if (
-    typeof threadId !== "string" ||
-    threadId.trim().length === 0 ||
-    (lastReplyAt !== null && typeof lastReplyAt !== "string")
-  ) {
-    return null;
-  }
-
-  return {
-    threadId,
-    lastReplyAt,
-  };
-}
-
-async function defaultFetchBoardThreads(
-  boardSlug: string,
-  client: PrismaThreadClient = prisma,
-): Promise<BoardThreadRow[]> {
-  const threads = await client.thread.findMany({
-    where: {
-      board: {
-        slug: boardSlug,
-      },
-    },
-    select: {
-      id: true,
-      title: true,
-      lastReplyAt: true,
-      board: {
-        select: {
-          slug: true,
-        },
-      },
-    },
-  });
-
-  return threads.map((thread) => ({
-    id: thread.id,
-    boardSlug: thread.board.slug,
-    title: thread.title,
-    lastReplyAt: normalizeDate(thread.lastReplyAt),
-  }));
+  return page;
 }
 
 export async function listBoardThreads(
   input: ListBoardThreadsInput,
   deps: ListBoardThreadsDeps = {},
 ): Promise<ListBoardThreadsResult> {
-  const fetchBoardThreads = deps.fetchBoardThreads
-    ? deps.fetchBoardThreads
-    : (boardSlug: string) => defaultFetchBoardThreads(boardSlug);
-
-  const threads = (await fetchBoardThreads(input.boardSlug))
-    .filter((thread) => thread.boardSlug === input.boardSlug)
-    .map((thread) => ({
-      ...thread,
-      title: thread.title ?? null,
-      lastReplyAt: normalizeDate(thread.lastReplyAt),
-    }))
-    .sort(compareThreadsDesc);
-
-  const cursor =
-    input.cursor == null || input.cursor === "" ? null : decodeThreadCursor(input.cursor);
-
-  if (input.cursor && !cursor) {
-    throw new Error("Invalid thread cursor");
+  if (input.limit < 1) {
+    throw new Error("Thread limit must be at least 1");
   }
 
-  const remaining = cursor
-    ? threads.filter((thread) => isAfterCursor(thread, cursor))
-    : threads;
-  const page = remaining.slice(0, input.limit);
-  const lastItem = page[page.length - 1] ?? null;
-  const nextCursor =
-    lastItem && remaining.length > page.length
-      ? encodeThreadCursor({
-          threadId: lastItem.id,
-          lastReplyAt: lastItem.lastReplyAt,
-        })
-      : null;
+  const page = normalizePage(input.page);
+  const client = deps.client ?? prisma;
+  const where = {
+    boardId: input.boardId,
+  } satisfies Prisma.ThreadWhereInput;
+
+  const [totalCount, threads] = await Promise.all([
+    client.thread.count({ where }),
+    client.thread.findMany({
+      where,
+      orderBy: [
+        {
+          lastReplyAt: {
+            sort: Prisma.SortOrder.desc,
+            nulls: Prisma.NullsOrder.last,
+          },
+        },
+        {
+          id: Prisma.SortOrder.desc,
+        },
+      ],
+      skip: (page - 1) * input.limit,
+      take: input.limit,
+      select: {
+        id: true,
+        title: true,
+        lastReplyAt: true,
+      },
+    }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / input.limit));
+  const safePage = Math.min(page, totalPages);
+
+  if (safePage !== page) {
+    const adjustedThreads = await client.thread.findMany({
+      where,
+      orderBy: [
+        {
+          lastReplyAt: {
+            sort: Prisma.SortOrder.desc,
+            nulls: Prisma.NullsOrder.last,
+          },
+        },
+        {
+          id: Prisma.SortOrder.desc,
+        },
+      ],
+      skip: (safePage - 1) * input.limit,
+      take: input.limit,
+      select: {
+        id: true,
+        title: true,
+        lastReplyAt: true,
+      },
+    });
+
+    return {
+      threads: adjustedThreads.map((thread) => ({
+        id: thread.id,
+        boardSlug: input.boardSlug,
+        title: thread.title ?? null,
+        lastReplyAt: normalizeDate(thread.lastReplyAt),
+      })),
+      page: safePage,
+      totalPages,
+      totalCount,
+      hasPreviousPage: safePage > 1,
+      hasNextPage: safePage < totalPages,
+    };
+  }
 
   return {
-    threads: page,
-    nextCursor,
+    threads: threads.map((thread) => ({
+      id: thread.id,
+      boardSlug: input.boardSlug,
+      title: thread.title ?? null,
+      lastReplyAt: normalizeDate(thread.lastReplyAt),
+    })),
+    page,
+    totalPages,
+    totalCount,
+    hasPreviousPage: page > 1,
+    hasNextPage: page < totalPages,
   };
 }

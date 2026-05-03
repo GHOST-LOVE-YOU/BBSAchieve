@@ -165,19 +165,75 @@ describe("web public routes", () => {
           lastReplyAt: "2026-05-01T08:10:00.000Z",
         },
       ],
-      nextCursor: null,
+      page: 1,
+      totalPages: 3,
+      totalCount: 42,
+      hasPreviousPage: false,
+      hasNextPage: true,
     });
 
     const ui = await BoardPage({
       params: Promise.resolve({ boardId: "job" }),
+      searchParams: Promise.resolve({}),
     });
     const { container } = render(ui);
-    const links = within(container).getAllByRole("link").map((node) => node.textContent);
-    expect(links).toEqual(["Newest active thread", "Older active thread"]);
+    const threadLinks = within(container)
+      .getAllByRole("link")
+      .map((node) => node.textContent)
+      .filter((text) => text !== "下一页" && text !== "上一页");
+    expect(threadLinks).toEqual(["Newest active thread", "Older active thread"]);
     expect(listBoardThreadsMock.listBoardThreads).toHaveBeenCalledWith({
+      boardId: "board:job",
       boardSlug: "job",
       limit: 20,
+      page: 1,
     });
+    expect(screen.getByText("第 1 页，共 3 页 · 42 个帖子")).toBeTruthy();
+  });
+
+  it("renders page navigation links and forwards the page param", async () => {
+    readingMock.findBoardById.mockResolvedValue(null);
+    readingMock.findBoardBySlug.mockResolvedValue({
+      id: "board:iwhisper",
+      slug: "iwhisper",
+      name: "IWhisper",
+      description: "Mirrored BYR content.",
+    });
+    listBoardThreadsMock.listBoardThreads.mockResolvedValue({
+      threads: [
+        {
+          id: "thread:page-2",
+          boardSlug: "iwhisper",
+          title: "Older page thread",
+          lastReplyAt: "2026-05-01T07:10:00.000Z",
+        },
+      ],
+      page: 2,
+      totalPages: 8,
+      totalCount: 155,
+      hasPreviousPage: true,
+      hasNextPage: true,
+    });
+
+    const ui = await BoardPage({
+      params: Promise.resolve({ boardId: "iwhisper" }),
+      searchParams: Promise.resolve({ page: "2" }),
+    });
+    const { container } = render(ui);
+
+    expect(listBoardThreadsMock.listBoardThreads).toHaveBeenCalledWith({
+      boardId: "board:iwhisper",
+      boardSlug: "iwhisper",
+      limit: 20,
+      page: 2,
+    });
+    expect(within(container).getByText("第 2 页，共 8 页 · 155 个帖子")).toBeTruthy();
+    expect(within(container).getByRole("link", { name: "上一页" }).getAttribute("href")).toBe(
+      "/boards/iwhisper",
+    );
+    expect(within(container).getByRole("link", { name: "下一页" }).getAttribute("href")).toBe(
+      "/boards/iwhisper?page=3",
+    );
   });
 
   it("renders thread detail and replies", async () => {
@@ -312,6 +368,7 @@ describe("web public routes", () => {
     await expect(
       BoardPage({
         params: Promise.resolve({ boardId: "missing-board" }),
+        searchParams: Promise.resolve({}),
       }),
     ).rejects.toThrow(nextNavigation.error);
 
