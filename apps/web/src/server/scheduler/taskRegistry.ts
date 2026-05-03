@@ -11,7 +11,7 @@ export type ScheduledTaskDefinition = {
   runnerType: "byr_sync_recent_window";
 };
 
-export const scheduledTasks: ScheduledTaskDefinition[] = [
+export const scheduledTasks = [
   {
     taskKey: "iwhisper_recent_sync",
     title: "IWhisper 最近内容同步",
@@ -24,7 +24,7 @@ export const scheduledTasks: ScheduledTaskDefinition[] = [
     enabled: true,
     runnerType: "byr_sync_recent_window",
   },
-];
+] as const satisfies readonly ScheduledTaskDefinition[];
 
 export function getScheduledTask(taskKey: string) {
   return scheduledTasks.find((task) => task.taskKey === taskKey) ?? null;

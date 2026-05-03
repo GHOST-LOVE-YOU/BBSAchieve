@@ -5,7 +5,16 @@ import type {
   ScheduledTaskTriggerSource,
 } from "@prisma/client";
 
-export type ScheduledTaskRunStore = Pick<PrismaClient, "scheduledTaskRun">;
+type ScheduledTaskRunDelegate = PrismaClient["scheduledTaskRun"];
+
+type ScheduledTaskRunTerminalStatus = Exclude<ScheduledTaskRunStatus, "running">;
+
+export type ScheduledTaskRunStore = {
+  scheduledTaskRun: Pick<
+    ScheduledTaskRunDelegate,
+    "create" | "findUniqueOrThrow" | "update" | "updateMany"
+  >;
+};
 
 export async function createScheduledTaskRun(
   prisma: ScheduledTaskRunStore,
@@ -36,12 +45,12 @@ export async function finishScheduledTaskRun(
   prisma: ScheduledTaskRunStore,
   runId: string,
   input: {
-    status: ScheduledTaskRunStatus;
+    status: ScheduledTaskRunTerminalStatus;
     importedThreads?: number;
     importedReplies?: number;
     skippedReason?: string | null;
     errorMessage?: string | null;
-    metadataJson?: Prisma.InputJsonObject | null;
+    metadataJson?: Prisma.InputJsonValue | null;
   },
 ) {
   const finishedAt = new Date();
@@ -49,8 +58,15 @@ export async function finishScheduledTaskRun(
     where: { id: runId },
   });
 
-  return prisma.scheduledTaskRun.update({
-    where: { id: runId },
+  if (run.status !== "running") {
+    throw new Error(`scheduled task run ${runId} is already finalized as ${run.status}`);
+  }
+
+  const result = await prisma.scheduledTaskRun.updateMany({
+    where: {
+      id: runId,
+      status: "running",
+    },
     data: {
       status: input.status,
       finishedAt,
@@ -59,7 +75,20 @@ export async function finishScheduledTaskRun(
       importedReplies: input.importedReplies ?? 0,
       skippedReason: input.skippedReason ?? null,
       errorMessage: input.errorMessage ?? null,
-      metadataJson: input.metadataJson ?? Prisma.JsonNull,
+      ...(input.metadataJson === undefined
+        ? {}
+        : {
+            metadataJson:
+              input.metadataJson === null ? Prisma.DbNull : input.metadataJson,
+          }),
     },
+  });
+
+  if (result.count !== 1) {
+    throw new Error(`scheduled task run ${runId} could not be finalized from running state`);
+  }
+
+  return prisma.scheduledTaskRun.findUniqueOrThrow({
+    where: { id: runId },
   });
 }
