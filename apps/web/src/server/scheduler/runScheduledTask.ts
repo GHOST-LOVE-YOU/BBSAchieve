@@ -37,16 +37,20 @@ export async function runScheduledTask(input: {
   }
 
   runningTaskKeys.add(input.task.taskKey);
-  const run = await createScheduledTaskRun(input.prisma, {
-    taskKey: input.task.taskKey,
-    taskTitle: input.task.title,
-    triggerSource: input.triggerSource,
-    intervalMinutes: input.task.intervalMinutes,
-    windowMinutes: input.task.windowMinutes,
-    boardName: input.task.boardName,
-  });
+  let run:
+    | Awaited<ReturnType<typeof createScheduledTaskRun>>
+    | null = null;
 
   try {
+    run = await createScheduledTaskRun(input.prisma, {
+      taskKey: input.task.taskKey,
+      taskTitle: input.task.title,
+      triggerSource: input.triggerSource,
+      intervalMinutes: input.task.intervalMinutes,
+      windowMinutes: input.task.windowMinutes,
+      boardName: input.task.boardName,
+    });
+
     const importResult = await runByrSyncImport({
       prisma: input.prisma,
       boardName: input.task.boardName,
@@ -59,6 +63,10 @@ export async function runScheduledTask(input: {
       importedReplies: importResult.importedReplies,
     });
   } catch (error) {
+    if (!run) {
+      throw error;
+    }
+
     return await finishScheduledTaskRun(input.prisma, run.id, {
       status: "failed",
       errorMessage:

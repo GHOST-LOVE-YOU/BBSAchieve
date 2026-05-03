@@ -40,7 +40,7 @@ const emptyBatch = {
   replies: [],
 };
 
-function createSchedulerPrismaMock() {
+function createSchedulerPrismaMock(options?: { failCreateOnce?: boolean }) {
   const runs = new Map<
     string,
     {
@@ -63,6 +63,7 @@ function createSchedulerPrismaMock() {
     }
   >();
   let idCounter = 1;
+  let shouldFailCreate = options?.failCreateOnce ?? false;
 
   return {
     thread: {
@@ -70,6 +71,11 @@ function createSchedulerPrismaMock() {
     },
     scheduledTaskRun: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        if (shouldFailCreate) {
+          shouldFailCreate = false;
+          throw new Error("create boom");
+        }
+
         const run = {
           id: `run-${idCounter++}`,
           taskKey: data.taskKey as string,
@@ -201,5 +207,42 @@ describe("runScheduledTask", () => {
 
     expect(secondRun.status).toBe("skipped");
     expect(secondRun.skippedReason).toBe("previous run still active");
+  });
+
+  it("releases the running guard when creating the run record fails", async () => {
+    const task = getScheduledTask("iwhisper_recent_sync")!;
+    const prisma = createSchedulerPrismaMock({ failCreateOnce: true });
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 2,
+      cutoff_at: "2026-05-03T21:40:00",
+      threads: [],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue(emptyBatch);
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-1",
+      importedThreads: 2,
+      importedReplies: 3,
+      skippedReplies: 0,
+    });
+
+    await expect(
+      runScheduledTask({
+        prisma: prisma as never,
+        task,
+        triggerSource: "scheduled",
+      }),
+    ).rejects.toThrow("create boom");
+
+    const secondRun = await runScheduledTask({
+      prisma: prisma as never,
+      task,
+      triggerSource: "scheduled",
+    });
+
+    expect(secondRun.status).toBe("succeeded");
+    expect(secondRun.skippedReason).toBeNull();
+    expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledTimes(1);
   });
 });
