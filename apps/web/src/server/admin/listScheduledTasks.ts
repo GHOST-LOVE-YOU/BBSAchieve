@@ -8,10 +8,22 @@ type ScheduledTaskListClient = Pick<PrismaClient, "scheduledTaskRun">;
 export async function listScheduledTasks(
   client: ScheduledTaskListClient = prisma,
 ) {
-  const latestRuns = await client.scheduledTaskRun.findMany({
+  const taskKeys = scheduledTasks.map((task) => task.taskKey);
+  const runs = await client.scheduledTaskRun.findMany({
+    where: {
+      taskKey: {
+        in: taskKeys,
+      },
+    },
     orderBy: { startedAt: "desc" },
-    take: 20,
   });
+  const latestRunByTaskKey = new Map<string, (typeof runs)[number]>();
+
+  for (const run of runs) {
+    if (!latestRunByTaskKey.has(run.taskKey)) {
+      latestRunByTaskKey.set(run.taskKey, run);
+    }
+  }
 
   return scheduledTasks.map((task) => ({
     taskKey: task.taskKey,
@@ -21,6 +33,6 @@ export async function listScheduledTasks(
     intervalMinutes: task.intervalMinutes,
     windowMinutes: task.windowMinutes,
     enabled: task.enabled,
-    latestRun: latestRuns.find((run) => run.taskKey === task.taskKey) ?? null,
+    latestRun: latestRunByTaskKey.get(task.taskKey) ?? null,
   }));
 }
