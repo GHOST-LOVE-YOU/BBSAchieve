@@ -1,56 +1,245 @@
-# Welcome to your Expo app 👋
+# BYRAchieve Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## 项目说明
 
-## Get started
+`apps/mobile` 是仓库中的移动端应用，基于 Expo、React Native 与 Expo Router 构建。
 
-1. Install dependencies
+当前仓库已经完成了 Expo 项目绑定与 EAS 构建基础配置：
 
-   ```bash
-   npm install
-   ```
+- Expo owner: `yinyra`
+- Expo slug: `byrachieve`
+- EAS projectId: `055670c5-bb3f-4fc4-92d7-ae1ee587a5d1`
 
-2. Start the app
+## 目录位置
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+所有移动端相关命令都应在本目录执行：
 
 ```bash
-npm run reset-project
+cd /Users/ghost/code/BBSAchieve/apps/mobile
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+不要在仓库根目录直接执行 `expo` 或 `eas` 命令。
 
-### Other setup steps
+## 本地开发
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+安装依赖：
 
-## Learn more
+```bash
+pnpm install
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+启动开发服务器：
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+pnpm --filter @bbs/mobile start
+```
 
-## Join the community
+如果已经进入 `apps/mobile` 目录，也可以直接执行：
 
-Join our community of developers creating universal apps.
+```bash
+npx expo start
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+常用命令：
+
+```bash
+npx expo start --android
+npx expo start --ios
+npx expo start --web
+```
+
+## 构建配置
+
+当前已配置的 EAS profile 位于 [eas.json](/Users/ghost/code/BBSAchieve/apps/mobile/eas.json)：
+
+- `development`
+  用于开发调试版，包含 development client。
+- `preview`
+  用于测试分发。
+- `production`
+  用于正式发布。
+
+应用基础配置位于 [app.json](/Users/ghost/code/BBSAchieve/apps/mobile/app.json)。
+
+## 首次登录 Expo
+
+如果本机还没有登录 Expo，先执行：
+
+```bash
+npx eas-cli@latest login
+```
+
+可以通过下面的命令确认当前绑定项目是否正确：
+
+```bash
+npx eas-cli@latest project:info
+```
+
+## 打包测试版
+
+Android 测试包：
+
+```bash
+npx eas-cli@latest build --platform android --profile preview
+```
+
+iOS 测试包：
+
+```bash
+npx eas-cli@latest build --platform ios --profile preview
+```
+
+构建完成后，可以在 Expo Dashboard 的 Builds 页面下载安装包或查看构建日志。
+
+## 发布正式版
+
+Android 正式包：
+
+```bash
+npx eas-cli@latest build --platform android --profile production
+```
+
+iOS 正式包：
+
+```bash
+npx eas-cli@latest build --platform ios --profile production
+```
+
+如果需要提交到应用商店，再执行：
+
+```bash
+npx eas-cli@latest submit --platform android
+npx eas-cli@latest submit --platform ios
+```
+
+## 更新内容后怎么重新提交
+
+如果你已经修改了移动端页面、文案、样式或逻辑，通常按下面步骤处理。
+
+### 1. 先提交代码
+
+在仓库根目录执行：
+
+```bash
+cd /Users/ghost/code/BBSAchieve
+git status
+git add .
+git commit -m "更新移动端内容"
+```
+
+如果只想提交移动端文件，可以改成：
+
+```bash
+git add apps/mobile
+git commit -m "更新移动端内容"
+```
+
+再推送到远端：
+
+```bash
+git push
+```
+
+### 2. 如果要让测试用户安装新包
+
+重新发一个测试构建：
+
+```bash
+cd /Users/ghost/code/BBSAchieve/apps/mobile
+npx eas-cli@latest build --platform android --profile preview
+```
+
+如果是 iOS：
+
+```bash
+npx eas-cli@latest build --platform ios --profile preview
+```
+
+这适用于：
+
+- 改了原生配置
+- 改了 `app.json`
+- 更新了图标、启动图、包名、插件
+- 还没有接入 OTA 更新
+
+### 3. 如果要发正式版本
+
+重新构建 production 包：
+
+```bash
+cd /Users/ghost/code/BBSAchieve/apps/mobile
+npx eas-cli@latest build --platform android --profile production
+```
+
+需要上架时再执行 submit。
+
+## 什么时候必须重新打包
+
+出现下面这些改动时，必须重新执行 `eas build`：
+
+- 修改 `app.json`
+- 修改 `eas.json`
+- 新增或调整 Expo 插件
+- 修改应用图标、启动图、包名、scheme
+- 安装涉及原生能力的依赖
+
+## 什么时候后续可以只发热更新
+
+如果后面接入 `EAS Update`，那么这类纯前端改动通常可以直接发 OTA 更新，而不必重新打包：
+
+- 页面文案
+- 样式
+- 业务逻辑
+- 大部分 TypeScript / JavaScript 代码
+
+当前仓库还没有配置 `EAS Update`，所以现在默认按“修改后重新 build”处理最稳妥。
+
+## 环境变量
+
+当前 `apps/mobile` 目录下还没有自定义 `.env` 文件。
+
+如果后续需要为移动端新增环境变量，建议在本目录创建：
+
+```bash
+apps/mobile/.env
+```
+
+Expo 前端可读取的变量应使用 `EXPO_PUBLIC_` 前缀，例如：
+
+```env
+EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
+代码中可通过下面方式读取：
+
+```ts
+const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+```
+
+不要把密钥、令牌等敏感信息放进前端环境变量。
+
+## 常见问题
+
+### Android application id 是什么
+
+例如：
+
+```txt
+com.yinyra.byrachieve
+```
+
+这是 Android 应用唯一标识，不要求你真的拥有对应域名，但要尽量保证唯一。一旦正式上架，后续不要轻易更改。
+
+### `Install and run the Android build on an emulator?` 是什么
+
+这是在问构建完成后，是否自动安装到本机 Android 模拟器中运行。
+
+- 有本地模拟器并且想马上预览：选 `Y`
+- 只是先打包，或者没有开模拟器：选 `n`
+
+## 参考文档
+
+- Expo Build setup: https://docs.expo.dev/build/setup/
+- Expo monorepo: https://docs.expo.dev/guides/monorepos/
+- Expo environment variables: https://docs.expo.dev/guides/environment-variables/
+- EAS Update: https://docs.expo.dev/eas-update/getting-started/
