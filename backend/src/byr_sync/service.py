@@ -4,8 +4,11 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from typing import Protocol
+from zoneinfo import ZoneInfo
 
 from .models import SyncPost
+
+FORUM_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
 @dataclass(slots=True)
@@ -90,7 +93,6 @@ class SyncService:
         self.board_service = board_service
         self.thread_service = thread_service
         self.cache = cache
-        self._last_scanned_pages = 0
 
     def list_updates(
         self,
@@ -100,8 +102,8 @@ class SyncService:
         window_minutes: int | None = None,
         now: datetime | None = None,
     ) -> SyncUpdateResult:
-        reference_now = now or datetime.now()
-        candidate_threads = self._collect_candidate_threads(
+        reference_now = self._normalize_reference_now(now)
+        candidate_threads, scanned_pages = self._collect_candidate_threads(
             board_name=board_name,
             limit=limit,
             window_minutes=window_minutes,
@@ -155,7 +157,7 @@ class SyncService:
             board_name=board_name,
             threads=threads,
             window_minutes=window_minutes,
-            scanned_pages=self._last_scanned_pages,
+            scanned_pages=scanned_pages,
             cutoff_at=(
                 reference_now - timedelta(minutes=window_minutes)
                 if window_minutes is not None
@@ -294,11 +296,10 @@ class SyncService:
         limit: int,
         window_minutes: int | None,
         now: datetime,
-    ) -> list[BoardThreadLike]:
+    ) -> tuple[list[BoardThreadLike], int]:
         if window_minutes is None:
-            self._last_scanned_pages = 1
             board_page = self.board_service.fetch_page(board_name=board_name, page=1)
-            return board_page.threads[:limit]
+            return board_page.threads[:limit], 1
 
         cutoff = now - timedelta(minutes=window_minutes)
         collected: list[BoardThreadLike] = []
@@ -307,20 +308,19 @@ class SyncService:
 
         while len(collected) < limit:
             board_page = self.board_service.fetch_page(board_name=board_name, page=page)
-            self._last_scanned_pages = page
             for thread in board_page.threads:
                 observed_time = self._resolve_thread_observed_time(thread, now=now)
                 if observed_time >= cutoff:
                     collected.append(thread)
                     if len(collected) >= limit:
-                        return collected
+                        return collected, page
                 else:
                     reached_out_of_window = True
             if reached_out_of_window or not board_page.has_next_page:
                 break
             page += 1
 
-        return collected
+        return collected, page
 
     @staticmethod
     def _build_posts(
@@ -411,3 +411,11 @@ class SyncService:
             parsed_date = datetime.strptime(normalized, "%Y-%m-%d").date()
             return datetime.combine(parsed_date, time(23, 59, 59))
         raise ValueError(f"Unsupported board time format: {raw_time}")
+
+    @staticmethod
+    def _normalize_reference_now(now: datetime | None) -> datetime:
+        if now is None:
+            return datetime.now(FORUM_TIMEZONE).replace(tzinfo=None)
+        if now.tzinfo is not None:
+            return now.astimezone(FORUM_TIMEZONE).replace(tzinfo=None)
+        return now

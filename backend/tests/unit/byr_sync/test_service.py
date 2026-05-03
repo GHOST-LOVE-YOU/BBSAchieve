@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -600,6 +600,46 @@ def test_list_updates_uses_post_time_when_reply_time_is_empty() -> None:
         limit=20,
         window_minutes=30,
         now=datetime(2026, 5, 3, 22, 10, 0),
+    )
+
+    assert [thread.article_id for thread in result.threads] == ["a1"]
+
+
+def test_list_updates_accepts_aware_now_for_window_filtering() -> None:
+    board_service = FakePagedBoardService(
+        {
+            1: FakeBoardPage(
+                threads=[
+                    FakeBoardThread(
+                        article_id="a1",
+                        title="recent in forum timezone",
+                        reply_count=0,
+                        post_time="21:50:00",
+                        latest_reply_time="22:05:00",
+                    ),
+                    FakeBoardThread(
+                        article_id="a2",
+                        title="too old in forum timezone",
+                        reply_count=0,
+                        post_time="21:00:00",
+                        latest_reply_time="21:30:00",
+                    ),
+                ],
+                has_next_page=False,
+            )
+        }
+    )
+    service = SyncService(
+        board_service=board_service,
+        thread_service=FakeThreadService(),
+        cache=InMemorySyncCache(),
+    )
+
+    result = service.list_updates(
+        board_name="IWhisper",
+        limit=20,
+        window_minutes=30,
+        now=datetime(2026, 5, 3, 14, 10, 0, tzinfo=timezone.utc),
     )
 
     assert [thread.article_id for thread in result.threads] == ["a1"]
