@@ -245,4 +245,35 @@ describe("runScheduledTask", () => {
     expect(secondRun.skippedReason).toBeNull();
     expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledTimes(1);
   });
+
+  it("records a failed run and logs scheduled failures with task context", async () => {
+    const task = getScheduledTask("iwhisper_recent_sync")!;
+    const prisma = createSchedulerPrismaMock();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    routeMocks.fetchSyncUpdates.mockRejectedValue(new Error("sync boom"));
+
+    try {
+      const result = await runScheduledTask({
+        prisma: prisma as never,
+        task,
+        triggerSource: "scheduled",
+      });
+
+      expect(result.status).toBe("failed");
+      expect(result.errorMessage).toBe("sync boom");
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Scheduled task run failed",
+        expect.objectContaining({
+          taskKey: "iwhisper_recent_sync",
+          taskTitle: task.title,
+          triggerSource: "scheduled",
+          runId: result.id,
+          errorMessage: "sync boom",
+        }),
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
 });

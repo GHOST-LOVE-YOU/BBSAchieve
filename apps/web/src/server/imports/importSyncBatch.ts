@@ -202,14 +202,23 @@ export async function importSyncBatch(
       const authorUserId = resolveThreadAuthorId(thread, existingThread, botUserRecords);
       const persistedReplyCount = existingThread?.replyCount ?? 0;
       const nextReplyCount = Math.max(persistedReplyCount, thread.replyCount, threadReplies.length);
-      const lastReplyAt =
+      const batchLastReplyAt =
         threadReplies.length > 0
           ? new Date(
               Math.max(
                 ...threadReplies.map((reply) => reply.publishedAt.getTime()),
               ),
             )
-          : existingThread?.lastReplyAt ?? null;
+          : null;
+      const lastReplyAt =
+        batchLastReplyAt && existingThread?.lastReplyAt
+          ? new Date(
+              Math.max(
+                batchLastReplyAt.getTime(),
+                existingThread.lastReplyAt.getTime(),
+              ),
+            )
+          : batchLastReplyAt ?? existingThread?.lastReplyAt ?? null;
       const body = thread.body ?? existingThread?.body ?? "";
       const publishedAt =
         existingThread && thread.publishedAt

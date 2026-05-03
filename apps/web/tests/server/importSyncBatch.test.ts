@@ -514,4 +514,79 @@ describe("importSyncBatch", () => {
       publishedAt: new Date("2026-04-25T10:07:24.000Z"),
     });
   });
+
+  it("preserves a newer lastReplyAt when importing older missing replies", async () => {
+    const prisma = createMockPrisma();
+
+    prisma.state.threads.set("iwhisper:8830220", {
+      id: "thread-1",
+      boardId: "board-1",
+      sourceBoardSlug: "iwhisper",
+      sourceThreadId: "8830220",
+      authorUserId: "user-1",
+      title: "Need advice",
+      body: "Opening post",
+      publishedAt: new Date("2026-05-02T08:00:00.000Z"),
+      lastReplyAt: new Date("2026-05-02T09:00:00.000Z"),
+      replyCount: 2,
+    });
+    prisma.state.users.set("Alice", {
+      id: "user-1",
+      username: "Alice",
+      displayName: "Alice",
+      userType: "bot",
+      status: "active",
+      mailboxKey: null,
+    });
+
+    const result = await importSyncBatch(prisma as any, {
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [
+        {
+          username: "Robot B",
+          displayName: "Robot B",
+          mailboxKey: null,
+        },
+      ],
+      threads: [
+        {
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "8830220",
+          authorUsername: null,
+          title: "Need advice",
+          body: null,
+          publishedAt: null,
+          replyCount: 2,
+        },
+      ],
+      replies: [
+        {
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "8830220",
+          replyIndex: 1,
+          authorUsername: "Robot B",
+          body: "Older reply body",
+          publishedAt: new Date("2026-05-02T08:10:00.000Z"),
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({
+      importedThreads: 1,
+      importedReplies: 1,
+      skippedReplies: 0,
+    });
+    expect(prisma.state.threads.get("iwhisper:8830220")).toMatchObject({
+      lastReplyAt: new Date("2026-05-02T09:00:00.000Z"),
+      replyCount: 2,
+    });
+  });
 });

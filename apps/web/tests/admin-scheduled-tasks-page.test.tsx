@@ -60,7 +60,7 @@ describe("admin scheduled tasks page", () => {
       },
     ]);
 
-    render(await AdminScheduledTasksPage());
+    const { container } = render(await AdminScheduledTasksPage());
 
     expect(screen.getByText("定时任务")).toBeTruthy();
     expect(screen.getByText("IWhisper 最近内容同步")).toBeTruthy();
@@ -70,5 +70,14 @@ describe("admin scheduled tasks page", () => {
     expect(
       screen.getByRole("button", { name: "立即执行一次" }),
     ).toBeTruthy();
+
+    const form = container.querySelector(
+      'form[action="/admin/api/scheduled-tasks/iwhisper_recent_sync/run"]',
+    );
+    expect(form).toBeTruthy();
+    expect(
+      (form?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)
+        ?.value,
+    ).toBe("/admin/scheduled-tasks");
   });
 });

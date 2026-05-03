@@ -2,8 +2,31 @@ import Link from "next/link";
 
 import { listScheduledTasks } from "@/src/server/admin/listScheduledTasks";
 
-export default async function AdminScheduledTasksPage() {
+type AdminScheduledTasksPageProps = {
+  searchParams?: Promise<{
+    runTaskKey?: string;
+    runStatus?: string;
+    runMessage?: string;
+  }>;
+};
+
+export default async function AdminScheduledTasksPage({
+  searchParams,
+}: AdminScheduledTasksPageProps = {}) {
   const tasks = await listScheduledTasks();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const runStatus = resolvedSearchParams?.runStatus;
+  const runTaskKey = resolvedSearchParams?.runTaskKey;
+  const runMessage = resolvedSearchParams?.runMessage;
+  const activeTask = runTaskKey
+    ? tasks.find((task) => task.taskKey === runTaskKey)
+    : null;
+  const runNotice =
+    runStatus === "succeeded"
+      ? `${activeTask?.title ?? "任务"}执行完成`
+      : runStatus === "failed"
+        ? `${activeTask?.title ?? "任务"}执行失败${runMessage ? `：${runMessage}` : ""}`
+        : null;
 
   return (
     <main className="min-h-screen p-8">
@@ -12,6 +35,15 @@ export default async function AdminScheduledTasksPage() {
           <Link href="/admin">返回总览</Link>
         </p>
         <h1 className="text-3xl font-semibold">定时任务</h1>
+        {runNotice ? (
+          <p
+            className={
+              runStatus === "failed" ? "text-sm text-red-600" : "text-sm text-zinc-600"
+            }
+          >
+            {runNotice}
+          </p>
+        ) : null}
       </div>
 
       <section className="mt-8 grid gap-4">
@@ -40,6 +72,11 @@ export default async function AdminScheduledTasksPage() {
               method="post"
               className="mt-3"
             >
+              <input
+                type="hidden"
+                name="redirectTo"
+                value="/admin/scheduled-tasks"
+              />
               <button
                 className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm"
                 type="submit"

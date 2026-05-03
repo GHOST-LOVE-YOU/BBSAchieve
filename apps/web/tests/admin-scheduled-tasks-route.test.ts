@@ -43,4 +43,52 @@ describe("admin scheduled tasks run route", () => {
       run: { id: "run-1", status: "succeeded" },
     });
   });
+
+  it("returns a failure response when the run finishes with failed status", async () => {
+    routeMocks.runScheduledTask.mockResolvedValue({
+      id: "run-2",
+      status: "failed",
+      errorMessage: "sync boom",
+    });
+
+    const response = await POST(new Request("http://localhost"), {
+      params: Promise.resolve({ taskKey: "iwhisper_recent_sync" }),
+    });
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "sync boom",
+      run: {
+        id: "run-2",
+        status: "failed",
+        errorMessage: "sync boom",
+      },
+    });
+  });
+
+  it("redirects form submissions back to the admin page instead of rendering raw json", async () => {
+    routeMocks.runScheduledTask.mockResolvedValue({
+      id: "run-3",
+      status: "succeeded",
+    });
+
+    const response = await POST(
+      new Request("http://localhost/admin/api/scheduled-tasks/iwhisper_recent_sync/run", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: "redirectTo=%2Fadmin%2Fscheduled-tasks",
+      }),
+      {
+        params: Promise.resolve({ taskKey: "iwhisper_recent_sync" }),
+      },
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost/admin/scheduled-tasks?runTaskKey=iwhisper_recent_sync&runStatus=succeeded",
+    );
+  });
 });

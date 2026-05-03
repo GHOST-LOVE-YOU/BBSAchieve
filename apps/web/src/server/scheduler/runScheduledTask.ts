@@ -67,11 +67,23 @@ export async function runScheduledTask(input: {
       throw error;
     }
 
-    return await finishScheduledTaskRun(input.prisma, run.id, {
+    const failedRun = await finishScheduledTaskRun(input.prisma, run.id, {
       status: "failed",
       errorMessage:
         error instanceof Error ? error.message : "Unknown scheduled task error",
     });
+
+    if (input.triggerSource === "scheduled") {
+      console.error("Scheduled task run failed", {
+        taskKey: input.task.taskKey,
+        taskTitle: input.task.title,
+        triggerSource: input.triggerSource,
+        runId: failedRun.id,
+        errorMessage: failedRun.errorMessage,
+      });
+    }
+
+    return failedRun;
   } finally {
     runningTaskKeys.delete(input.task.taskKey);
   }
