@@ -5,7 +5,10 @@ function getRequiredEnv(name: string): string | null {
   return value && value.trim().length > 0 ? value : null;
 }
 
-export async function fetchSyncUpdates(): Promise<ByrSyncUpdatesPayload> {
+export async function fetchSyncUpdates(input: {
+  boardName: string;
+  windowMinutes: number;
+}): Promise<ByrSyncUpdatesPayload> {
   const baseUrl = getRequiredEnv("BYR_SYNC_API_BASE_URL");
   const token = getRequiredEnv("BYR_SYNC_API_TOKEN");
 
@@ -13,13 +16,21 @@ export async function fetchSyncUpdates(): Promise<ByrSyncUpdatesPayload> {
     throw new Error("Missing BYR_SYNC_API_BASE_URL or BYR_SYNC_API_TOKEN");
   }
 
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/sync/updates`, {
-    method: "GET",
-    headers: {
-      "X-Sync-Token": token,
-    },
-    cache: "no-store",
+  const params = new URLSearchParams({
+    board_name: input.boardName,
+    window_minutes: String(input.windowMinutes),
   });
+
+  const response = await fetch(
+    `${baseUrl.replace(/\/$/, "")}/api/sync/updates?${params.toString()}`,
+    {
+      method: "GET",
+      headers: {
+        "X-Sync-Token": token,
+      },
+      cache: "no-store",
+    },
+  );
 
   if (!response.ok) {
     throw new Error(`Sync API request failed: ${response.status}`);

@@ -12,7 +12,9 @@ describe("fetchSyncUpdates", () => {
     vi.stubEnv("BYR_SYNC_API_BASE_URL", "");
     vi.stubEnv("BYR_SYNC_API_TOKEN", "");
 
-    await expect(fetchSyncUpdates()).rejects.toThrow(
+    await expect(
+      fetchSyncUpdates({ boardName: "IWhisper", windowMinutes: 30 }),
+    ).rejects.toThrow(
       "Missing BYR_SYNC_API_BASE_URL or BYR_SYNC_API_TOKEN",
     );
   });
@@ -25,7 +27,9 @@ describe("fetchSyncUpdates", () => {
       vi.fn(async () => new Response("bad token", { status: 401 })),
     );
 
-    await expect(fetchSyncUpdates()).rejects.toThrow(
+    await expect(
+      fetchSyncUpdates({ boardName: "IWhisper", windowMinutes: 30 }),
+    ).rejects.toThrow(
       "Sync API request failed: 401",
     );
   });
@@ -42,14 +46,44 @@ describe("fetchSyncUpdates", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchSyncUpdates();
+    await fetchSyncUpdates({ boardName: "IWhisper", windowMinutes: 30 });
 
-    expect(fetchMock).toHaveBeenCalledWith("https://sync.example.test/api/sync/updates", {
-      cache: "no-store",
-      method: "GET",
-      headers: {
-        "X-Sync-Token": "secret-token",
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://sync.example.test/api/sync/updates?board_name=IWhisper&window_minutes=30",
+      {
+        cache: "no-store",
+        method: "GET",
+        headers: {
+          "X-Sync-Token": "secret-token",
+        },
       },
-    });
+    );
+  });
+
+  it("requests the updates endpoint with board and window query params", async () => {
+    vi.stubEnv("BYR_SYNC_API_BASE_URL", "https://sync.example.test");
+    vi.stubEnv("BYR_SYNC_API_TOKEN", "secret-token");
+
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        board_name: "IWhisper",
+        window_minutes: 30,
+        scanned_pages: 2,
+        cutoff_at: "2026-05-03T21:40:00",
+        threads: [],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSyncUpdates({ boardName: "IWhisper", windowMinutes: 30 });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://sync.example.test/api/sync/updates?board_name=IWhisper&window_minutes=30",
+      {
+        cache: "no-store",
+        method: "GET",
+        headers: { "X-Sync-Token": "secret-token" },
+      },
+    );
   });
 });
