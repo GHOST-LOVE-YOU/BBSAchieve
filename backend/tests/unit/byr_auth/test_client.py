@@ -31,6 +31,17 @@ def test_parse_json_uses_response_encoding() -> None:
     assert payload["ajax_msg"] == "登录成功"
 
 
+def test_parse_json_falls_back_when_response_encoding_is_wrong() -> None:
+    response = make_response(
+        content='{"ajax_msg":"登录成功"}'.encode("gbk"),
+        encoding="utf-8",
+    )
+
+    payload = ByrAuthClient._parse_json(response)
+
+    assert payload["ajax_msg"] == "登录成功"
+
+
 def test_require_env_reads_from_loaded_env(tmp_path) -> None:
     env_path = tmp_path / ".env"
     env_path.write_text("BBS_USERNAME=test-user\n", encoding="utf-8")
