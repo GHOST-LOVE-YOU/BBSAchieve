@@ -37,10 +37,21 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
         return {"ok": True}
 
     @app.get("/api/sync/updates")
-    def sync_updates(_: str = Depends(require_sync_token)) -> SyncUpdatesResponse:
-        result = app.state.sync_service.list_updates(board_name="IWhisper", limit=20)
+    def sync_updates(
+        board_name: str = Query(default="IWhisper"),
+        window_minutes: int = Query(default=30, ge=1),
+        _: str = Depends(require_sync_token),
+    ) -> SyncUpdatesResponse:
+        result = app.state.sync_service.list_updates(
+            board_name=board_name,
+            limit=20,
+            window_minutes=window_minutes,
+        )
         return SyncUpdatesResponse(
             board_name=result.board_name,
+            window_minutes=result.window_minutes,
+            scanned_pages=result.scanned_pages,
+            cutoff_at=result.cutoff_at.isoformat() if result.cutoff_at else None,
             threads=[
                 SyncThreadResponse(
                     article_id=thread.article_id,

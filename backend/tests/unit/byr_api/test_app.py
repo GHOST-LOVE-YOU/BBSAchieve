@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -11,7 +13,17 @@ from byr_sync.service import SyncService, SyncUpdateResult
 
 
 class FakeSyncService:
-    def list_updates(self, *, board_name: str, limit: int) -> SyncUpdateResult:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, int, int | None]] = []
+
+    def list_updates(
+        self,
+        *,
+        board_name: str,
+        limit: int,
+        window_minutes: int | None = None,
+    ) -> SyncUpdateResult:
+        self.calls.append((board_name, limit, window_minutes))
         return SyncUpdateResult(
             board_name=board_name,
             threads=[
@@ -30,6 +42,9 @@ class FakeSyncService:
                     ],
                 ),
             ],
+            window_minutes=window_minutes,
+            scanned_pages=2,
+            cutoff_at=datetime.fromisoformat("2026-05-03T21:40:00"),
         )
 
     def fetch_original_post(self, *, board_name: str, article_id: str) -> SyncPost:
@@ -94,7 +109,13 @@ class FakeThreadService:
 
 
 class RaisingSyncService:
-    def list_updates(self, *, board_name: str, limit: int) -> SyncUpdateResult:
+    def list_updates(
+        self,
+        *,
+        board_name: str,
+        limit: int,
+        window_minutes: int | None = None,
+    ) -> SyncUpdateResult:
         raise AssertionError("not used")
 
     def backfill_thread(
@@ -135,6 +156,9 @@ def test_sync_endpoint_returns_threads_with_valid_token(monkeypatch: pytest.Monk
     assert response.status_code == 200
     assert response.json() == {
         "board_name": "IWhisper",
+        "window_minutes": 30,
+        "scanned_pages": 2,
+        "cutoff_at": "2026-05-03T21:40:00",
         "threads": [
             {
                 "article_id": "123",
@@ -152,6 +176,38 @@ def test_sync_endpoint_returns_threads_with_valid_token(monkeypatch: pytest.Monk
             }
         ],
     }
+
+
+def test_sync_endpoint_passes_board_name_and_window_minutes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    service = FakeSyncService()
+    client = TestClient(create_app(sync_service=service))
+
+    response = client.get(
+        "/api/sync/updates",
+        params={"board_name": "IWhisper", "window_minutes": 30},
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert service.calls == [("IWhisper", 20, 30)]
+
+
+def test_sync_endpoint_returns_window_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    client = TestClient(create_app(sync_service=FakeSyncService()))
+
+    response = client.get(
+        "/api/sync/updates",
+        params={"board_name": "IWhisper", "window_minutes": 30},
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.json()["window_minutes"] == 30
+    assert response.json()["scanned_pages"] == 2
+    assert response.json()["cutoff_at"] == "2026-05-03T21:40:00"
 
 
 def test_backfill_endpoint_returns_requested_thread_posts(monkeypatch: pytest.MonkeyPatch) -> None:
