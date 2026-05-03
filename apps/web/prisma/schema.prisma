@@ -34,6 +34,18 @@ enum ImportSourceType {
   legacy_postgres
 }
 
+enum ScheduledTaskRunStatus {
+  running
+  succeeded
+  failed
+  skipped
+}
+
+enum ScheduledTaskTriggerSource {
+  scheduled
+  manual
+}
+
 enum ProfileStatus {
   pending
   active
@@ -209,4 +221,29 @@ model ImportJob {
   @@index([sourceType, sourceLabel])
   @@index([status, startedAt])
   @@map("import_jobs")
+}
+
+model ScheduledTaskRun {
+  id              String                     @id @default(uuid())
+  taskKey         String
+  taskTitle       String
+  triggerSource   ScheduledTaskTriggerSource
+  status          ScheduledTaskRunStatus
+  startedAt       DateTime
+  finishedAt      DateTime?
+  durationMs      Int?
+  intervalMinutes Int
+  windowMinutes   Int
+  boardName       String
+  importedThreads Int                        @default(0)
+  importedReplies Int                        @default(0)
+  skippedReason   String?
+  errorMessage    String?
+  metadataJson    Json?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  @@index([taskKey, startedAt])
+  @@index([status, startedAt])
+  @@map("scheduled_task_runs")
 }
