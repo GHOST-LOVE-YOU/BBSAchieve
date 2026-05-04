@@ -23,6 +23,10 @@ function readBoardFullSyncMetadata(metadataJson: unknown) {
     );
   }
 
+  if (!Number.isFinite(fullSyncWindowMinutes) || fullSyncWindowMinutes <= 0) {
+    throw new Error("invalid board full sync metadata: fullSyncWindowMinutes");
+  }
+
   return {
     boardName,
     fullSyncWindowMinutes,
