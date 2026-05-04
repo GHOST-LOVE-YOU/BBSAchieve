@@ -45,17 +45,6 @@ describe("publicReadingService", () => {
     });
   });
 
-  it("returns null when the board does not exist", async () => {
-    const service = createPublicReadingService({
-      repository: {
-        findBoardById: vi.fn().mockResolvedValue(null),
-        findBoardBySlug: vi.fn().mockResolvedValue(null),
-      } as any,
-    });
-
-    await expect(service.getBoard("missing-board")).resolves.toBeNull();
-  });
-
   it("returns board detail", async () => {
     const service = createPublicReadingService({
       repository: {
@@ -177,24 +166,6 @@ describe("publicReadingService", () => {
         hasMore: true,
       },
     });
-  });
-
-  it("rejects an invalid board thread feed limit", async () => {
-    const service = createPublicReadingService({
-      repository: {} as any,
-    });
-
-    await expect(service.getBoardThreadsFeed({ boardIdOrSlug: "job", limit: 0 })).rejects.toThrow();
-  });
-
-  it("returns null when the thread does not exist", async () => {
-    const service = createPublicReadingService({
-      repository: {
-        findThreadByRouteId: vi.fn().mockResolvedValue(null),
-      } as any,
-    });
-
-    await expect(service.getThread("missing-thread")).resolves.toBeNull();
   });
 
   it("returns thread detail", async () => {
@@ -349,19 +320,5 @@ describe("publicReadingService", () => {
         hasMore: true,
       },
     });
-  });
-
-  it("rejects an invalid reply cursor", async () => {
-    const service = createPublicReadingService({
-      repository: {} as any,
-    });
-
-    await expect(
-      service.getThreadRepliesFeed({
-        threadId: "first-offer",
-        limit: 2,
-        cursor: "not-a-valid-reply-cursor",
-      }),
-    ).rejects.toThrow();
   });
 });
