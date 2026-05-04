@@ -25,14 +25,17 @@ export function scheduleBoardBatchFullSyncRun(input: {
     void runBoardBatchFullSyncJob(
       {
         prisma,
-        findJobById: (scheduledJobId) => findJobById(prisma, scheduledJobId),
-        markJobPaused: (scheduledJobId, progressNote) =>
+        findJobById: (scheduledJobId: string) => findJobById(prisma, scheduledJobId),
+        markJobPaused: (scheduledJobId: string, progressNote: string | null | undefined) =>
           markJobPaused(prisma, scheduledJobId, progressNote),
-        markJobRunning: (scheduledJobId) => markJobRunning(prisma, scheduledJobId),
-        updateJobProgress: (scheduledJobId, progress) =>
+        markJobRunning: (scheduledJobId: string) => markJobRunning(prisma, scheduledJobId),
+        updateJobProgress: (
+          scheduledJobId: string,
+          progress: Parameters<typeof updateJobProgress>[2],
+        ) =>
           updateJobProgress(prisma, scheduledJobId, progress),
-        markJobSucceeded: (scheduledJobId) => markJobSucceeded(prisma, scheduledJobId),
-        markJobFailed: (scheduledJobId, errorMessage) =>
+        markJobSucceeded: (scheduledJobId: string) => markJobSucceeded(prisma, scheduledJobId),
+        markJobFailed: (scheduledJobId: string, errorMessage: string) =>
           markJobFailed(prisma, scheduledJobId, errorMessage),
       } as never,
       {

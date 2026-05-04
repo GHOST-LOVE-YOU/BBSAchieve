@@ -13,8 +13,7 @@ export type ScheduledTaskDefinition = {
   runnerType: "byr_sync_recent_window";
 };
 
-export const scheduledTasks =
-  getScheduledBoardTasks() as const satisfies readonly ScheduledTaskDefinition[];
+export const scheduledTasks: readonly ScheduledTaskDefinition[] = getScheduledBoardTasks();
 
 export function getScheduledTask(taskKey: string) {
   return scheduledTasks.find((task) => task.taskKey === taskKey) ?? null;

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
 import { createBatchJobMetadata } from "./boardBatchJobMetadata";
@@ -23,7 +24,7 @@ export type JobProgressUpdate = {
   skippedReplies?: number;
   progressNote?: string | null;
   lastProcessedAt?: Date | null;
-  metadataJson?: unknown;
+  metadataJson?: Prisma.InputJsonValue | null;
 };
 
 export function createBoardFullSyncJob(
@@ -140,34 +141,39 @@ export function updateJobProgress(
   jobId: string,
   progress: JobProgressUpdate,
 ) {
+  const data = {
+    ...(progress.cursorThreadKey === undefined
+      ? {}
+      : { cursorThreadKey: progress.cursorThreadKey }),
+    ...(progress.processedThreads === undefined
+      ? {}
+      : { processedThreads: progress.processedThreads }),
+    ...(progress.processedReplies === undefined
+      ? {}
+      : { processedReplies: progress.processedReplies }),
+    ...(progress.skippedThreads === undefined
+      ? {}
+      : { skippedThreads: progress.skippedThreads }),
+    ...(progress.skippedReplies === undefined
+      ? {}
+      : { skippedReplies: progress.skippedReplies }),
+    ...(progress.progressNote === undefined
+      ? {}
+      : { progressNote: progress.progressNote }),
+    ...(progress.lastProcessedAt === undefined
+      ? {}
+      : { lastProcessedAt: progress.lastProcessedAt }),
+    ...(progress.metadataJson === undefined
+      ? {}
+      : {
+          metadataJson:
+            progress.metadataJson === null ? Prisma.DbNull : progress.metadataJson,
+        }),
+  };
+
   return prisma.importJob.update({
     where: { id: jobId },
-    data: {
-      ...(progress.cursorThreadKey === undefined
-        ? {}
-        : { cursorThreadKey: progress.cursorThreadKey }),
-      ...(progress.processedThreads === undefined
-        ? {}
-        : { processedThreads: progress.processedThreads }),
-      ...(progress.processedReplies === undefined
-        ? {}
-        : { processedReplies: progress.processedReplies }),
-      ...(progress.skippedThreads === undefined
-        ? {}
-        : { skippedThreads: progress.skippedThreads }),
-      ...(progress.skippedReplies === undefined
-        ? {}
-        : { skippedReplies: progress.skippedReplies }),
-      ...(progress.progressNote === undefined
-        ? {}
-        : { progressNote: progress.progressNote }),
-      ...(progress.lastProcessedAt === undefined
-        ? {}
-        : { lastProcessedAt: progress.lastProcessedAt }),
-      ...(progress.metadataJson === undefined
-        ? {}
-        : { metadataJson: progress.metadataJson }),
-    },
+    data,
   });
 }
 
