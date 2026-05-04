@@ -120,5 +120,11 @@ describe("admin imports page", () => {
     expect(screen.getByText("LEGACY_DATABASE_URL missing")).toBeTruthy();
     expect(screen.getByRole("button", { name: "继续" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "停止" })).toHaveLength(2);
+
+    const boardFullSyncButton = screen.getByRole("button", { name: "从旧库导入 iwhisper" });
+    const boardFullSyncForm = boardFullSyncButton.closest("form");
+    expect(boardFullSyncForm?.getAttribute("action")).toBe("/admin/api/import-jobs/byr-board-full-sync");
+    const boardNameInput = boardFullSyncForm?.querySelector('input[name="boardName"]');
+    expect(boardNameInput?.getAttribute("value")).toBe("JobInfo");
   });
 });

@@ -33,7 +33,8 @@ export default async function AdminImportsPage() {
               同步北邮人数据
             </button>
           </form>
-          <form action="/admin/api/import-jobs/legacy-iwhisper" method="post">
+          <form action="/admin/api/import-jobs/byr-board-full-sync" method="post">
+            <input name="boardName" type="hidden" value="JobInfo" />
             <button
               className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
               type="submit"

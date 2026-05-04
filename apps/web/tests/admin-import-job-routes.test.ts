@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const routeMocks = vi.hoisted(() => ({
   createBoardFullSyncJob: vi.fn(),
@@ -39,6 +39,10 @@ import { POST as stopPOST } from "../app/admin/api/import-jobs/[jobId]/stop/rout
 describe("admin import job routes", () => {
   const request = new Request("http://localhost/admin/api/import-jobs");
 
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("starts a board full-sync job for a hard-coded board", async () => {
     routeMocks.createBoardFullSyncJob.mockResolvedValue({ id: "job-1" });
     const formData = new FormData();
@@ -73,6 +77,31 @@ describe("admin import job routes", () => {
     await expect(response.json()).resolves.toEqual({
       ok: true,
       jobId: "job-2",
+    });
+  });
+
+  it("resumes a board full-sync job through the board full-sync scheduler path", async () => {
+    routeMocks.findJobById.mockResolvedValue({
+      id: "job-board-1",
+      jobType: "byr_board_full_sync",
+      status: "paused",
+      cursorThreadKey: null,
+      metadataJson: {
+        boardName: "JobInfo",
+      },
+    });
+
+    const response = await resumePOST(request, {
+      params: Promise.resolve({ jobId: "job-board-1" }),
+    });
+
+    expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-board-1");
+    expect(routeMocks.scheduleBoardFullSync).toHaveBeenCalled();
+    expect(routeMocks.markJobRunning).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      jobId: "job-board-1",
     });
   });
 
