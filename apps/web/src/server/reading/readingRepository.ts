@@ -237,9 +237,13 @@ export function createReadingRepository(
       return thread ? toThreadRecord(thread) : null;
     },
     async findThreadByRouteId(routeId) {
+      const normalizedRouteId = routeId.startsWith("thread:")
+        ? routeId
+        : `thread:${routeId}`;
       const thread = await client.thread.findFirst({
-        where: { sourceThreadId: routeId },
-        orderBy: { publishedAt: "desc" },
+        where: {
+          OR: [{ id: routeId }, { id: normalizedRouteId }],
+        },
         select: createThreadSelect(),
       });
 

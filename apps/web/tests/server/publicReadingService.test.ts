@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createPublicReadingService } from "@/src/server/reading/publicReadingService";
-import type { ReadingRepository } from "@/src/server/reading/readingRepository";
+import {
+  createReadingRepository,
+  type ReadingRepository,
+} from "@/src/server/reading/readingRepository";
 
 type PublicReadingRepository = ReadingRepository;
 
@@ -348,5 +351,95 @@ describe("publicReadingService", () => {
         hasMore: true,
       },
     });
+  });
+
+  it("passes raw thread route param into repository route lookup semantics", async () => {
+    const findThreadByRouteId = vi
+      .fn<ReadingRepository["findThreadByRouteId"]>()
+      .mockResolvedValue({
+        id: "thread:first-offer",
+        boardId: "board:job",
+        authorUserId: "user:robot-1",
+        sourceBoardSlug: "job",
+        sourceThreadId: "source-thread-1",
+        title: "First offer from the mirror",
+        body: "A new listing has been mirrored and is ready to read.",
+        publishedAt: "2026-05-01T08:00:00.000Z",
+        replyCount: 2,
+        lastReplyAt: "2026-05-01T08:10:00.000Z",
+      });
+
+    const service = createPublicReadingService({
+      repository: createRepository({
+        findThreadByRouteId,
+        findBoardById: vi.fn<ReadingRepository["findBoardById"]>().mockResolvedValue({
+          id: "board:job",
+          slug: "job",
+          name: "Jobs and Offers",
+          description: "Signals for roles, openings, and practical next steps.",
+        }),
+        findUserById: vi.fn<ReadingRepository["findUserById"]>().mockResolvedValue({
+          id: "user:robot-1",
+          username: "robot-1",
+          displayName: "Robot 1",
+          userType: "bot",
+          status: "active",
+        }),
+      }),
+    });
+
+    await service.getThread("first-offer");
+
+    expect(findThreadByRouteId).toHaveBeenCalledWith("first-offer");
+  });
+
+  it("matches thread route ids against thread.id semantics", async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    const repository = createReadingRepository({
+      board: {} as never,
+      reply: {} as never,
+      thread: {
+        findUnique: vi.fn(),
+        findFirst,
+        findMany: vi.fn(),
+      } as never,
+      user: {} as never,
+    });
+
+    await repository.findThreadByRouteId("first-offer");
+
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [{ id: "first-offer" }, { id: "thread:first-offer" }],
+        },
+      }),
+    );
+  });
+
+  it("rejects reply cursors that are not strictly numeric", async () => {
+    const service = createPublicReadingService({
+      repository: createRepository({
+        findThreadByRouteId: vi.fn<ReadingRepository["findThreadByRouteId"]>().mockResolvedValue({
+          id: "thread:first-offer",
+          boardId: "board:job",
+          authorUserId: "user:robot-1",
+          sourceBoardSlug: "job",
+          sourceThreadId: "source-thread-1",
+          title: "First offer from the mirror",
+          body: "A new listing has been mirrored and is ready to read.",
+          publishedAt: "2026-05-01T08:00:00.000Z",
+          replyCount: 2,
+          lastReplyAt: "2026-05-01T08:10:00.000Z",
+        }),
+      }),
+    });
+
+    await expect(
+      service.getThreadRepliesFeed({
+        threadId: "first-offer",
+        cursor: "2abc",
+      }),
+    ).rejects.toThrow("Invalid reply cursor");
   });
 });
