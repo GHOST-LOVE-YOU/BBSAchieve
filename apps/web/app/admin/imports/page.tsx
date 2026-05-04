@@ -35,21 +35,25 @@ export default async function AdminImportsPage() {
               同步北邮人数据
             </button>
           </form>
-          {fullSyncBoards.map((board) => (
-            <form
-              key={board.boardName}
-              action="/admin/api/import-jobs/byr-board-full-sync"
-              method="post"
+          <form action="/admin/api/import-jobs/byr-board-full-sync-batch" method="post">
+            {fullSyncBoards.map((board) => (
+              <input
+                key={board.boardName}
+                type="hidden"
+                name="boardNames"
+                value={board.boardName}
+              />
+            ))}
+            <button
+              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
+              type="submit"
             >
-              <input type="hidden" name="boardName" value={board.boardName} />
-              <button
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
-                type="submit"
-              >
-                {`开始抓取 ${board.boardName} 全量内容`}
-              </button>
-            </form>
-          ))}
+              开始抓取全部首页板块全量内容
+            </button>
+          </form>
+          <p className="text-sm text-zinc-500">
+            当前将按首页目录顺序抓取：{fullSyncBoards.map((board) => board.boardName).join("、")}
+          </p>
         </div>
       </div>
 

@@ -62,27 +62,29 @@ describe("admin imports page", () => {
 
     render(await AdminImportsPage());
 
-    const boardFullSyncButtons = screen.getAllByRole("button", {
-      name: /开始抓取 .* 全量内容/u,
+    const batchStartButton = screen.getByRole("button", {
+      name: "开始抓取全部首页板块全量内容",
     });
 
-    expect(boardFullSyncButtons).toHaveLength(fullSyncBoards.length);
-    expect(boardFullSyncButtons.map((button) => button.textContent)).toEqual(
-      fullSyncBoards.map((board) => `开始抓取 ${board.boardName} 全量内容`),
-    );
+    expect(batchStartButton.textContent).toBe("开始抓取全部首页板块全量内容");
+    expect(
+      screen.getByText(
+        `当前将按首页目录顺序抓取：${fullSyncBoards.map((board) => board.boardName).join("、")}`,
+      ),
+    ).toBeTruthy();
     expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
     expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
     expect(screen.getByRole("button", { name: "停止" })).toBeTruthy();
     expect(screen.getByText("waiting for slot")).toBeTruthy();
 
-    const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
-    expect(boardFullSyncForms.map((form) => form?.getAttribute("action"))).toEqual(
-      fullSyncBoards.map(() => "/admin/api/import-jobs/byr-board-full-sync"),
+    const batchForm = batchStartButton.closest("form");
+    expect(batchForm?.getAttribute("action")).toBe(
+      "/admin/api/import-jobs/byr-board-full-sync-batch",
     );
     expect(
-      boardFullSyncForms.map((form) =>
-        form?.querySelector<HTMLInputElement>('input[name="boardName"]')?.value,
-      ),
+      Array.from(
+        batchForm?.querySelectorAll<HTMLInputElement>('input[name="boardNames"]') ?? [],
+      ).map((input) => input.value),
     ).toEqual(fullSyncBoards.map((board) => board.boardName));
   });
 
@@ -183,11 +185,12 @@ describe("admin imports page", () => {
 
     expect(screen.getByRole("heading", { name: "导入导出" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "同步北邮人数据" })).toBeTruthy();
-    for (const board of fullSyncBoards) {
-      expect(
-        screen.getByRole("button", { name: `开始抓取 ${board.boardName} 全量内容` }),
-      ).toBeTruthy();
-    }
+    expect(screen.getByRole("button", { name: "开始抓取全部首页板块全量内容" })).toBeTruthy();
+    expect(
+      screen.getByText(
+        `当前将按首页目录顺序抓取：${fullSyncBoards.map((board) => board.boardName).join("、")}`,
+      ),
+    ).toBeTruthy();
     expect(screen.getByText("最近导入活动")).toBeTruthy();
     expect(screen.getByText("JobInfo · 任务")).toBeTruthy();
     expect(screen.getByText("IWhisper · 任务")).toBeTruthy();
@@ -214,18 +217,16 @@ describe("admin imports page", () => {
       take: 20,
     });
 
-    const boardFullSyncButtons = screen.getAllByRole("button", {
-      name: /开始抓取 .* 全量内容/u,
-    });
-    expect(boardFullSyncButtons).toHaveLength(fullSyncBoards.length);
-    const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
-    expect(boardFullSyncForms.map((form) => form?.getAttribute("action"))).toEqual(
-      fullSyncBoards.map(() => "/admin/api/import-jobs/byr-board-full-sync"),
+    const batchForm = screen
+      .getByRole("button", { name: "开始抓取全部首页板块全量内容" })
+      .closest("form");
+    expect(batchForm?.getAttribute("action")).toBe(
+      "/admin/api/import-jobs/byr-board-full-sync-batch",
     );
     expect(
-      boardFullSyncForms.map((form) =>
-        form?.querySelector<HTMLInputElement>('input[name="boardName"]')?.value,
-      ),
+      Array.from(
+        batchForm?.querySelectorAll<HTMLInputElement>('input[name="boardNames"]') ?? [],
+      ).map((input) => input.value),
     ).toEqual(fullSyncBoards.map((board) => board.boardName));
   });
 });

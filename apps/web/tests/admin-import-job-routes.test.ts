@@ -89,6 +89,25 @@ describe("admin import job routes", () => {
     });
   });
 
+  it("returns 400 for an unknown board in the batch selection", async () => {
+    const formData = new FormData();
+    formData.append("boardNames", "UnknownBoard");
+    const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync-batch", {
+      method: "POST",
+      body: formData,
+    });
+
+    const response = await startPOST(request);
+
+    expect(routeMocks.createBoardBatchFullSyncJob).not.toHaveBeenCalled();
+    expect(routeMocks.scheduleBoardBatchFullSync).not.toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "Unknown board selection",
+    });
+  });
+
   it("rejects resuming a non-board full-sync job", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-2",
