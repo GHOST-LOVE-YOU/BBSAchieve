@@ -1,5 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const publicReadingMock = vi.hoisted(() => ({
   listBoards: vi.fn(),
@@ -43,6 +43,10 @@ import ThreadPage from "../app/threads/[threadId]/page";
 describe("web public routes", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("renders board entries on the home page", async () => {
@@ -251,5 +255,88 @@ describe("web public routes", () => {
     ).rejects.toThrow(nextNavigation.error);
 
     expect(nextNavigation.notFound).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders board fallback UI when service calls fail", async () => {
+    publicReadingMock.getBoard.mockRejectedValueOnce(new Error("board failed"));
+
+    const firstRender = render(
+      await BoardPage({
+        params: Promise.resolve({ boardId: "job" }),
+      }),
+    );
+
+    expect(within(firstRender.container).getByText("版面帖子")).toBeTruthy();
+    expect(within(firstRender.container).getByText("读取版面失败。")).toBeTruthy();
+    expect(nextNavigation.notFound).not.toHaveBeenCalled();
+
+    cleanup();
+    vi.resetAllMocks();
+
+    publicReadingMock.getBoard.mockResolvedValue({
+      id: "board:job",
+      slug: "job",
+      name: "Jobs and Offers",
+      description: "Signals for roles, openings, and practical next steps.",
+    });
+    publicReadingMock.getBoardThreadsFeed.mockRejectedValueOnce(
+      new Error("board threads failed"),
+    );
+
+    const secondRender = render(
+      await BoardPage({
+        params: Promise.resolve({ boardId: "job" }),
+      }),
+    );
+
+    expect(within(secondRender.container).getByText("版面帖子")).toBeTruthy();
+    expect(within(secondRender.container).getByText("读取版面失败。")).toBeTruthy();
+    expect(nextNavigation.notFound).not.toHaveBeenCalled();
+  });
+
+  it("renders thread fallback UI when service calls fail", async () => {
+    publicReadingMock.getThread.mockRejectedValueOnce(new Error("thread failed"));
+
+    const firstRender = render(
+      await ThreadPage({
+        params: Promise.resolve({ threadId: "first-offer" }),
+      }),
+    );
+
+    expect(within(firstRender.container).getByText("帖子详情")).toBeTruthy();
+    expect(within(firstRender.container).getByText("读取帖子失败。")).toBeTruthy();
+    expect(nextNavigation.notFound).not.toHaveBeenCalled();
+
+    cleanup();
+    vi.resetAllMocks();
+
+    publicReadingMock.getThread.mockResolvedValue({
+      board: {
+        id: "board:job",
+        slug: "job",
+        name: "Jobs and Offers",
+      },
+      thread: {
+        id: "thread:first-offer",
+        title: "First offer from the mirror",
+        body: "A new listing has been mirrored and is ready to read.",
+        authorName: "Robot 1",
+        publishedAt: "2026-05-01T08:00:00.000Z",
+        replyCount: 2,
+      },
+    });
+    publicReadingMock.getThreadRepliesFeed.mockRejectedValueOnce(
+      new Error("thread replies failed"),
+    );
+
+    const secondRender = render(
+      await ThreadPage({
+        params: Promise.resolve({ threadId: "first-offer" }),
+      }),
+    );
+
+    expect(within(secondRender.container).getByText("帖子详情")).toBeTruthy();
+    expect(within(secondRender.container).getByText("读取帖子失败。")).toBeTruthy();
+    expect(nextNavigation.notFound).not.toHaveBeenCalled();
   });
 });

@@ -50,9 +50,14 @@ export function useThreadRepliesFeed(threadId?: string | null): ThreadRepliesFee
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const nextCursorRef = useRef<string | null>(null);
+  const loadMoreInFlightRef = useRef(false);
+  const requestVersionRef = useRef(0);
 
   useEffect(() => {
+    requestVersionRef.current += 1;
+    loadMoreInFlightRef.current = false;
     let active = true;
+    const requestVersion = requestVersionRef.current;
 
     if (!threadId) {
       setThread(null);
@@ -86,7 +91,7 @@ export function useThreadRepliesFeed(threadId?: string | null): ThreadRepliesFee
           fetchThreadRepliesFeed(threadId),
         ]);
 
-        if (!active) {
+        if (!active || requestVersionRef.current !== requestVersion) {
           return;
         }
 
@@ -97,7 +102,7 @@ export function useThreadRepliesFeed(threadId?: string | null): ThreadRepliesFee
         nextCursorRef.current = feed.page.nextCursor;
         setInitialStatus("success");
       } catch (error) {
-        if (!active) {
+        if (!active || requestVersionRef.current !== requestVersion) {
           return;
         }
 
@@ -119,25 +124,45 @@ export function useThreadRepliesFeed(threadId?: string | null): ThreadRepliesFee
   }, [threadId]);
 
   const loadMore = useCallback(async () => {
-    if (!threadId || initialStatus !== "success" || isLoadingMore || !hasMore) {
+    if (
+      !threadId ||
+      initialStatus !== "success" ||
+      loadMoreInFlightRef.current ||
+      !hasMore
+    ) {
       return;
     }
 
+    const requestVersion = requestVersionRef.current;
+    loadMoreInFlightRef.current = true;
     setIsLoadingMore(true);
     setLoadMoreError(null);
 
     try {
       const feed = await fetchThreadRepliesFeed(threadId, nextCursorRef.current ?? undefined);
 
+      if (requestVersionRef.current !== requestVersion) {
+        return;
+      }
+
       setItems((currentItems) => [...currentItems, ...feed.items]);
       setHasMore(feed.page.hasMore);
       nextCursorRef.current = feed.page.nextCursor;
     } catch (error) {
+      if (requestVersionRef.current !== requestVersion) {
+        return;
+      }
+
       setLoadMoreError(getErrorMessage(error));
     } finally {
+      if (requestVersionRef.current !== requestVersion) {
+        return;
+      }
+
+      loadMoreInFlightRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [threadId, hasMore, initialStatus, isLoadingMore]);
+  }, [threadId, hasMore, initialStatus]);
 
   return {
     thread,

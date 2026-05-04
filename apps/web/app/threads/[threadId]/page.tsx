@@ -11,17 +11,17 @@ export default async function ThreadPage({
 }) {
   const { threadId } = await params;
   const service = createPublicReadingService();
-  const threadResult = await service.getThread(threadId);
-  if (!threadResult) {
-    notFound();
-  }
-
-  const repliesResult = await service.getThreadRepliesFeed({ threadId, limit: 20 });
-  if (!repliesResult) {
-    notFound();
-  }
-
   try {
+    const threadResult = await service.getThread(threadId);
+    if (!threadResult) {
+      notFound();
+    }
+
+    const repliesResult = await service.getThreadRepliesFeed({ threadId, limit: 20 });
+    if (!repliesResult) {
+      notFound();
+    }
+
     return (
       <main className="min-h-screen p-8">
         <h1 className="text-3xl font-semibold">{threadResult.thread.title}</h1>
@@ -37,7 +37,16 @@ export default async function ThreadPage({
         </div>
       </main>
     );
-  } catch {
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "digest" in error &&
+      error.digest === "NEXT_NOT_FOUND"
+    ) {
+      throw error;
+    }
+
     return (
       <main className="min-h-screen p-8">
         <h1 className="text-3xl font-semibold">帖子详情</h1>
