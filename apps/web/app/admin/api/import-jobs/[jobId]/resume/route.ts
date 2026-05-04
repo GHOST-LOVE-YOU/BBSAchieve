@@ -1,58 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/src/server/db/client";
-import { runBoardFullSyncJob } from "@/src/server/imports/boardFullSyncRunner";
 import {
   findJobById,
-  markJobFailed,
-  markJobPaused,
   markJobRunning,
-  markJobSucceeded,
-  updateJobProgress,
 } from "@/src/server/imports/importJobStore";
-import { scheduleBoardFullSync } from "@/src/server/imports/scheduleBoardFullSync";
-import {
-  releaseGlobalSyncThrottle,
-  tryAcquireGlobalSyncThrottle,
-} from "@/src/server/syncThrottle/globalSyncThrottle";
-
-function scheduleBoardFullSyncResume(jobId: string, boardName: string) {
-  scheduleBoardFullSync(async () =>
-    runBoardFullSyncJob(
-      {
-        prisma,
-        findJobById: (scheduledJobId) => findJobById(prisma, scheduledJobId),
-        markJobPaused: (scheduledJobId, progressNote) =>
-          markJobPaused(prisma, scheduledJobId, progressNote),
-        markJobRunning: (scheduledJobId) => markJobRunning(prisma, scheduledJobId),
-        updateJobProgress: (scheduledJobId, progress) =>
-          updateJobProgress(prisma, scheduledJobId, progress),
-        markJobSucceeded: (scheduledJobId) => markJobSucceeded(prisma, scheduledJobId),
-        markJobFailed: (scheduledJobId, errorMessage) =>
-          markJobFailed(prisma, scheduledJobId, errorMessage),
-      },
-      {
-        jobId,
-        ownerKey: `manual:${boardName}`,
-        alreadyMarkedRunning: true,
-        acquireThrottle: () =>
-          tryAcquireGlobalSyncThrottle({
-            ownerKey: `manual:${boardName}`,
-            triggerSource: "manual",
-          }),
-        releaseThrottle: releaseGlobalSyncThrottle,
-      },
-    ),
-  );
-}
-
-function readBoardNameFromJob(job: { metadataJson?: unknown }) {
-  const metadata =
-    job.metadataJson && typeof job.metadataJson === "object"
-      ? (job.metadataJson as Record<string, unknown>)
-      : null;
-  return typeof metadata?.boardName === "string" ? metadata.boardName : null;
-}
+import { scheduleBoardBatchFullSyncRun } from "@/src/server/imports/scheduleBoardBatchFullSync";
 
 export async function POST(
   _request: Request,
@@ -73,19 +26,10 @@ export async function POST(
       );
     }
 
-    if (job.jobType !== "byr_board_full_sync") {
+    if (job.jobType !== "byr_board_full_sync_batch") {
       return NextResponse.json(
-        { ok: false, error: "Only board full sync jobs can be resumed" },
+        { ok: false, error: "Only batch full sync jobs can be resumed" },
         { status: 409 },
-      );
-    }
-
-    const boardName = readBoardNameFromJob(job);
-
-    if (!boardName) {
-      return NextResponse.json(
-        { ok: false, error: "Board full sync job is missing boardName metadata" },
-        { status: 500 },
       );
     }
 
@@ -101,7 +45,11 @@ export async function POST(
         { status: 409 },
       );
     }
-    scheduleBoardFullSyncResume(jobId, boardName);
+
+    scheduleBoardBatchFullSyncRun({
+      jobId,
+      alreadyMarkedRunning: true,
+    });
 
     return NextResponse.json({ ok: true, jobId });
   } catch (error) {

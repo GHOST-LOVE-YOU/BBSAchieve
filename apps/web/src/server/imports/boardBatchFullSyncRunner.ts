@@ -13,6 +13,7 @@ type BatchRunnerDeps = {
     status: string;
     metadataJson: BoardBatchJobMetadata;
   } | null>;
+  markJobPaused: (jobId: string, progressNote: string) => Promise<{ count: number } | unknown>;
   markJobRunning: (jobId: string) => Promise<{ count: number } | unknown>;
   updateJobProgress: (jobId: string, progress: Record<string, unknown>) => Promise<unknown>;
   markJobSucceeded: (jobId: string) => Promise<{ count: number } | unknown>;
@@ -23,6 +24,7 @@ type BatchRunnerDeps = {
 
 type BatchRunnerInput = {
   jobId: string;
+  alreadyMarkedRunning?: boolean;
   acquireThrottle: () => { acquired: boolean; holder: unknown };
   releaseThrottle: () => void;
 };
@@ -38,25 +40,46 @@ export async function runBoardBatchFullSyncJob(
     throw new Error(`Batch job ${input.jobId} not found`);
   }
 
+  if (job.status === "cancelled") {
+    return { status: "cancelled" as const };
+  }
+
   const metadata = job.metadataJson;
   const throttle = input.acquireThrottle();
 
   if (!throttle.acquired) {
-    await deps.updateJobProgress(input.jobId, {
-      progressNote: `等待全局抓取窗口，当前板块 ${getCurrentBoardName(metadata) ?? "—"}`,
-    });
+    const pauseResult = input.alreadyMarkedRunning
+      ? await deps.markJobPaused(
+          input.jobId,
+          `等待全局抓取窗口，当前板块 ${getCurrentBoardName(metadata) ?? "—"}`,
+        )
+      : await deps.updateJobProgress(input.jobId, {
+          progressNote: `等待全局抓取窗口，当前板块 ${getCurrentBoardName(metadata) ?? "—"}`,
+        });
+
+    if (
+      pauseResult &&
+      typeof pauseResult === "object" &&
+      "count" in pauseResult &&
+      pauseResult.count === 0
+    ) {
+      return { status: "cancelled" as const };
+    }
+
     return { status: "paused" as const };
   }
 
   try {
-    const runningResult = await deps.markJobRunning(input.jobId);
-    if (
-      runningResult &&
-      typeof runningResult === "object" &&
-      "count" in runningResult &&
-      runningResult.count === 0
-    ) {
-      return { status: "cancelled" as const };
+    if (!input.alreadyMarkedRunning) {
+      const runningResult = await deps.markJobRunning(input.jobId);
+      if (
+        runningResult &&
+        typeof runningResult === "object" &&
+        "count" in runningResult &&
+        runningResult.count === 0
+      ) {
+        return { status: "cancelled" as const };
+      }
     }
 
     let current = metadata;

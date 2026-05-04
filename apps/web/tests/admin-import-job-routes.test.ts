@@ -10,7 +10,7 @@ const routeMocks = vi.hoisted(() => ({
   markJobSucceeded: vi.fn(),
   updateJobProgress: vi.fn(),
   scheduleBoardBatchFullSync: vi.fn(),
-  scheduleBoardFullSync: vi.fn(),
+  scheduleBoardBatchFullSyncRun: vi.fn(),
   prisma: {},
 }));
 
@@ -29,12 +29,9 @@ vi.mock("@/src/server/imports/importJobStore", () => ({
   updateJobProgress: routeMocks.updateJobProgress,
 }));
 
-vi.mock("@/src/server/imports/scheduleBoardFullSync", () => ({
-  scheduleBoardFullSync: routeMocks.scheduleBoardFullSync,
-}));
-
 vi.mock("@/src/server/imports/scheduleBoardBatchFullSync", () => ({
   scheduleBoardBatchFullSync: routeMocks.scheduleBoardBatchFullSync,
+  scheduleBoardBatchFullSyncRun: routeMocks.scheduleBoardBatchFullSyncRun,
 }));
 
 import { POST as startPOST } from "../app/admin/api/import-jobs/byr-board-full-sync-batch/route";
@@ -81,7 +78,7 @@ describe("admin import job routes", () => {
     const response = await startPOST(request);
 
     expect(routeMocks.createBoardBatchFullSyncJob).not.toHaveBeenCalled();
-    expect(routeMocks.scheduleBoardBatchFullSync).not.toHaveBeenCalled();
+    expect(routeMocks.scheduleBoardBatchFullSyncRun).not.toHaveBeenCalled();
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       ok: false,
@@ -108,7 +105,7 @@ describe("admin import job routes", () => {
     });
   });
 
-  it("rejects resuming a non-board full-sync job", async () => {
+  it("rejects resuming a non-batch full-sync job", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-2",
       jobType: "some_other_job",
@@ -122,61 +119,79 @@ describe("admin import job routes", () => {
 
     expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-2");
     expect(routeMocks.markJobRunning).not.toHaveBeenCalled();
-    expect(routeMocks.scheduleBoardFullSync).not.toHaveBeenCalled();
+    expect(routeMocks.scheduleBoardBatchFullSync).not.toHaveBeenCalled();
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
       ok: false,
-      error: "Only board full sync jobs can be resumed",
+      error: "Only batch full sync jobs can be resumed",
     });
   });
 
-  it("resumes a board full-sync job through the board full-sync scheduler path", async () => {
+  it("resumes a batch full-sync job through the batch scheduler path", async () => {
     routeMocks.findJobById.mockResolvedValue({
-      id: "job-board-1",
-      jobType: "byr_board_full_sync",
-      status: "paused",
-      cursorThreadKey: null,
+      id: "job-batch-1",
+      jobType: "byr_board_full_sync_batch",
+      status: "failed",
       metadataJson: {
-        boardName: "JobInfo",
+        selectedBoardNames: ["JobInfo", "IWhisper"],
+        orderedBoardNames: ["IWhisper", "JobInfo"],
+        completedBoardNames: ["IWhisper"],
+        currentBoardName: "JobInfo",
+        failedBoardName: "JobInfo",
+        currentBoardIndex: 1,
+        perBoardStats: {
+          IWhisper: {
+            processedThreads: 2,
+            processedReplies: 6,
+          },
+        },
       },
     });
 
     const response = await resumePOST(request, {
-      params: Promise.resolve({ jobId: "job-board-1" }),
+      params: Promise.resolve({ jobId: "job-batch-1" }),
     });
 
-    expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-board-1");
-    expect(routeMocks.markJobRunning).toHaveBeenCalledWith(routeMocks.prisma, "job-board-1");
-    expect(routeMocks.scheduleBoardFullSync).toHaveBeenCalled();
+    expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-batch-1");
+    expect(routeMocks.markJobRunning).toHaveBeenCalledWith(routeMocks.prisma, "job-batch-1");
+    expect(routeMocks.scheduleBoardBatchFullSyncRun).toHaveBeenCalledWith({
+      jobId: "job-batch-1",
+      alreadyMarkedRunning: true,
+    });
     expect(routeMocks.markJobRunning.mock.invocationCallOrder[0]).toBeLessThan(
-      routeMocks.scheduleBoardFullSync.mock.invocationCallOrder[0],
+      routeMocks.scheduleBoardBatchFullSyncRun.mock.invocationCallOrder[0],
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      jobId: "job-board-1",
+      jobId: "job-batch-1",
     });
   });
 
-  it("does not resume a board full-sync job if the running transition is rejected after cancellation", async () => {
+  it("does not resume a batch full-sync job if the running transition is rejected after cancellation", async () => {
     routeMocks.findJobById.mockResolvedValue({
-      id: "job-board-2",
-      jobType: "byr_board_full_sync",
+      id: "job-batch-2",
+      jobType: "byr_board_full_sync_batch",
       status: "paused",
-      cursorThreadKey: null,
       metadataJson: {
-        boardName: "JobInfo",
+        selectedBoardNames: ["JobInfo", "IWhisper"],
+        orderedBoardNames: ["IWhisper", "JobInfo"],
+        completedBoardNames: [],
+        currentBoardName: "IWhisper",
+        failedBoardName: null,
+        currentBoardIndex: 0,
+        perBoardStats: {},
       },
     });
     routeMocks.markJobRunning.mockResolvedValue({ count: 0 });
 
     const response = await resumePOST(request, {
-      params: Promise.resolve({ jobId: "job-board-2" }),
+      params: Promise.resolve({ jobId: "job-batch-2" }),
     });
 
-    expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-board-2");
-    expect(routeMocks.markJobRunning).toHaveBeenCalledWith(routeMocks.prisma, "job-board-2");
-    expect(routeMocks.scheduleBoardFullSync).not.toHaveBeenCalled();
+    expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-batch-2");
+    expect(routeMocks.markJobRunning).toHaveBeenCalledWith(routeMocks.prisma, "job-batch-2");
+    expect(routeMocks.scheduleBoardBatchFullSyncRun).not.toHaveBeenCalled();
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
       ok: false,
