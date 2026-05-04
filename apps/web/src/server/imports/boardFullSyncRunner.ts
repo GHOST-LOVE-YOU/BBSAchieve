@@ -75,6 +75,10 @@ export async function runBoardFullSyncJob(
     await deps.markJobSucceeded(input.jobId);
     return { status: "succeeded" as const, importResult };
   } catch (error) {
+    const refreshedJob = await deps.findJobById(input.jobId);
+    if (refreshedJob?.status === "cancelled") {
+      return { status: "cancelled" as const };
+    }
     await deps.markJobFailed(
       input.jobId,
       error instanceof Error ? error.message : "Unknown board full sync error",

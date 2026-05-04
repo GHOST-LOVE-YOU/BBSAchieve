@@ -131,6 +131,25 @@ describe("runBoardFullSyncJob", () => {
     expect(runnerMocks.markJobFailed).toHaveBeenCalledWith("job-1", "sync boom");
   });
 
+  it("returns cancelled without marking failure when the job is cancelled before an import error is handled", async () => {
+    runnerMocks.runByrSyncImport.mockRejectedValueOnce(new Error("sync boom"));
+    const deps = {
+      ...makeDeps(),
+      findJobById: vi
+        .fn()
+        .mockResolvedValueOnce(makeJob())
+        .mockResolvedValueOnce({
+          ...makeJob(),
+          status: "cancelled",
+        }),
+    };
+
+    const result = await runBoardFullSyncJob(deps as never, makeInput());
+
+    expect(result).toEqual({ status: "cancelled" });
+    expect(runnerMocks.markJobFailed).not.toHaveBeenCalled();
+  });
+
   it("marks the job failed when required metadata is missing", async () => {
     const deps = {
       ...makeDeps(),
