@@ -44,9 +44,9 @@ describe("admin imports page", () => {
     prismaMock.importJob.findMany.mockResolvedValue([
       {
         id: "job-1",
-        jobType: "byr_board_full_sync",
+        jobType: "byr_board_full_sync_batch",
         sourceType: "byr_sync_api",
-        sourceLabel: "JobInfo",
+        sourceLabel: "multi-board full sync",
         status: "pending",
         cursorThreadKey: null,
         processedThreads: 0,
@@ -93,9 +93,9 @@ describe("admin imports page", () => {
     prismaMock.importJob.findMany.mockResolvedValue([
       {
         id: "job-pending",
-        jobType: "byr_board_full_sync",
+        jobType: "byr_board_full_sync_batch",
         sourceType: "byr_sync_api",
-        sourceLabel: "IWhisper",
+        sourceLabel: "multi-board full sync",
         status: "pending",
         cursorThreadKey: null,
         processedThreads: 0,
@@ -140,9 +140,9 @@ describe("admin imports page", () => {
     prismaMock.importJob.findMany.mockResolvedValue([
       {
         id: "job-1",
-        jobType: "byr_board_full_sync",
+        jobType: "byr_board_full_sync_batch",
         sourceType: "byr_sync_api",
-        sourceLabel: "JobInfo",
+        sourceLabel: "multi-board full sync",
         status: "running",
         cursorThreadKey: "2026-05-02T10:00:00.000Z|post-2",
         processedThreads: 3,
@@ -201,7 +201,7 @@ describe("admin imports page", () => {
     expect(screen.getByText("回复：10")).toBeTruthy();
     expect(screen.getByText("Sync API request failed: 401")).toBeTruthy();
     expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
-    expect(screen.getByText("byr_board_full_sync")).toBeTruthy();
+    expect(screen.getByText("byr_board_full_sync_batch")).toBeTruthy();
     expect(screen.queryByText(/legacy_/u)).toBeNull();
     expect(screen.getByText("running")).toBeTruthy();
     expect(screen.getByText("2026-05-02T10:00:00.000Z|post-2")).toBeTruthy();
@@ -212,7 +212,7 @@ describe("admin imports page", () => {
     expect(screen.getAllByRole("button", { name: "停止" })).toHaveLength(1);
 
     expect(prismaMock.importJob.findMany).toHaveBeenCalledWith({
-      where: { jobType: "byr_board_full_sync" },
+      where: { jobType: "byr_board_full_sync_batch" },
       orderBy: { createdAt: "desc" },
       take: 20,
     });
