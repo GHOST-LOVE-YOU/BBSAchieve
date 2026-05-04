@@ -235,6 +235,23 @@ def test_sync_endpoint_passes_large_window_minutes(
     assert service.calls == [("JobInfo", 20, 5256000)]
 
 
+def test_sync_endpoint_passes_explicit_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    service = FakeSyncService()
+    client = TestClient(create_app(sync_service=service))
+
+    response = client.get(
+        "/api/sync/updates",
+        params={"board_name": "JobInfo", "window_minutes": 5256000, "limit": 200},
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert service.calls == [("JobInfo", 200, 5256000)]
+
+
 def test_sync_endpoint_returns_window_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
     client = TestClient(create_app(sync_service=FakeSyncService()))

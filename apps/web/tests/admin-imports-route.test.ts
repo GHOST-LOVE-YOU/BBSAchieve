@@ -38,6 +38,7 @@ vi.mock("@/src/server/imports/importSyncBatch", () => ({
 }));
 
 import { POST } from "../app/admin/api/imports/byr-sync/route";
+import { runByrSyncImport } from "../app/admin/api/imports/byr-sync/route";
 
 describe("admin byr sync route", () => {
   beforeEach(() => {
@@ -803,5 +804,85 @@ describe("admin byr sync route", () => {
     expect(routeMocks.fetchSyncThreadSnapshot).not.toHaveBeenCalled();
     expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
+  });
+
+  it("looks up existing threads using the actual board slug for non-IWhisper boards", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue({
+      id: "thread-job-1",
+      body: "已有主贴正文",
+      replyCount: 1,
+    });
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "JobInfo",
+      window_minutes: 180,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
+      threads: [
+        {
+          article_id: "3001",
+          title: "JobInfo continuity",
+          reply_count: 1,
+          posts: [
+            {
+              post_id: "p1",
+              floor_label: "第1楼",
+              author_display_name: "JobInfo#001",
+              posted_at: "Sun May 3 00:08:00 2026",
+              body: "reply 1",
+            },
+          ],
+        },
+      ],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "JobInfo",
+      boards: [
+        {
+          slug: "jobinfo",
+          name: "JobInfo",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-job-1",
+      importedThreads: 1,
+      importedReplies: 1,
+      skippedReplies: 0,
+    });
+
+    const result = await runByrSyncImport({
+      prisma: routeMocks.prisma as never,
+      boardName: "JobInfo",
+      windowMinutes: 180,
+    });
+
+    expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledWith({
+      boardName: "JobInfo",
+      windowMinutes: 180,
+    });
+    expect(routeMocks.prisma.thread.findUnique).toHaveBeenCalledWith({
+      where: {
+        sourceBoardSlug_sourceThreadId: {
+          sourceBoardSlug: "jobinfo",
+          sourceThreadId: "3001",
+        },
+      },
+      select: {
+        id: true,
+        body: true,
+        replyCount: true,
+      },
+    });
+    expect(result).toEqual({
+      importId: "import-job-1",
+      importedThreads: 1,
+      importedReplies: 1,
+      skippedReplies: 0,
+    });
   });
 });

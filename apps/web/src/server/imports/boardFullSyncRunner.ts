@@ -5,6 +5,8 @@ type BoardFullSyncMetadata = {
   fullSyncWindowMinutes: number;
 };
 
+const BOARD_FULL_SYNC_LIMIT = 200;
+
 function readBoardFullSyncMetadata(
   metadataJson: unknown,
 ): BoardFullSyncMetadata {
@@ -91,6 +93,7 @@ export async function runBoardFullSyncJob(
       prisma: deps.prisma,
       boardName: metadata.boardName,
       windowMinutes: metadata.fullSyncWindowMinutes,
+      limit: BOARD_FULL_SYNC_LIMIT,
     });
     const refreshedJob = await deps.findJobById(input.jobId);
     if (refreshedJob?.status === "cancelled") {

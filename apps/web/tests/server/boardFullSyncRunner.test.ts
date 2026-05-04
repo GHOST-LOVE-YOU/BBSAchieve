@@ -127,6 +127,7 @@ describe("runBoardFullSyncJob", () => {
       prisma: { thread: {} },
       boardName: "JobInfo",
       windowMinutes: 999999,
+      limit: 200,
     });
     expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1");
   });
