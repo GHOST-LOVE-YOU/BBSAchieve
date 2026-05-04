@@ -92,7 +92,7 @@ export function createPublicReadingService(
       const rows = await repository.listThreadsPageByBoard({
         boardId: board.id,
         limit: limit + 1,
-        cursor: input.cursor ? decodeBoardFeedCursor(input.cursor) : undefined,
+        cursor: input.cursor == null ? undefined : decodeBoardFeedCursor(input.cursor),
       });
       const hasMore = rows.length > limit;
       const items = rows.slice(0, limit);

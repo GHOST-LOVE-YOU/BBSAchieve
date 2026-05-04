@@ -549,4 +549,25 @@ describe("publicReadingService", () => {
       expect(() => decodeBoardFeedCursor(cursor)).toThrow("Invalid board cursor");
     }
   });
+
+  it("rejects an explicitly empty board cursor", async () => {
+    const service = createPublicReadingService({
+      repository: createRepository({
+        findBoardById: vi.fn<ReadingRepository["findBoardById"]>().mockResolvedValue(null),
+        findBoardBySlug: vi.fn<ReadingRepository["findBoardBySlug"]>().mockResolvedValue({
+          id: "board:job",
+          slug: "job",
+          name: "Jobs and Offers",
+          description: "Signals for roles, openings, and practical next steps.",
+        }),
+      }),
+    });
+
+    await expect(
+      service.getBoardThreadsFeed({
+        boardIdOrSlug: "job",
+        cursor: "",
+      }),
+    ).rejects.toThrow("Invalid board cursor");
+  });
 });
