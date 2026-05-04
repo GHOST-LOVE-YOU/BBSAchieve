@@ -24,14 +24,20 @@ vi.mock("next/link", () => ({
   },
 }));
 
-import AdminImportsPage from "../app/admin/imports/page";
 import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
 import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 
-const fullSyncBoards = boardCatalog.filter((board) => board.fullSyncEnabled);
+const selectableBoards = boardCatalog;
+
+async function renderAdminImportsPage() {
+  const { default: AdminImportsPage } = await import("../app/admin/imports/page");
+  render(await AdminImportsPage());
+}
 
 describe("admin imports page", () => {
   beforeEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/src/server/boardSync/boardRegistry");
     vi.clearAllMocks();
   });
 
@@ -40,6 +46,16 @@ describe("admin imports page", () => {
   });
 
   it("renders board full-sync batch selection without old import controls", async () => {
+    vi.doMock("@/src/server/boardSync/boardRegistry", async () => {
+      const actual = await vi.importActual<typeof import("@/src/server/boardSync/boardRegistry")>(
+        "@/src/server/boardSync/boardRegistry",
+      );
+
+      return {
+        ...actual,
+        boardSyncBoards: actual.boardSyncBoards.filter((board) => board.boardName === "IWhisper"),
+      };
+    });
     prismaMock.import.findMany.mockResolvedValue([]);
     prismaMock.importJob.findMany.mockResolvedValue([
       {
@@ -60,12 +76,12 @@ describe("admin imports page", () => {
     ]);
     vi.mocked(listRecentImportActivity).mockResolvedValue([]);
 
-    render(await AdminImportsPage());
+    await renderAdminImportsPage();
 
     const batchStartButton = screen.getByRole("button", { name: "开始全量抓取" });
 
     expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
-    for (const board of fullSyncBoards) {
+    for (const board of selectableBoards) {
       const checkbox = screen.getByRole("checkbox", { name: board.boardName });
       expect(checkbox).toBeTruthy();
       expect(checkbox.getAttribute("name")).toBe("boardNames");
@@ -86,7 +102,7 @@ describe("admin imports page", () => {
         batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
           [],
       ).map((input) => input.value),
-    ).toEqual(fullSyncBoards.map((board) => board.boardName));
+    ).toEqual(selectableBoards.map((board) => board.boardName));
     expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
   });
 
@@ -111,7 +127,7 @@ describe("admin imports page", () => {
     ]);
     vi.mocked(listRecentImportActivity).mockResolvedValue([]);
 
-    render(await AdminImportsPage());
+    await renderAdminImportsPage();
 
     const stopButton = screen.getByRole("button", { name: "停止" });
     expect(stopButton.closest("form")?.getAttribute("action")).toBe(
@@ -183,13 +199,13 @@ describe("admin imports page", () => {
       },
     ]);
 
-    render(await AdminImportsPage());
+    await renderAdminImportsPage();
 
     expect(screen.getByRole("heading", { name: "导入导出" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "同步北邮人数据" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "开始全量抓取" })).toBeTruthy();
     expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
-    for (const board of fullSyncBoards) {
+    for (const board of selectableBoards) {
       expect(screen.getByRole("checkbox", { name: board.boardName })).toBeTruthy();
     }
     expect(screen.getByText("最近导入活动")).toBeTruthy();
@@ -229,7 +245,7 @@ describe("admin imports page", () => {
         batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
           [],
       ).map((input) => input.value),
-    ).toEqual(fullSyncBoards.map((board) => board.boardName));
+    ).toEqual(selectableBoards.map((board) => board.boardName));
     expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
   });
 });

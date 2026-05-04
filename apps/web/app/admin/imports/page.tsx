@@ -1,13 +1,13 @@
 import Link from "next/link";
 
-import { boardSyncBoards } from "@/src/server/boardSync/boardRegistry";
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 import { prisma } from "@/src/server/db/client";
 import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminImportsPage() {
-  const fullSyncBoards = boardSyncBoards.filter((board) => board.fullSyncEnabled);
+  const selectableBoards = boardCatalog;
   const imports = await prisma.import.findMany({
     orderBy: { startedAt: "desc" },
     take: 20,
@@ -42,7 +42,7 @@ export default async function AdminImportsPage() {
           >
             <fieldset className="grid gap-3">
               <legend className="text-sm font-medium text-zinc-900">选择要全量抓取的板块</legend>
-              {fullSyncBoards.map((board) => (
+              {selectableBoards.map((board) => (
                 <div
                   key={board.boardName}
                   className="flex items-start gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm"
@@ -80,7 +80,7 @@ export default async function AdminImportsPage() {
               开始全量抓取
             </button>
             <p className="mt-3 text-sm text-zinc-500">
-              当前将按首页目录顺序串行抓取：{fullSyncBoards.map((board) => board.boardName).join("、")}
+              当前将按首页目录顺序串行抓取：{selectableBoards.map((board) => board.boardName).join("、")}
             </p>
           </form>
         </div>
