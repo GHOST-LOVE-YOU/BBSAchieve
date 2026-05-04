@@ -1,28 +1,9 @@
-import type { ReplyRecord, ThreadRecord, UserRecord } from "@bbs/domain";
 import { describe, expect, it, vi } from "vitest";
 
 import { createPublicReadingService } from "@/src/server/reading/publicReadingService";
 import type { ReadingRepository } from "@/src/server/reading/readingRepository";
 
-type FindThreadByRouteId = (routeId: string) => Promise<ThreadRecord | null>;
-type ListThreadsPageByBoard = (input: {
-  boardId: string;
-  limit: number;
-  cursor?: string | null;
-}) => Promise<ThreadRecord[]>;
-type ListRepliesPageByThread = (input: {
-  threadId: string;
-  limit: number;
-  cursor?: string | null;
-}) => Promise<ReplyRecord[]>;
-type FindUsersByIds = (userIds: string[]) => Promise<Map<string, UserRecord>>;
-
-type PublicReadingRepository = ReadingRepository & {
-  findThreadByRouteId: FindThreadByRouteId;
-  listThreadsPageByBoard: ListThreadsPageByBoard;
-  listRepliesPageByThread: ListRepliesPageByThread;
-  findUsersByIds: FindUsersByIds;
-};
+type PublicReadingRepository = ReadingRepository;
 
 function createRepository(
   overrides: Partial<PublicReadingRepository> = {},
@@ -119,7 +100,9 @@ describe("publicReadingService", () => {
           name: "Jobs and Offers",
           description: "Signals for roles, openings, and practical next steps.",
         }),
-        listThreadsPageByBoard: vi.fn<ListThreadsPageByBoard>().mockResolvedValue([
+        listThreadsPageByBoard: vi
+          .fn<ReadingRepository["listThreadsPageByBoard"]>()
+          .mockResolvedValue([
           {
             id: "thread:2",
             boardId: "board:job",
@@ -157,7 +140,7 @@ describe("publicReadingService", () => {
             lastReplyAt: null,
           },
         ]),
-        findUsersByIds: vi.fn<FindUsersByIds>().mockResolvedValue(
+        findUsersByIds: vi.fn<ReadingRepository["findUsersByIds"]>().mockResolvedValue(
           new Map([
             [
               "user:robot-1",
@@ -214,7 +197,7 @@ describe("publicReadingService", () => {
   it("returns thread detail", async () => {
     const service = createPublicReadingService({
       repository: createRepository({
-        findThreadByRouteId: vi.fn<FindThreadByRouteId>().mockResolvedValue({
+        findThreadByRouteId: vi.fn<ReadingRepository["findThreadByRouteId"]>().mockResolvedValue({
           id: "thread:first-offer",
           boardId: "board:job",
           authorUserId: "user:robot-1",
@@ -262,7 +245,7 @@ describe("publicReadingService", () => {
   it("returns thread replies feed DTO with pagination metadata", async () => {
     const service = createPublicReadingService({
       repository: createRepository({
-        findThreadByRouteId: vi.fn<FindThreadByRouteId>().mockResolvedValue({
+        findThreadByRouteId: vi.fn<ReadingRepository["findThreadByRouteId"]>().mockResolvedValue({
           id: "thread:first-offer",
           boardId: "board:job",
           authorUserId: "user:robot-1",
@@ -287,7 +270,9 @@ describe("publicReadingService", () => {
           userType: "bot",
           status: "active",
         }),
-        listRepliesPageByThread: vi.fn<ListRepliesPageByThread>().mockResolvedValue([
+        listRepliesPageByThread: vi
+          .fn<ReadingRepository["listRepliesPageByThread"]>()
+          .mockResolvedValue([
           {
             id: "reply:1",
             threadId: "thread:first-offer",
@@ -313,7 +298,7 @@ describe("publicReadingService", () => {
             publishedAt: "2026-05-01T08:15:00.000Z",
           },
         ]),
-        findUsersByIds: vi.fn<FindUsersByIds>().mockResolvedValue(
+        findUsersByIds: vi.fn<ReadingRepository["findUsersByIds"]>().mockResolvedValue(
           new Map([
             [
               "user:alice",

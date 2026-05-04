@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 
 import type {
   BoardRecord,
@@ -16,10 +16,25 @@ export type ReadingRepository = {
   findBoardBySlug(slug: string): Promise<BoardRecord | null>;
   listBoards(): Promise<BoardRecord[]>;
   findThreadById(id: string): Promise<ThreadRecord | null>;
+  findThreadByRouteId(routeId: string): Promise<ThreadRecord | null>;
   listThreadsByBoard(boardId: string): Promise<ThreadRecord[]>;
+  listThreadsPageByBoard(input: {
+    boardId: string;
+    limit: number;
+    cursor?: {
+      lastReplyAt: string | null;
+      id: string;
+    };
+  }): Promise<ThreadRecord[]>;
   findReplyById(id: string): Promise<ReplyRecord | null>;
   listRepliesByThread(threadId: string): Promise<ReplyRecord[]>;
+  listRepliesPageByThread(input: {
+    threadId: string;
+    limit: number;
+    cursor?: number;
+  }): Promise<ReplyRecord[]>;
   findUserById(id: string): Promise<UserRecord | null>;
+  findUsersByIds(ids: string[]): Promise<Map<string, UserRecord>>;
   findUserByUsername(username: string): Promise<UserRecord | null>;
 };
 
@@ -99,6 +114,77 @@ function toUserRecord(user: {
   };
 }
 
+function createThreadSelect() {
+  return {
+    id: true,
+    boardId: true,
+    authorUserId: true,
+    sourceBoardSlug: true,
+    sourceThreadId: true,
+    title: true,
+    body: true,
+    publishedAt: true,
+    replyCount: true,
+    lastReplyAt: true,
+  } satisfies Prisma.ThreadSelect;
+}
+
+function createReplySelect() {
+  return {
+    id: true,
+    threadId: true,
+    authorUserId: true,
+    replyIndex: true,
+    body: true,
+    publishedAt: true,
+  } satisfies Prisma.ReplySelect;
+}
+
+function createUserSelect() {
+  return {
+    id: true,
+    username: true,
+    displayName: true,
+    userType: true,
+    status: true,
+    mailboxKey: true,
+  } satisfies Prisma.UserSelect;
+}
+
+function buildThreadPageWhere(input: {
+  boardId: string;
+  cursor?: {
+    lastReplyAt: string | null;
+    id: string;
+  };
+}): Prisma.ThreadWhereInput {
+  if (input.cursor == null) {
+    return { boardId: input.boardId };
+  }
+
+  if (input.cursor.lastReplyAt == null) {
+    return {
+      boardId: input.boardId,
+      lastReplyAt: null,
+      id: { lt: input.cursor.id },
+    };
+  }
+
+  const cursorLastReplyAt = new Date(input.cursor.lastReplyAt);
+
+  return {
+    boardId: input.boardId,
+    OR: [
+      { lastReplyAt: { lt: cursorLastReplyAt } },
+      {
+        lastReplyAt: cursorLastReplyAt,
+        id: { lt: input.cursor.id },
+      },
+      { lastReplyAt: null },
+    ],
+  };
+}
+
 export function createReadingRepository(
   client: PrismaReadingClient = prisma,
 ): ReadingRepository {
@@ -145,18 +231,16 @@ export function createReadingRepository(
     async findThreadById(id) {
       const thread = await client.thread.findUnique({
         where: { id },
-        select: {
-          id: true,
-          boardId: true,
-          authorUserId: true,
-          sourceBoardSlug: true,
-          sourceThreadId: true,
-          title: true,
-          body: true,
-          publishedAt: true,
-          replyCount: true,
-          lastReplyAt: true,
-        },
+        select: createThreadSelect(),
+      });
+
+      return thread ? toThreadRecord(thread) : null;
+    },
+    async findThreadByRouteId(routeId) {
+      const thread = await client.thread.findFirst({
+        where: { sourceThreadId: routeId },
+        orderBy: { publishedAt: "desc" },
+        select: createThreadSelect(),
       });
 
       return thread ? toThreadRecord(thread) : null;
@@ -165,18 +249,25 @@ export function createReadingRepository(
       const threads = await client.thread.findMany({
         where: { boardId },
         orderBy: { publishedAt: "desc" },
-        select: {
-          id: true,
-          boardId: true,
-          authorUserId: true,
-          sourceBoardSlug: true,
-          sourceThreadId: true,
-          title: true,
-          body: true,
-          publishedAt: true,
-          replyCount: true,
-          lastReplyAt: true,
-        },
+        select: createThreadSelect(),
+      });
+
+      return threads.map(toThreadRecord);
+    },
+    async listThreadsPageByBoard(input) {
+      const threads = await client.thread.findMany({
+        where: buildThreadPageWhere(input),
+        orderBy: [
+          {
+            lastReplyAt: {
+              sort: Prisma.SortOrder.desc,
+              nulls: Prisma.NullsOrder.last,
+            },
+          },
+          { id: Prisma.SortOrder.desc },
+        ],
+        take: input.limit,
+        select: createThreadSelect(),
       });
 
       return threads.map(toThreadRecord);
@@ -184,14 +275,7 @@ export function createReadingRepository(
     async findReplyById(id) {
       const reply = await client.reply.findUnique({
         where: { id },
-        select: {
-          id: true,
-          threadId: true,
-          authorUserId: true,
-          replyIndex: true,
-          body: true,
-          publishedAt: true,
-        },
+        select: createReplySelect(),
       });
 
       return reply ? toReplyRecord(reply) : null;
@@ -200,14 +284,20 @@ export function createReadingRepository(
       const replies = await client.reply.findMany({
         where: { threadId },
         orderBy: { replyIndex: "asc" },
-        select: {
-          id: true,
-          threadId: true,
-          authorUserId: true,
-          replyIndex: true,
-          body: true,
-          publishedAt: true,
+        select: createReplySelect(),
+      });
+
+      return replies.map(toReplyRecord);
+    },
+    async listRepliesPageByThread(input) {
+      const replies = await client.reply.findMany({
+        where: {
+          threadId: input.threadId,
+          ...(input.cursor == null ? {} : { replyIndex: { gt: input.cursor } }),
         },
+        orderBy: { replyIndex: "asc" },
+        take: input.limit,
+        select: createReplySelect(),
       });
 
       return replies.map(toReplyRecord);
@@ -215,29 +305,28 @@ export function createReadingRepository(
     async findUserById(id) {
       const user = await client.user.findUnique({
         where: { id },
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          userType: true,
-          status: true,
-          mailboxKey: true,
-        },
+        select: createUserSelect(),
       });
 
       return user ? toUserRecord(user) : null;
     },
+    async findUsersByIds(ids) {
+      const uniqueIds = [...new Set(ids)];
+      if (uniqueIds.length === 0) {
+        return new Map();
+      }
+
+      const users = await client.user.findMany({
+        where: { id: { in: uniqueIds } },
+        select: createUserSelect(),
+      });
+
+      return new Map(users.map((user) => [user.id, toUserRecord(user)]));
+    },
     async findUserByUsername(username) {
       const user = await client.user.findFirst({
         where: { username },
-        select: {
-          id: true,
-          username: true,
-          displayName: true,
-          userType: true,
-          status: true,
-          mailboxKey: true,
-        },
+        select: createUserSelect(),
       });
 
       return user ? toUserRecord(user) : null;
