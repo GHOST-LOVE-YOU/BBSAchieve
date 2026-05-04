@@ -8,6 +8,15 @@ import {
 } from "@/src/server/imports/boardBatchJobMetadata";
 
 describe("boardBatchJobMetadata", () => {
+  it("rejects creating metadata with no ordered boards", () => {
+    expect(() =>
+      createBatchJobMetadata({
+        selectedBoardNames: [],
+        orderedBoardNames: [],
+      }),
+    ).toThrow("orderedBoardNames must not be empty");
+  });
+
   it("creates ordered metadata from selected boards", () => {
     const metadata = createBatchJobMetadata({
       selectedBoardNames: ["JobInfo", "IWhisper"],
@@ -46,6 +55,44 @@ describe("boardBatchJobMetadata", () => {
     });
   });
 
+  it("rejects completing a board that is not the current board", () => {
+    expect(() =>
+      markBoardCompleted(
+        createBatchJobMetadata({
+          selectedBoardNames: ["JobInfo", "IWhisper"],
+          orderedBoardNames: ["IWhisper", "JobInfo"],
+        }),
+        {
+          boardName: "JobInfo",
+          processedThreads: 3,
+          processedReplies: 7,
+        },
+      ),
+    ).toThrow('cannot complete board "JobInfo" while current board is "IWhisper"');
+  });
+
+  it("rejects completing the same board twice", () => {
+    const metadata = markBoardCompleted(
+      createBatchJobMetadata({
+        selectedBoardNames: ["JobInfo", "IWhisper"],
+        orderedBoardNames: ["IWhisper", "JobInfo"],
+      }),
+      {
+        boardName: "IWhisper",
+        processedThreads: 3,
+        processedReplies: 7,
+      },
+    );
+
+    expect(() =>
+      markBoardCompleted(metadata, {
+        boardName: "IWhisper",
+        processedThreads: 4,
+        processedReplies: 8,
+      }),
+    ).toThrow('board "IWhisper" is already completed');
+  });
+
   it("records the failed board and keeps the cursor there", () => {
     const metadata = markBoardFailed(
       createBatchJobMetadata({
@@ -57,5 +104,29 @@ describe("boardBatchJobMetadata", () => {
 
     expect(metadata.failedBoardName).toBe("IWhisper");
     expect(getCurrentBoardName(metadata)).toBe("IWhisper");
+  });
+
+  it("rejects failing a board that is not the current board", () => {
+    expect(() =>
+      markBoardFailed(
+        createBatchJobMetadata({
+          selectedBoardNames: ["JobInfo", "IWhisper"],
+          orderedBoardNames: ["IWhisper", "JobInfo"],
+        }),
+        "JobInfo",
+      ),
+    ).toThrow('cannot fail board "JobInfo" while current board is "IWhisper"');
+  });
+
+  it("rejects failing a board outside orderedBoardNames", () => {
+    expect(() =>
+      markBoardFailed(
+        createBatchJobMetadata({
+          selectedBoardNames: ["JobInfo", "IWhisper"],
+          orderedBoardNames: ["IWhisper", "JobInfo"],
+        }),
+        "UnknownBoard",
+      ),
+    ).toThrow('board "UnknownBoard" is not in orderedBoardNames');
   });
 });
