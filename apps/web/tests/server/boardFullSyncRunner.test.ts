@@ -75,7 +75,10 @@ describe("runBoardFullSyncJob", () => {
     );
 
     expect(result.status).toBe("paused");
-    expect(runnerMocks.markJobPaused).toHaveBeenCalled();
+    expect(runnerMocks.markJobPaused).toHaveBeenCalledWith(
+      "job-1",
+      "skipped by global throttle",
+    );
     expect(runnerMocks.runByrSyncImport).not.toHaveBeenCalled();
   });
 
