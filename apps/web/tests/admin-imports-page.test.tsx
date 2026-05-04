@@ -8,9 +8,6 @@ const prismaMock = vi.hoisted(() => ({
   importJob: {
     findMany: vi.fn(),
   },
-  recentActivity: {
-    findMany: vi.fn(),
-  },
 }));
 
 vi.mock("@/src/server/db/client", () => ({
@@ -29,6 +26,9 @@ vi.mock("next/link", () => ({
 
 import AdminImportsPage from "../app/admin/imports/page";
 import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
+import { boardSyncBoards } from "@/src/server/boardSync/boardRegistry";
+
+const fullSyncBoards = boardSyncBoards.filter((board) => board.fullSyncEnabled);
 
 describe("admin imports page", () => {
   beforeEach(() => {
@@ -61,9 +61,26 @@ describe("admin imports page", () => {
 
     render(await AdminImportsPage());
 
-    expect(screen.getByRole("button", { name: "开始抓取 JobInfo 全量内容" })).toBeTruthy();
+    const boardFullSyncButtons = screen.getAllByRole("button", {
+      name: /开始抓取 .* 全量内容/u,
+    });
+
+    expect(boardFullSyncButtons).toHaveLength(fullSyncBoards.length);
+    expect(boardFullSyncButtons.map((button) => button.textContent)).toEqual(
+      fullSyncBoards.map((board) => `开始抓取 ${board.boardName} 全量内容`),
+    );
     expect(screen.queryByRole("button", { name: "从旧库导入 iwhisper" })).toBeNull();
     expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
+
+    const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
+    expect(boardFullSyncForms.map((form) => form?.getAttribute("action"))).toEqual(
+      fullSyncBoards.map(() => "/admin/api/import-jobs/byr-board-full-sync"),
+    );
+    expect(
+      boardFullSyncForms.map((form) =>
+        form?.querySelector<HTMLInputElement>('input[name="boardName"]')?.value,
+      ),
+    ).toEqual(fullSyncBoards.map((board) => board.boardName));
   });
 
   it("renders the sync entry, recent activity, and import jobs including board full-sync tasks", async () => {
@@ -124,7 +141,11 @@ describe("admin imports page", () => {
 
     expect(screen.getByRole("heading", { name: "导入导出" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "同步北邮人数据" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "开始抓取 JobInfo 全量内容" })).toBeTruthy();
+    for (const board of fullSyncBoards) {
+      expect(
+        screen.getByRole("button", { name: `开始抓取 ${board.boardName} 全量内容` }),
+      ).toBeTruthy();
+    }
     expect(screen.getByText("最近导入活动")).toBeTruthy();
     expect(screen.getByText("JobInfo · 任务")).toBeTruthy();
     expect(screen.getByText("IWhisper updates")).toBeTruthy();
@@ -149,10 +170,18 @@ describe("admin imports page", () => {
       take: 20,
     });
 
-    const boardFullSyncButton = screen.getByRole("button", { name: "开始抓取 JobInfo 全量内容" });
-    const boardFullSyncForm = boardFullSyncButton.closest("form");
-    expect(boardFullSyncForm?.getAttribute("action")).toBe("/admin/api/import-jobs/byr-board-full-sync");
-    const boardNameInput = boardFullSyncForm?.querySelector('input[name="boardName"]');
-    expect(boardNameInput?.getAttribute("value")).toBe("JobInfo");
+    const boardFullSyncButtons = screen.getAllByRole("button", {
+      name: /开始抓取 .* 全量内容/u,
+    });
+    expect(boardFullSyncButtons).toHaveLength(fullSyncBoards.length);
+    const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
+    expect(boardFullSyncForms.map((form) => form?.getAttribute("action"))).toEqual(
+      fullSyncBoards.map(() => "/admin/api/import-jobs/byr-board-full-sync"),
+    );
+    expect(
+      boardFullSyncForms.map((form) =>
+        form?.querySelector<HTMLInputElement>('input[name="boardName"]')?.value,
+      ),
+    ).toEqual(fullSyncBoards.map((board) => board.boardName));
   });
 });

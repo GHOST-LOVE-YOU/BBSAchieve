@@ -7,6 +7,7 @@ import { listRecentImportActivity } from "@/src/server/admin/listRecentImportAct
 export const dynamic = "force-dynamic";
 
 export default async function AdminImportsPage() {
+  const fullSyncBoards = boardSyncBoards.filter((board) => board.fullSyncEnabled);
   const imports = await prisma.import.findMany({
     orderBy: { startedAt: "desc" },
     take: 20,
@@ -34,23 +35,21 @@ export default async function AdminImportsPage() {
               同步北邮人数据
             </button>
           </form>
-          {boardSyncBoards
-            .filter((board) => board.fullSyncEnabled)
-            .map((board) => (
-              <form
-                key={board.boardName}
-                action="/admin/api/import-jobs/byr-board-full-sync"
-                method="post"
+          {fullSyncBoards.map((board) => (
+            <form
+              key={board.boardName}
+              action="/admin/api/import-jobs/byr-board-full-sync"
+              method="post"
+            >
+              <input type="hidden" name="boardName" value={board.boardName} />
+              <button
+                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
+                type="submit"
               >
-                <input type="hidden" name="boardName" value={board.boardName} />
-                <button
-                  className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
-                  type="submit"
-                >
-                  {`开始抓取 ${board.boardName} 全量内容`}
-                </button>
-              </form>
-            ))}
+                {`开始抓取 ${board.boardName} 全量内容`}
+              </button>
+            </form>
+          ))}
         </div>
       </div>
 
