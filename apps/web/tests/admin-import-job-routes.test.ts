@@ -130,25 +130,25 @@ describe("admin import job routes", () => {
     });
   });
 
-  it("stops a job by pausing it", async () => {
+  it("stops a board full-sync job by cancelling it", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-3",
       status: "running",
-      cursorThreadKey: "cursor-3",
+      jobType: "byr_board_full_sync",
     });
-    routeMocks.markJobPaused.mockResolvedValue({});
+    routeMocks.markJobCancelled.mockResolvedValue({});
 
     const response = await stopPOST(request, {
       params: Promise.resolve({ jobId: "job-3" }),
     });
 
     expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-3");
-    expect(routeMocks.markJobPaused).toHaveBeenCalledWith(routeMocks.prisma, "job-3");
+    expect(routeMocks.markJobCancelled).toHaveBeenCalledWith(routeMocks.prisma, "job-3");
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
       jobId: "job-3",
-      status: "paused",
+      status: "cancelled",
     });
   });
 });

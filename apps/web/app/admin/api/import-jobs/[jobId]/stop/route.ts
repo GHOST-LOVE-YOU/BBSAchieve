@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/src/server/db/client";
-import { findJobById, markJobPaused } from "@/src/server/imports/importJobStore";
+import { findJobById, markJobCancelled } from "@/src/server/imports/importJobStore";
 
 export async function POST(
   _request: Request,
@@ -15,16 +15,16 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "Job not found" }, { status: 404 });
     }
 
-    if (job.status !== "running" && job.status !== "paused" && job.status !== "failed") {
+    if (!["pending", "running", "paused", "failed"].includes(job.status)) {
       return NextResponse.json(
         { ok: false, error: `Job is not stoppable from ${job.status}` },
         { status: 409 },
       );
     }
 
-    await markJobPaused(prisma, jobId);
+    await markJobCancelled(prisma, jobId);
 
-    return NextResponse.json({ ok: true, jobId, status: "paused" });
+    return NextResponse.json({ ok: true, jobId, status: "cancelled" });
   } catch (error) {
     return NextResponse.json(
       {

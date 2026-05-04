@@ -68,6 +68,10 @@ export async function runBoardFullSyncJob(
       boardName: metadata.boardName,
       windowMinutes: metadata.fullSyncWindowMinutes,
     });
+    const refreshedJob = await deps.findJobById(input.jobId);
+    if (refreshedJob?.status === "cancelled") {
+      return { status: "cancelled" as const };
+    }
     await deps.markJobSucceeded(input.jobId);
     return { status: "succeeded" as const, importResult };
   } catch (error) {
