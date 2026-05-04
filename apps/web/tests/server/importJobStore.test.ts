@@ -71,7 +71,7 @@ describe("markJobPaused", () => {
 });
 
 describe("markJobRunning", () => {
-  it("updates running only when the job is not already cancelled", async () => {
+  it("updates running only when the job is still resumable", async () => {
     const updateMany = vi.fn(async () => ({ count: 1 }));
     const now = new Date("2026-05-04T07:02:00.000Z");
 
@@ -91,7 +91,7 @@ describe("markJobRunning", () => {
         where: {
           id: "job-1",
           status: {
-            not: "cancelled",
+            in: ["pending", "paused", "failed"],
           },
         },
         data: expect.objectContaining({
@@ -107,8 +107,8 @@ describe("markJobRunning", () => {
 });
 
 describe("markJobCancelled", () => {
-  it("writes cancelled status and finished time", async () => {
-    const update = vi.fn(async () => ({ id: "job-1" }));
+  it("writes cancelled status and finished time only when the job is still stoppable", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
     const now = new Date("2026-05-04T07:05:00.000Z");
 
     vi.useFakeTimers();
@@ -117,13 +117,18 @@ describe("markJobCancelled", () => {
     try {
       await markJobCancelled(
         {
-          importJob: { update },
+          importJob: { updateMany },
         } as any,
         "job-1",
       );
 
-      expect(update).toHaveBeenCalledWith({
-        where: { id: "job-1" },
+      expect(updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "job-1",
+          status: {
+            in: ["pending", "running", "paused", "failed"],
+          },
+        },
         data: expect.objectContaining({
           status: "cancelled",
           finishedAt: now,

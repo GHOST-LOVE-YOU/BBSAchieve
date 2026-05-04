@@ -153,7 +153,7 @@ describe("admin import job routes", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
       ok: false,
-      error: "Job was cancelled before resume",
+      error: "Job is no longer resumable",
     });
   });
 
@@ -176,6 +176,27 @@ describe("admin import job routes", () => {
       ok: true,
       jobId: "job-3",
       status: "cancelled",
+    });
+  });
+
+  it("does not stop a board full-sync job if the cancel transition is rejected at write time", async () => {
+    routeMocks.findJobById.mockResolvedValue({
+      id: "job-5",
+      status: "running",
+      jobType: "byr_board_full_sync",
+    });
+    routeMocks.markJobCancelled.mockResolvedValue({ count: 0 });
+
+    const response = await stopPOST(request, {
+      params: Promise.resolve({ jobId: "job-5" }),
+    });
+
+    expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-5");
+    expect(routeMocks.markJobCancelled).toHaveBeenCalledWith(routeMocks.prisma, "job-5");
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "Job is no longer stoppable",
     });
   });
 

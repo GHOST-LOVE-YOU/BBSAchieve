@@ -32,7 +32,18 @@ export async function POST(
       );
     }
 
-    await markJobCancelled(prisma, jobId);
+    const cancelResult = await markJobCancelled(prisma, jobId);
+    if (
+      cancelResult &&
+      typeof cancelResult === "object" &&
+      "count" in cancelResult &&
+      cancelResult.count === 0
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Job is no longer stoppable" },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ ok: true, jobId, status: "cancelled" });
   } catch (error) {
     return NextResponse.json(

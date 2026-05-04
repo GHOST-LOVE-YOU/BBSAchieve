@@ -31,6 +31,7 @@ function scheduleBoardFullSyncResume(jobId: string, boardName: string) {
       {
         jobId,
         ownerKey: `manual:${boardName}`,
+        alreadyMarkedRunning: true,
         acquireThrottle: () =>
           tryAcquireGlobalSyncThrottle({
             ownerKey: `manual:${boardName}`,
@@ -93,7 +94,7 @@ export async function POST(
       runningResult.count === 0
     ) {
       return NextResponse.json(
-        { ok: false, error: "Job was cancelled before resume" },
+        { ok: false, error: "Job is no longer resumable" },
         { status: 409 },
       );
     }

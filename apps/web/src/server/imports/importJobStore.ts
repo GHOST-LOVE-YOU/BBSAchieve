@@ -55,7 +55,7 @@ export function markJobRunning(
   return prisma.importJob.updateMany({
     where: {
       id: jobId,
-      status: { not: "cancelled" },
+      status: { in: ["pending", "paused", "failed"] },
     },
     data: {
       status: "running",
@@ -84,8 +84,11 @@ export function markJobPaused(
 }
 
 export function markJobCancelled(prisma: ImportJobStore, jobId: string) {
-  return prisma.importJob.update({
-    where: { id: jobId },
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: { in: ["pending", "running", "paused", "failed"] },
+    },
     data: {
       status: "cancelled",
       finishedAt: new Date(),

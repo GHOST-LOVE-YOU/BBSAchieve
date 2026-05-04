@@ -58,6 +58,7 @@ export async function runBoardFullSyncJob(
   input: {
     jobId: string;
     ownerKey: string;
+    alreadyMarkedRunning?: boolean;
     acquireThrottle: () => { acquired: boolean; holder: unknown };
     releaseThrottle: (ownerKey: string) => void;
   },
@@ -88,14 +89,16 @@ export async function runBoardFullSyncJob(
   }
 
   try {
-    const runningResult = await deps.markJobRunning(input.jobId);
-    if (
-      runningResult &&
-      typeof runningResult === "object" &&
-      "count" in runningResult &&
-      runningResult.count === 0
-    ) {
-      return { status: "cancelled" as const };
+    if (!input.alreadyMarkedRunning) {
+      const runningResult = await deps.markJobRunning(input.jobId);
+      if (
+        runningResult &&
+        typeof runningResult === "object" &&
+        "count" in runningResult &&
+        runningResult.count === 0
+      ) {
+        return { status: "cancelled" as const };
+      }
     }
     const metadata = readBoardFullSyncMetadata(job.metadataJson);
     const importResult = await runByrSyncImport({
