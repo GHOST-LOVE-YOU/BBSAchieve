@@ -45,7 +45,39 @@ describe("publicReadingService", () => {
     });
   });
 
-  it("returns board detail and thread feed with cursor pagination", async () => {
+  it("returns null when the board does not exist", async () => {
+    const service = createPublicReadingService({
+      repository: {
+        findBoardById: vi.fn().mockResolvedValue(null),
+        findBoardBySlug: vi.fn().mockResolvedValue(null),
+      } as any,
+    });
+
+    await expect(service.getBoard("missing-board")).resolves.toBeNull();
+  });
+
+  it("returns board detail", async () => {
+    const service = createPublicReadingService({
+      repository: {
+        findBoardById: vi.fn().mockResolvedValue(null),
+        findBoardBySlug: vi.fn().mockResolvedValue({
+          id: "board:job",
+          slug: "job",
+          name: "Jobs and Offers",
+          description: "Signals for roles, openings, and practical next steps.",
+        }),
+      } as any,
+    });
+
+    await expect(service.getBoard("job")).resolves.toEqual({
+      id: "board:job",
+      slug: "job",
+      name: "Jobs and Offers",
+      description: "Signals for roles, openings, and practical next steps.",
+    });
+  });
+
+  it("returns board thread feed with cursor pagination", async () => {
     const service = createPublicReadingService({
       repository: {
         findBoardById: vi.fn().mockResolvedValue(null),
@@ -120,13 +152,6 @@ describe("publicReadingService", () => {
       } as any,
     });
 
-    await expect(service.getBoard("job")).resolves.toEqual({
-      id: "board:job",
-      slug: "job",
-      name: "Jobs and Offers",
-      description: "Signals for roles, openings, and practical next steps.",
-    });
-
     await expect(service.getBoardThreadsFeed({ boardIdOrSlug: "job", limit: 2 })).resolves.toEqual({
       items: [
         {
@@ -154,7 +179,73 @@ describe("publicReadingService", () => {
     });
   });
 
-  it("returns thread detail and replies feed sorted by replyIndex asc", async () => {
+  it("rejects an invalid board thread feed limit", async () => {
+    const service = createPublicReadingService({
+      repository: {} as any,
+    });
+
+    await expect(service.getBoardThreadsFeed({ boardIdOrSlug: "job", limit: 0 })).rejects.toThrow();
+  });
+
+  it("returns null when the thread does not exist", async () => {
+    const service = createPublicReadingService({
+      repository: {
+        findThreadByRouteId: vi.fn().mockResolvedValue(null),
+      } as any,
+    });
+
+    await expect(service.getThread("missing-thread")).resolves.toBeNull();
+  });
+
+  it("returns thread detail", async () => {
+    const service = createPublicReadingService({
+      repository: {
+        findThreadByRouteId: vi.fn().mockResolvedValue({
+          id: "thread:first-offer",
+          boardId: "board:job",
+          authorUserId: "user:robot-1",
+          sourceBoardSlug: "job",
+          sourceThreadId: "source-thread-1",
+          title: "First offer from the mirror",
+          body: "A new listing has been mirrored and is ready to read.",
+          publishedAt: "2026-05-01T08:00:00.000Z",
+          replyCount: 2,
+          lastReplyAt: "2026-05-01T08:10:00.000Z",
+        }),
+        findBoardById: vi.fn().mockResolvedValue({
+          id: "board:job",
+          slug: "job",
+          name: "Jobs and Offers",
+          description: "Signals for roles, openings, and practical next steps.",
+        }),
+        findUserById: vi.fn().mockResolvedValue({
+          id: "user:robot-1",
+          username: "robot-1",
+          displayName: "Robot 1",
+          userType: "bot",
+          status: "active",
+        }),
+      } as any,
+    });
+
+    await expect(service.getThread("first-offer")).resolves.toEqual({
+      board: {
+        id: "board:job",
+        slug: "job",
+        name: "Jobs and Offers",
+      },
+      thread: {
+        id: "thread:first-offer",
+        title: "First offer from the mirror",
+        body: "A new listing has been mirrored and is ready to read.",
+        authorName: "Robot 1",
+        publishedAt: "2026-05-01T08:00:00.000Z",
+        replyCount: 2,
+      },
+    });
+  });
+
+  it("returns thread replies feed sorted by replyIndex asc", async () => {
     const service = createPublicReadingService({
       repository: {
         findThreadByRouteId: vi.fn().mockResolvedValue({
@@ -235,22 +326,6 @@ describe("publicReadingService", () => {
       } as any,
     });
 
-    await expect(service.getThread("first-offer")).resolves.toEqual({
-      board: {
-        id: "board:job",
-        slug: "job",
-        name: "Jobs and Offers",
-      },
-      thread: {
-        id: "thread:first-offer",
-        title: "First offer from the mirror",
-        body: "A new listing has been mirrored and is ready to read.",
-        authorName: "Robot 1",
-        publishedAt: "2026-05-01T08:00:00.000Z",
-        replyCount: 2,
-      },
-    });
-
     await expect(service.getThreadRepliesFeed({ threadId: "first-offer", limit: 2 })).resolves.toEqual({
       items: [
         {
@@ -270,9 +345,23 @@ describe("publicReadingService", () => {
       ],
       page: {
         limit: 2,
-        nextCursor: "2",
+        nextCursor: expect.any(String),
         hasMore: true,
       },
     });
+  });
+
+  it("rejects an invalid reply cursor", async () => {
+    const service = createPublicReadingService({
+      repository: {} as any,
+    });
+
+    await expect(
+      service.getThreadRepliesFeed({
+        threadId: "first-offer",
+        limit: 2,
+        cursor: "not-a-valid-reply-cursor",
+      }),
+    ).rejects.toThrow();
   });
 });
