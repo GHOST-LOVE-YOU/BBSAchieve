@@ -7,15 +7,10 @@ export const dynamic = "force-dynamic";
 
 export default async function BoardPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ boardId: string }>;
-  searchParams?: Promise<{ page?: string }>;
 }) {
   const { boardId } = await params;
-  if (searchParams) {
-    await searchParams;
-  }
   const service = createPublicReadingService();
   const board = await service.getBoard(boardId);
 
@@ -23,34 +18,12 @@ export default async function BoardPage({
     notFound();
   }
 
+  let result: Awaited<ReturnType<typeof service.getBoardThreadsFeed>>;
   try {
-    const result = await service.getBoardThreadsFeed({
+    result = await service.getBoardThreadsFeed({
       boardIdOrSlug: boardId,
       limit: 20,
     });
-    if (!result) {
-      notFound();
-    }
-
-    return (
-      <main className="min-h-screen p-8">
-        <h1 className="text-3xl font-semibold">{board.name}</h1>
-        <p className="mt-4 text-base text-zinc-700">{board.description}</p>
-        <div className="mt-6 space-y-4">
-          {result.items.map((thread) => (
-            <section key={thread.id} className="rounded-xl border border-zinc-200 p-4">
-              <Link
-                className="text-lg font-medium"
-                href={`/threads/${thread.id.replace(/^thread:/, "")}`}
-              >
-                {thread.title ?? thread.id}
-              </Link>
-              <p className="mt-2 text-sm text-zinc-500">{thread.lastReplyAt ?? "暂无回复"}</p>
-            </section>
-          ))}
-        </div>
-      </main>
-    );
   } catch {
     return (
       <main className="min-h-screen p-8">
@@ -59,4 +32,28 @@ export default async function BoardPage({
       </main>
     );
   }
+
+  if (!result) {
+    notFound();
+  }
+
+  return (
+    <main className="min-h-screen p-8">
+      <h1 className="text-3xl font-semibold">{board.name}</h1>
+      <p className="mt-4 text-base text-zinc-700">{board.description}</p>
+      <div className="mt-6 space-y-4">
+        {result.items.map((thread) => (
+          <section key={thread.id} className="rounded-xl border border-zinc-200 p-4">
+            <Link
+              className="text-lg font-medium"
+              href={`/threads/${thread.id.replace(/^thread:/, "")}`}
+            >
+              {thread.title ?? thread.id}
+            </Link>
+            <p className="mt-2 text-sm text-zinc-500">{thread.lastReplyAt ?? "暂无回复"}</p>
+          </section>
+        ))}
+      </div>
+    </main>
+  );
 }

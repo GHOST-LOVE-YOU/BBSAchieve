@@ -108,7 +108,6 @@ describe("web public routes", () => {
 
     const ui = await BoardPage({
       params: Promise.resolve({ boardId: "job" }),
-      searchParams: Promise.resolve({ page: "2" }),
     });
     const { container } = render(ui);
     const threadLinks = within(container)
@@ -234,5 +233,24 @@ describe("web public routes", () => {
     ).rejects.toThrow(nextNavigation.error);
 
     expect(nextNavigation.notFound).toHaveBeenCalledTimes(2);
+  });
+
+  it("calls notFound when the board thread feed is missing", async () => {
+    nextNavigation.notFound.mockClear();
+    publicReadingMock.getBoard.mockResolvedValue({
+      id: "board:job",
+      slug: "job",
+      name: "Jobs and Offers",
+      description: "Signals for roles, openings, and practical next steps.",
+    });
+    publicReadingMock.getBoardThreadsFeed.mockResolvedValue(null);
+
+    await expect(
+      BoardPage({
+        params: Promise.resolve({ boardId: "job" }),
+      }),
+    ).rejects.toThrow(nextNavigation.error);
+
+    expect(nextNavigation.notFound).toHaveBeenCalledTimes(1);
   });
 });
