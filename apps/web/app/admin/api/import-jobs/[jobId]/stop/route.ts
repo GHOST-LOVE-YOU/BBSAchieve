@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/src/server/db/client";
-import { findJobById, markJobCancelled } from "@/src/server/imports/importJobStore";
+import {
+  findJobById,
+  markJobCancelled,
+  markJobPaused,
+} from "@/src/server/imports/importJobStore";
 
 export async function POST(
   _request: Request,
@@ -22,9 +26,14 @@ export async function POST(
       );
     }
 
-    await markJobCancelled(prisma, jobId);
+    if (job.jobType === "byr_board_full_sync") {
+      await markJobCancelled(prisma, jobId);
+      return NextResponse.json({ ok: true, jobId, status: "cancelled" });
+    }
 
-    return NextResponse.json({ ok: true, jobId, status: "cancelled" });
+    await markJobPaused(prisma, jobId);
+
+    return NextResponse.json({ ok: true, jobId, status: "paused" });
   } catch (error) {
     return NextResponse.json(
       {

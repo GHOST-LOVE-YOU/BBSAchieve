@@ -151,4 +151,28 @@ describe("admin import job routes", () => {
       status: "cancelled",
     });
   });
+
+  it("stops a non-board full-sync job by pausing it", async () => {
+    routeMocks.findJobById.mockResolvedValue({
+      id: "job-4",
+      status: "running",
+      jobType: "legacy_iwhisper_migration",
+      cursorThreadKey: "cursor-4",
+    });
+    routeMocks.markJobPaused.mockResolvedValue({});
+
+    const response = await stopPOST(request, {
+      params: Promise.resolve({ jobId: "job-4" }),
+    });
+
+    expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-4");
+    expect(routeMocks.markJobPaused).toHaveBeenCalledWith(routeMocks.prisma, "job-4");
+    expect(routeMocks.markJobCancelled).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      jobId: "job-4",
+      status: "paused",
+    });
+  });
 });
