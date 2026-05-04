@@ -105,11 +105,11 @@ describe("admin import job routes", () => {
     });
   });
 
-  it("rejects resuming a non-batch full-sync job", async () => {
+  it("rejects resuming a non-batch full-sync job even when it has a terminal status", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-2",
       jobType: "some_other_job",
-      status: "paused",
+      status: "succeeded",
       cursorThreadKey: "cursor-2",
     });
 
@@ -119,7 +119,7 @@ describe("admin import job routes", () => {
 
     expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-2");
     expect(routeMocks.markJobRunning).not.toHaveBeenCalled();
-    expect(routeMocks.scheduleBoardBatchFullSync).not.toHaveBeenCalled();
+    expect(routeMocks.scheduleBoardBatchFullSyncRun).not.toHaveBeenCalled();
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
       ok: false,
@@ -242,10 +242,10 @@ describe("admin import job routes", () => {
     });
   });
 
-  it("rejects stopping a non-batch full-sync job", async () => {
+  it("rejects stopping a non-batch full-sync job even when it has a terminal status", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-4",
-      status: "running",
+      status: "cancelled",
       jobType: "byr_board_full_sync",
       cursorThreadKey: "cursor-4",
     });

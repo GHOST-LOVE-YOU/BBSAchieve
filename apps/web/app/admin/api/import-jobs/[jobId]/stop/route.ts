@@ -18,16 +18,16 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "Job not found" }, { status: 404 });
     }
 
-    if (!["pending", "running", "paused", "failed"].includes(job.status)) {
+    if (job.jobType !== "byr_board_full_sync_batch") {
       return NextResponse.json(
-        { ok: false, error: `Job is not stoppable from ${job.status}` },
+        { ok: false, error: "Only batch full sync jobs can be stopped" },
         { status: 409 },
       );
     }
 
-    if (job.jobType !== "byr_board_full_sync_batch") {
+    if (!["pending", "running", "paused", "failed"].includes(job.status)) {
       return NextResponse.json(
-        { ok: false, error: "Only batch full sync jobs can be stopped" },
+        { ok: false, error: `Job is not stoppable from ${job.status}` },
         { status: 409 },
       );
     }
