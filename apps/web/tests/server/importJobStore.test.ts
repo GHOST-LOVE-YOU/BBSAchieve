@@ -7,6 +7,7 @@ import {
   markJobPaused,
   markJobRunning,
   markJobSucceeded,
+  updateJobProgress,
 } from "@/src/server/imports/importJobStore";
 
 describe("createBoardFullSyncJob", () => {
@@ -112,7 +113,7 @@ describe("markJobRunning", () => {
 });
 
 describe("markJobSucceeded", () => {
-  it("writes succeeded status only when the job is still running", async () => {
+  it("writes succeeded status and final counters only when the job is still running", async () => {
     const updateMany = vi.fn(async () => ({ count: 1 }));
     const now = new Date("2026-05-04T07:03:00.000Z");
 
@@ -125,6 +126,12 @@ describe("markJobSucceeded", () => {
           importJob: { updateMany },
         } as any,
         "job-1",
+        {
+          processedThreads: 7,
+          processedReplies: 19,
+          skippedReplies: 3,
+          progressNote: null,
+        },
       );
 
       expect(updateMany).toHaveBeenCalledWith({
@@ -135,11 +142,40 @@ describe("markJobSucceeded", () => {
         data: expect.objectContaining({
           status: "succeeded",
           finishedAt: now,
+          processedThreads: 7,
+          processedReplies: 19,
+          skippedReplies: 3,
+          progressNote: null,
         }),
       });
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("updateJobProgress", () => {
+  it("updates job counters without changing omitted fields", async () => {
+    const update = vi.fn(async () => ({ id: "job-1" }));
+
+    await updateJobProgress(
+      {
+        importJob: { update },
+      } as any,
+      "job-1",
+      {
+        processedThreads: 2,
+        processedReplies: 5,
+      },
+    );
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "job-1" },
+      data: {
+        processedThreads: 2,
+        processedReplies: 5,
+      },
+    });
   });
 });
 

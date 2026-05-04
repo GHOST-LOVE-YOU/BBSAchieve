@@ -86,6 +86,36 @@ describe("admin imports page", () => {
     ).toEqual(fullSyncBoards.map((board) => board.boardName));
   });
 
+  it("renders a stop action for pending board full-sync jobs", async () => {
+    prismaMock.import.findMany.mockResolvedValue([]);
+    prismaMock.importJob.findMany.mockResolvedValue([
+      {
+        id: "job-pending",
+        jobType: "byr_board_full_sync",
+        sourceType: "byr_sync_api",
+        sourceLabel: "IWhisper",
+        status: "pending",
+        cursorThreadKey: null,
+        processedThreads: 0,
+        processedReplies: 0,
+        progressNote: "skipped by global throttle",
+        skippedReplies: 0,
+        errorMessage: null,
+        startedAt: null,
+        finishedAt: null,
+      },
+    ]);
+    vi.mocked(listRecentImportActivity).mockResolvedValue([]);
+
+    render(await AdminImportsPage());
+
+    const stopButton = screen.getByRole("button", { name: "停止" });
+    expect(stopButton.closest("form")?.getAttribute("action")).toBe(
+      "/admin/api/import-jobs/job-pending/stop",
+    );
+    expect(screen.getByText("skipped by global throttle")).toBeTruthy();
+  });
+
   it("renders the sync entry, recent activity, and import jobs including board full-sync tasks", async () => {
     prismaMock.import.findMany.mockResolvedValue([
       {

@@ -60,7 +60,15 @@ export async function runBoardFullSyncJob(
         progressNote?: string | null;
       },
     ) => Promise<unknown>;
-    markJobSucceeded: (jobId: string) => Promise<{ count: number } | unknown>;
+    markJobSucceeded: (
+      jobId: string,
+      progress?: {
+        processedThreads?: number;
+        processedReplies?: number;
+        skippedReplies?: number;
+        progressNote?: string | null;
+      },
+    ) => Promise<{ count: number } | unknown>;
     markJobFailed: (jobId: string, errorMessage: string) => Promise<{ count: number } | unknown>;
     prisma: any;
   },
@@ -116,13 +124,14 @@ export async function runBoardFullSyncJob(
       windowMinutes: metadata.fullSyncWindowMinutes,
       limit: null,
     });
-    await deps.updateJobProgress(input.jobId, {
+    const successProgress = {
       processedThreads: importResult.importedThreads,
       processedReplies: importResult.importedReplies,
       skippedReplies: importResult.skippedReplies,
       progressNote: null,
-    });
-    const succeededResult = await deps.markJobSucceeded(input.jobId);
+    };
+    await deps.updateJobProgress(input.jobId, successProgress);
+    const succeededResult = await deps.markJobSucceeded(input.jobId, successProgress);
     if (
       succeededResult &&
       typeof succeededResult === "object" &&

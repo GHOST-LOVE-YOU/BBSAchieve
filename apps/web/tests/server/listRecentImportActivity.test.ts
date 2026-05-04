@@ -127,4 +127,33 @@ describe("listRecentImportActivity", () => {
       detail: "skipped by global throttle",
     });
   });
+
+  it("prefers progress notes over zeroed counters for pending jobs", async () => {
+    const result = await listRecentImportActivity({
+      import: { findMany: vi.fn(async () => []) } as any,
+      importJob: {
+        findMany: vi.fn(async () => [
+          {
+            id: "job-2",
+            jobType: "byr_board_full_sync",
+            sourceLabel: "IWhisper",
+            status: "pending",
+            createdAt: new Date("2026-05-04T11:00:00.000Z"),
+            startedAt: null,
+            finishedAt: null,
+            processedThreads: 0,
+            processedReplies: 0,
+            progressNote: "skipped by global throttle",
+            errorMessage: null,
+          },
+        ]),
+      } as any,
+    });
+
+    expect(result[0]).toMatchObject({
+      id: "import-job:job-2",
+      status: "pending",
+      detail: "skipped by global throttle",
+    });
+  });
 });

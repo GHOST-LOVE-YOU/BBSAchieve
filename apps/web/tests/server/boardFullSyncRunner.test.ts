@@ -143,7 +143,32 @@ describe("runBoardFullSyncJob", () => {
       skippedReplies: 2,
       progressNote: null,
     });
-    expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1");
+    expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1", {
+      processedThreads: 1,
+      processedReplies: 4,
+      skippedReplies: 2,
+      progressNote: null,
+    });
+  });
+
+  it("persists imported counters before marking the job succeeded", async () => {
+    runnerMocks.runByrSyncImport.mockResolvedValueOnce({
+      importedThreads: 7,
+      importedReplies: 19,
+      skippedReplies: 3,
+    });
+
+    await runBoardFullSyncJob(makeDeps() as never, makeInput());
+
+    expect(runnerMocks.updateJobProgress).toHaveBeenCalledWith("job-1", {
+      processedThreads: 7,
+      processedReplies: 19,
+      skippedReplies: 3,
+      progressNote: null,
+    });
+    expect(runnerMocks.updateJobProgress.mock.invocationCallOrder[0]).toBeLessThan(
+      runnerMocks.markJobSucceeded.mock.invocationCallOrder[0],
+    );
   });
 
   it("returns cancelled when throttle skip cannot pause a cancelled job", async () => {
@@ -181,7 +206,12 @@ describe("runBoardFullSyncJob", () => {
     const result = await runBoardFullSyncJob(makeDeps() as never, makeInput());
 
     expect(result).toEqual({ status: "cancelled" });
-    expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1");
+    expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1", {
+      processedThreads: 1,
+      processedReplies: undefined,
+      skippedReplies: undefined,
+      progressNote: null,
+    });
   });
 
   it("marks the job failed when sync import throws", async () => {

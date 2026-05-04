@@ -142,6 +142,10 @@ export function findJobById(
 export function markJobSucceeded(
   prisma: ImportJobStore,
   jobId: string,
+  progress?: Pick<
+    JobProgressUpdate,
+    "processedThreads" | "processedReplies" | "skippedThreads" | "skippedReplies" | "progressNote"
+  >,
 ) {
   return prisma.importJob.updateMany({
     where: {
@@ -151,6 +155,21 @@ export function markJobSucceeded(
     data: {
       status: "succeeded",
       finishedAt: new Date(),
+      ...(progress?.processedThreads === undefined
+        ? {}
+        : { processedThreads: progress.processedThreads }),
+      ...(progress?.processedReplies === undefined
+        ? {}
+        : { processedReplies: progress.processedReplies }),
+      ...(progress?.skippedThreads === undefined
+        ? {}
+        : { skippedThreads: progress.skippedThreads }),
+      ...(progress?.skippedReplies === undefined
+        ? {}
+        : { skippedReplies: progress.skippedReplies }),
+      ...(progress?.progressNote === undefined
+        ? {}
+        : { progressNote: progress.progressNote }),
     },
   });
 }
