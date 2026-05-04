@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createBoardFullSyncJob,
+  markJobFailed,
   markJobCancelled,
   markJobPaused,
   markJobRunning,
+  markJobSucceeded,
 } from "@/src/server/imports/importJobStore";
 
 describe("createBoardFullSyncJob", () => {
@@ -98,6 +100,75 @@ describe("markJobRunning", () => {
           status: "running",
           startedAt: now,
           cursorThreadKey: "cursor-1",
+          finishedAt: null,
+          errorMessage: null,
+          progressNote: null,
+        }),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("markJobSucceeded", () => {
+  it("writes succeeded status only when the job is still running", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const now = new Date("2026-05-04T07:03:00.000Z");
+
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    try {
+      await markJobSucceeded(
+        {
+          importJob: { updateMany },
+        } as any,
+        "job-1",
+      );
+
+      expect(updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "job-1",
+          status: "running",
+        },
+        data: expect.objectContaining({
+          status: "succeeded",
+          finishedAt: now,
+        }),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("markJobFailed", () => {
+  it("writes failed status only when the job is still running", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const now = new Date("2026-05-04T07:04:00.000Z");
+
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    try {
+      await markJobFailed(
+        {
+          importJob: { updateMany },
+        } as any,
+        "job-1",
+        "sync boom",
+      );
+
+      expect(updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "job-1",
+          status: "running",
+        },
+        data: expect.objectContaining({
+          status: "failed",
+          finishedAt: now,
+          errorMessage: "sync boom",
         }),
       });
     } finally {

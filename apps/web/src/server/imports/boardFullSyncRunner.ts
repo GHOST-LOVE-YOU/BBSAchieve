@@ -51,8 +51,8 @@ export async function runBoardFullSyncJob(
     findJobById: (jobId: string) => Promise<any>;
     markJobPaused: (jobId: string, progressNote: string) => Promise<unknown>;
     markJobRunning: (jobId: string) => Promise<{ count: number } | unknown>;
-    markJobSucceeded: (jobId: string) => Promise<unknown>;
-    markJobFailed: (jobId: string, errorMessage: string) => Promise<unknown>;
+    markJobSucceeded: (jobId: string) => Promise<{ count: number } | unknown>;
+    markJobFailed: (jobId: string, errorMessage: string) => Promise<{ count: number } | unknown>;
     prisma: any;
   },
   input: {
@@ -107,21 +107,29 @@ export async function runBoardFullSyncJob(
       windowMinutes: metadata.fullSyncWindowMinutes,
       limit: null,
     });
-    const refreshedJob = await deps.findJobById(input.jobId);
-    if (refreshedJob?.status === "cancelled") {
+    const succeededResult = await deps.markJobSucceeded(input.jobId);
+    if (
+      succeededResult &&
+      typeof succeededResult === "object" &&
+      "count" in succeededResult &&
+      succeededResult.count === 0
+    ) {
       return { status: "cancelled" as const };
     }
-    await deps.markJobSucceeded(input.jobId);
     return { status: "succeeded" as const, importResult };
   } catch (error) {
-    const refreshedJob = await deps.findJobById(input.jobId);
-    if (refreshedJob?.status === "cancelled") {
-      return { status: "cancelled" as const };
-    }
-    await deps.markJobFailed(
+    const failedResult = await deps.markJobFailed(
       input.jobId,
       error instanceof Error ? error.message : "Unknown board full sync error",
     );
+    if (
+      failedResult &&
+      typeof failedResult === "object" &&
+      "count" in failedResult &&
+      failedResult.count === 0
+    ) {
+      return { status: "cancelled" as const };
+    }
     return { status: "failed" as const };
   } finally {
     input.releaseThrottle(input.ownerKey);

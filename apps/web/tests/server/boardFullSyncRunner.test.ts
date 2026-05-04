@@ -57,6 +57,8 @@ function makeInput(options?: {
 describe("runBoardFullSyncJob", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    runnerMocks.markJobSucceeded.mockResolvedValue({ count: 1 });
+    runnerMocks.markJobFailed.mockResolvedValue({ count: 1 });
   });
 
   it("pauses immediately when global throttle is already held", async () => {
@@ -160,23 +162,14 @@ describe("runBoardFullSyncJob", () => {
     expect(runnerMocks.runByrSyncImport).not.toHaveBeenCalled();
   });
 
-  it("returns cancelled without marking success when the job is cancelled before completion", async () => {
+  it("returns cancelled when a concurrent cancel wins before the success write", async () => {
     runnerMocks.runByrSyncImport.mockResolvedValueOnce({ importedThreads: 1 });
-    const deps = {
-      ...makeDeps(),
-      findJobById: vi
-        .fn()
-        .mockResolvedValueOnce(makeJob())
-        .mockResolvedValueOnce({
-          ...makeJob(),
-          status: "cancelled",
-        }),
-    };
+    runnerMocks.markJobSucceeded.mockResolvedValueOnce({ count: 0 });
 
-    const result = await runBoardFullSyncJob(deps as never, makeInput());
+    const result = await runBoardFullSyncJob(makeDeps() as never, makeInput());
 
     expect(result).toEqual({ status: "cancelled" });
-    expect(runnerMocks.markJobSucceeded).not.toHaveBeenCalled();
+    expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1");
   });
 
   it("marks the job failed when sync import throws", async () => {
@@ -188,23 +181,14 @@ describe("runBoardFullSyncJob", () => {
     expect(runnerMocks.markJobFailed).toHaveBeenCalledWith("job-1", "sync boom");
   });
 
-  it("returns cancelled without marking failure when the job is cancelled before an import error is handled", async () => {
+  it("returns cancelled when a concurrent cancel wins before the failure write", async () => {
     runnerMocks.runByrSyncImport.mockRejectedValueOnce(new Error("sync boom"));
-    const deps = {
-      ...makeDeps(),
-      findJobById: vi
-        .fn()
-        .mockResolvedValueOnce(makeJob())
-        .mockResolvedValueOnce({
-          ...makeJob(),
-          status: "cancelled",
-        }),
-    };
+    runnerMocks.markJobFailed.mockResolvedValueOnce({ count: 0 });
 
-    const result = await runBoardFullSyncJob(deps as never, makeInput());
+    const result = await runBoardFullSyncJob(makeDeps() as never, makeInput());
 
     expect(result).toEqual({ status: "cancelled" });
-    expect(runnerMocks.markJobFailed).not.toHaveBeenCalled();
+    expect(runnerMocks.markJobFailed).toHaveBeenCalledWith("job-1", "sync boom");
   });
 
   it("marks the job failed when required metadata is missing", async () => {

@@ -60,7 +60,10 @@ export function markJobRunning(
     data: {
       status: "running",
       startedAt: new Date(),
+      finishedAt: null,
       cursorThreadKey: cursorThreadKey ?? null,
+      errorMessage: null,
+      progressNote: null,
     },
   });
 }
@@ -140,8 +143,11 @@ export function markJobSucceeded(
   prisma: ImportJobStore,
   jobId: string,
 ) {
-  return prisma.importJob.update({
-    where: { id: jobId },
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: "running",
+    },
     data: {
       status: "succeeded",
       finishedAt: new Date(),
@@ -154,8 +160,11 @@ export function markJobFailed(
   jobId: string,
   errorMessage: string,
 ) {
-  return prisma.importJob.update({
-    where: { id: jobId },
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: "running",
+    },
     data: {
       status: "failed",
       finishedAt: new Date(),
