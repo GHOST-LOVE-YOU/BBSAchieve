@@ -1,11 +1,18 @@
 import type { PrismaClient } from "@prisma/client";
 
+import { createBatchJobMetadata } from "./boardBatchJobMetadata";
+
 export type ImportJobStore = Pick<PrismaClient, "importJob">;
 
 export type BoardFullSyncJobInput = {
   boardName: string;
   fullSyncWindowMinutes: number;
   requestedBy?: string | null;
+};
+
+export type BoardBatchFullSyncJobInput = {
+  selectedBoardNames: string[];
+  orderedBoardNames: string[];
 };
 
 export type JobProgressUpdate = {
@@ -43,6 +50,34 @@ export function createBoardFullSyncJob(
         fullSyncWindowMinutes: input.fullSyncWindowMinutes,
         requestedBy: input.requestedBy ?? null,
       },
+    },
+  });
+}
+
+export function createBoardBatchFullSyncJob(
+  prisma: ImportJobStore,
+  input: BoardBatchFullSyncJobInput,
+) {
+  return prisma.importJob.create({
+    data: {
+      jobType: "byr_board_full_sync_batch",
+      sourceType: "byr_sync_api",
+      sourceLabel: "multi-board full sync",
+      status: "pending",
+      cursorThreadKey: null,
+      lastProcessedAt: null,
+      startedAt: null,
+      finishedAt: null,
+      processedThreads: 0,
+      processedReplies: 0,
+      skippedThreads: 0,
+      skippedReplies: 0,
+      errorMessage: null,
+      progressNote: null,
+      metadataJson: createBatchJobMetadata({
+        selectedBoardNames: input.selectedBoardNames,
+        orderedBoardNames: input.orderedBoardNames,
+      }),
     },
   });
 }
