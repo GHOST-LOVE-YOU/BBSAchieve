@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   import: {
@@ -33,6 +33,37 @@ import { listRecentImportActivity } from "@/src/server/admin/listRecentImportAct
 describe("admin imports page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("renders board full-sync actions instead of legacy iwhisper import", async () => {
+    prismaMock.import.findMany.mockResolvedValue([]);
+    prismaMock.importJob.findMany.mockResolvedValue([
+      {
+        id: "job-1",
+        jobType: "byr_board_full_sync",
+        sourceType: "byr_sync_api",
+        sourceLabel: "JobInfo",
+        status: "paused",
+        cursorThreadKey: null,
+        processedThreads: 0,
+        processedReplies: 0,
+        skippedReplies: 0,
+        errorMessage: null,
+        startedAt: null,
+        finishedAt: null,
+      },
+    ]);
+    vi.mocked(listRecentImportActivity).mockResolvedValue([]);
+
+    render(await AdminImportsPage());
+
+    expect(screen.getByRole("button", { name: "开始抓取 JobInfo 全量内容" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "从旧库导入 iwhisper" })).toBeNull();
+    expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
   });
 
   it("renders the sync entry, recent activity, and import jobs including board full-sync tasks", async () => {
@@ -69,26 +100,12 @@ describe("admin imports page", () => {
         startedAt: new Date("2026-05-02T09:00:00.000Z"),
         finishedAt: null,
       },
-      {
-        id: "job-2",
-        jobType: "legacy_iwhisper_migration",
-        sourceType: "legacy_postgres",
-        sourceLabel: "legacy iwhisper",
-        status: "paused",
-        cursorThreadKey: null,
-        processedThreads: 0,
-        processedReplies: 0,
-        skippedReplies: 0,
-        errorMessage: "LEGACY_DATABASE_URL missing",
-        startedAt: new Date("2026-05-01T09:00:00.000Z"),
-        finishedAt: null,
-      },
     ]);
     vi.mocked(listRecentImportActivity).mockResolvedValue([
       {
         id: "import-job:job-1",
         kind: "import_job",
-        title: "legacy iwhisper",
+        title: "JobInfo",
         status: "running",
         happenedAt: "2026-05-02T09:00:00.000Z",
         detail: "帖子 3，回复 8",
@@ -105,38 +122,34 @@ describe("admin imports page", () => {
 
     render(await AdminImportsPage());
 
-    expect(screen.getByText("导入导出")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "导入导出" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "同步北邮人数据" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "启动 JobInfo 板块全量抓取" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "开始抓取 JobInfo 全量内容" })).toBeTruthy();
     expect(screen.getByText("最近导入活动")).toBeTruthy();
-    expect(screen.getByText("legacy iwhisper · 任务")).toBeTruthy();
+    expect(screen.getByText("JobInfo · 任务")).toBeTruthy();
     expect(screen.getByText("IWhisper updates")).toBeTruthy();
     expect(screen.getAllByText("状态：completed")).toHaveLength(2);
     expect(screen.getByText("帖子：3")).toBeTruthy();
     expect(screen.getByText("回复：10")).toBeTruthy();
     expect(screen.getByText("Sync API request failed: 401")).toBeTruthy();
-    expect(screen.getByText("导入任务")).toBeTruthy();
+    expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
     expect(screen.getByText("byr_board_full_sync")).toBeTruthy();
-    expect(screen.getByText("legacy_iwhisper_migration")).toBeTruthy();
+    expect(screen.queryByText("legacy_iwhisper_migration")).toBeNull();
     expect(screen.getByText("running")).toBeTruthy();
     expect(screen.getByText("2026-05-02T10:00:00.000Z|post-2")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();
     expect(screen.getByText("8")).toBeTruthy();
-    expect(screen.getByText("LEGACY_DATABASE_URL missing")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "继续" })).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "停止" })).toHaveLength(2);
+    expect(screen.queryByText("LEGACY_DATABASE_URL missing")).toBeNull();
+    expect(screen.queryByRole("button", { name: "继续" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "停止" })).toHaveLength(1);
 
     expect(prismaMock.importJob.findMany).toHaveBeenCalledWith({
-      where: {
-        sourceType: {
-          in: ["legacy_postgres", "byr_sync_api"],
-        },
-      },
+      where: { jobType: "byr_board_full_sync" },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: 20,
     });
 
-    const boardFullSyncButton = screen.getByRole("button", { name: "启动 JobInfo 板块全量抓取" });
+    const boardFullSyncButton = screen.getByRole("button", { name: "开始抓取 JobInfo 全量内容" });
     const boardFullSyncForm = boardFullSyncButton.closest("form");
     expect(boardFullSyncForm?.getAttribute("action")).toBe("/admin/api/import-jobs/byr-board-full-sync");
     const boardNameInput = boardFullSyncForm?.querySelector('input[name="boardName"]');
