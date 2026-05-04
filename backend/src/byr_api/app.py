@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import Depends, FastAPI, HTTPException, Query
 
 from .auth import require_sync_token
@@ -21,10 +23,12 @@ def build_sync_service() -> SyncService:
     board_service = BoardService(auth_client=auth_client)
     thread_service = ThreadService(auth_client=auth_client)
     cache = RedisSyncCache.from_env()
+    interval_ms = int(os.getenv("BYR_SYNC_REQUEST_INTERVAL_MS", "500"))
     return SyncService(
         board_service=board_service,
         thread_service=thread_service,
         cache=cache,
+        request_interval_seconds=max(interval_ms, 0) / 1000,
     )
 
 

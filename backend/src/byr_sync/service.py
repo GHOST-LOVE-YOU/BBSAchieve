@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import re
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
@@ -89,10 +90,19 @@ class SyncService:
         board_service: BoardServiceLike,
         thread_service: ThreadServiceLike | None,
         cache: ThreadProgressCacheLike,
+        *,
+        sleep: Callable[[float], None] | None = None,
+        request_interval_seconds: float = 0.0,
     ) -> None:
         self.board_service = board_service
         self.thread_service = thread_service
         self.cache = cache
+        self.sleep = sleep or (lambda _seconds: None)
+        self.request_interval_seconds = request_interval_seconds
+
+    def _sleep_between_requests(self) -> None:
+        if self.request_interval_seconds > 0:
+            self.sleep(self.request_interval_seconds)
 
     def list_updates(
         self,
@@ -128,6 +138,7 @@ class SyncService:
                 )
             )
             if should_fetch_thread_page:
+                self._sleep_between_requests()
                 page = 1 if cached is None else max(1, ((cached_reply_count + 1) // 10) + 1)
                 thread_page = self.thread_service.fetch_page(
                     board_name=board_name,
@@ -318,6 +329,7 @@ class SyncService:
                     reached_out_of_window = True
             if reached_out_of_window or not board_page.has_next_page:
                 break
+            self._sleep_between_requests()
             page += 1
 
         return collected, page
