@@ -94,4 +94,34 @@ describe("listRecentImportActivity", () => {
       happenedAt: "2026-05-02T09:10:00.000Z",
     });
   });
+
+  it("renders board full-sync jobs with board names as titles", async () => {
+    const result = await listRecentImportActivity({
+      import: { findMany: vi.fn(async () => []) } as any,
+      importJob: {
+        findMany: vi.fn(async () => [
+          {
+            id: "job-1",
+            jobType: "byr_board_full_sync",
+            sourceLabel: "JobInfo",
+            status: "paused",
+            createdAt: new Date("2026-05-04T10:00:00.000Z"),
+            startedAt: null,
+            finishedAt: null,
+            processedThreads: 0,
+            processedReplies: 0,
+            errorMessage: null,
+          },
+        ]),
+      } as any,
+    });
+
+    expect(result[0]).toMatchObject({
+      id: "import-job:job-1",
+      kind: "import_job",
+      title: "JobInfo",
+      status: "paused",
+      detail: "帖子 0，回复 0",
+    });
+  });
 });

@@ -2,6 +2,12 @@ import type { ImportJobStatus, ImportSourceType, PrismaClient } from "@prisma/cl
 
 export type ImportJobStore = Pick<PrismaClient, "importJob">;
 
+export type BoardFullSyncJobInput = {
+  boardName: string;
+  fullSyncWindowMinutes: number;
+  requestedBy?: string | null;
+};
+
 export type LegacyImportJob = {
   id: string;
   jobType: string;
@@ -53,6 +59,36 @@ export function createLegacyImportJob(
   });
 }
 
+export function createBoardFullSyncJob(
+  prisma: ImportJobStore,
+  input: BoardFullSyncJobInput,
+) {
+  return prisma.importJob.create({
+    data: {
+      jobType: "byr_board_full_sync",
+      sourceType: "byr_sync_api",
+      sourceLabel: input.boardName,
+      status: "pending",
+      cursorThreadKey: null,
+      lastProcessedAt: null,
+      startedAt: null,
+      finishedAt: null,
+      processedThreads: 0,
+      processedReplies: 0,
+      skippedThreads: 0,
+      skippedReplies: 0,
+      errorMessage: null,
+      progressNote: null,
+      metadataJson: {
+        boardName: input.boardName,
+        fullSyncWindowMinutes: input.fullSyncWindowMinutes,
+        requestedBy: input.requestedBy ?? null,
+        throttlePolicy: "global-single-flight",
+      },
+    },
+  });
+}
+
 export function markJobRunning(
   prisma: ImportJobStore,
   jobId: string,
@@ -71,11 +107,23 @@ export function markJobRunning(
 export function markJobPaused(
   prisma: ImportJobStore,
   jobId: string,
+  progressNote?: string | null,
 ) {
   return prisma.importJob.update({
     where: { id: jobId },
     data: {
       status: "paused",
+      finishedAt: new Date(),
+      progressNote: progressNote ?? null,
+    },
+  });
+}
+
+export function markJobCancelled(prisma: ImportJobStore, jobId: string) {
+  return prisma.importJob.update({
+    where: { id: jobId },
+    data: {
+      status: "cancelled",
       finishedAt: new Date(),
     },
   });
