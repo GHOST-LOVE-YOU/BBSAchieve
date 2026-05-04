@@ -6,15 +6,20 @@ import {
   tryAcquireGlobalSyncThrottle,
 } from "@/src/server/syncThrottle/globalSyncThrottle";
 
+function resetThrottleState() {
+  const holder = getGlobalSyncThrottleHolder();
+  if (holder) {
+    releaseGlobalSyncThrottle(holder.ownerKey);
+  }
+}
+
 describe("globalSyncThrottle", () => {
   beforeEach(() => {
-    releaseGlobalSyncThrottle("manual:JobInfo");
-    releaseGlobalSyncThrottle("scheduled:JobInfo");
+    resetThrottleState();
   });
 
   afterEach(() => {
-    releaseGlobalSyncThrottle("manual:JobInfo");
-    releaseGlobalSyncThrottle("scheduled:JobInfo");
+    resetThrottleState();
   });
 
   it("allows only one active holder at a time", () => {
@@ -46,6 +51,55 @@ describe("globalSyncThrottle", () => {
     });
 
     expect(acquired.acquired).toBe(true);
+    expect(getGlobalSyncThrottleHolder()).toMatchObject({
+      ownerKey: "manual:JobInfo",
+      triggerSource: "manual",
+    });
+  });
+
+  it("does not let acquire result mutation corrupt stored holder state", () => {
+    const acquired = tryAcquireGlobalSyncThrottle({
+      ownerKey: "manual:JobInfo",
+      triggerSource: "manual",
+    });
+
+    expect(acquired.acquired).toBe(true);
+
+    if (!acquired.acquired) {
+      throw new Error("expected throttle acquisition to succeed");
+    }
+
+    acquired.holder.ownerKey = "mutated:Owner";
+    acquired.holder.triggerSource = "scheduled";
+    acquired.holder.acquiredAt = new Date("2026-05-04T00:00:00.000Z");
+
+    expect(getGlobalSyncThrottleHolder()).toMatchObject({
+      ownerKey: "manual:JobInfo",
+      triggerSource: "manual",
+    });
+  });
+
+  it("does not let getter result mutation corrupt stored holder state", () => {
+    tryAcquireGlobalSyncThrottle({
+      ownerKey: "manual:JobInfo",
+      triggerSource: "manual",
+    });
+
+    const holder = getGlobalSyncThrottleHolder();
+
+    expect(holder).toMatchObject({
+      ownerKey: "manual:JobInfo",
+      triggerSource: "manual",
+    });
+
+    if (!holder) {
+      throw new Error("expected current throttle holder");
+    }
+
+    holder.ownerKey = "mutated:Owner";
+    holder.triggerSource = "scheduled";
+    holder.acquiredAt = new Date("2026-05-04T00:00:00.000Z");
+
     expect(getGlobalSyncThrottleHolder()).toMatchObject({
       ownerKey: "manual:JobInfo",
       triggerSource: "manual",

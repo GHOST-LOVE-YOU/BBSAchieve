@@ -12,13 +12,21 @@ function getHolder() {
   return globalForSyncThrottle.__bbsGlobalSyncThrottleHolder__ ?? null;
 }
 
+function createHolderSnapshot(holder: SyncThrottleHolder): SyncThrottleHolder {
+  return {
+    ownerKey: holder.ownerKey,
+    triggerSource: holder.triggerSource,
+    acquiredAt: new Date(holder.acquiredAt),
+  };
+}
+
 export function tryAcquireGlobalSyncThrottle(input: {
   ownerKey: string;
   triggerSource: "manual" | "scheduled";
 }) {
   const existing = getHolder();
   if (existing) {
-    return { acquired: false as const, holder: existing };
+    return { acquired: false as const, holder: createHolderSnapshot(existing) };
   }
 
   const holder: SyncThrottleHolder = {
@@ -28,7 +36,7 @@ export function tryAcquireGlobalSyncThrottle(input: {
   };
   globalForSyncThrottle.__bbsGlobalSyncThrottleHolder__ = holder;
 
-  return { acquired: true as const, holder };
+  return { acquired: true as const, holder: createHolderSnapshot(holder) };
 }
 
 export function releaseGlobalSyncThrottle(ownerKey: string) {
@@ -39,5 +47,6 @@ export function releaseGlobalSyncThrottle(ownerKey: string) {
 }
 
 export function getGlobalSyncThrottleHolder() {
-  return getHolder();
+  const holder = getHolder();
+  return holder ? createHolderSnapshot(holder) : null;
 }
