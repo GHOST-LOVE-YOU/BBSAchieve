@@ -1,12 +1,55 @@
+import type { ReplyRecord, ThreadRecord, UserRecord } from "@bbs/domain";
 import { describe, expect, it, vi } from "vitest";
 
 import { createPublicReadingService } from "@/src/server/reading/publicReadingService";
+import type { ReadingRepository } from "@/src/server/reading/readingRepository";
+
+type FindThreadByRouteId = (routeId: string) => Promise<ThreadRecord | null>;
+type ListThreadsPageByBoard = (input: {
+  boardId: string;
+  limit: number;
+  cursor?: string | null;
+}) => Promise<ThreadRecord[]>;
+type ListRepliesPageByThread = (input: {
+  threadId: string;
+  limit: number;
+  cursor?: string | null;
+}) => Promise<ReplyRecord[]>;
+type FindUsersByIds = (userIds: string[]) => Promise<Map<string, UserRecord>>;
+
+type PublicReadingRepository = ReadingRepository & {
+  findThreadByRouteId: FindThreadByRouteId;
+  listThreadsPageByBoard: ListThreadsPageByBoard;
+  listRepliesPageByThread: ListRepliesPageByThread;
+  findUsersByIds: FindUsersByIds;
+};
+
+function createRepository(
+  overrides: Partial<PublicReadingRepository> = {},
+): PublicReadingRepository {
+  return {
+    findBoardById: async () => null,
+    findBoardBySlug: async () => null,
+    listBoards: async () => [],
+    findThreadById: async () => null,
+    listThreadsByBoard: async () => [],
+    findReplyById: async () => null,
+    listRepliesByThread: async () => [],
+    findUserById: async () => null,
+    findUserByUsername: async () => null,
+    findThreadByRouteId: async () => null,
+    listThreadsPageByBoard: async () => [],
+    listRepliesPageByThread: async () => [],
+    findUsersByIds: async () => new Map(),
+    ...overrides,
+  };
+}
 
 describe("publicReadingService", () => {
   it("returns board summaries with threadCount and latestThreadTitle", async () => {
     const service = createPublicReadingService({
-      repository: {
-        listBoards: vi.fn().mockResolvedValue([
+      repository: createRepository({
+        listBoards: vi.fn<ReadingRepository["listBoards"]>().mockResolvedValue([
           {
             id: "board:job",
             slug: "job",
@@ -28,7 +71,7 @@ describe("publicReadingService", () => {
             lastReplyAt: "2026-05-01T08:10:00.000Z",
           },
         ]),
-      } as any,
+      }),
     });
 
     await expect(service.listBoards()).resolves.toEqual({
@@ -47,15 +90,15 @@ describe("publicReadingService", () => {
 
   it("returns board detail", async () => {
     const service = createPublicReadingService({
-      repository: {
-        findBoardById: vi.fn().mockResolvedValue(null),
-        findBoardBySlug: vi.fn().mockResolvedValue({
+      repository: createRepository({
+        findBoardById: vi.fn<ReadingRepository["findBoardById"]>().mockResolvedValue(null),
+        findBoardBySlug: vi.fn<ReadingRepository["findBoardBySlug"]>().mockResolvedValue({
           id: "board:job",
           slug: "job",
           name: "Jobs and Offers",
           description: "Signals for roles, openings, and practical next steps.",
         }),
-      } as any,
+      }),
     });
 
     await expect(service.getBoard("job")).resolves.toEqual({
@@ -68,15 +111,15 @@ describe("publicReadingService", () => {
 
   it("returns board thread feed with cursor pagination", async () => {
     const service = createPublicReadingService({
-      repository: {
-        findBoardById: vi.fn().mockResolvedValue(null),
-        findBoardBySlug: vi.fn().mockResolvedValue({
+      repository: createRepository({
+        findBoardById: vi.fn<ReadingRepository["findBoardById"]>().mockResolvedValue(null),
+        findBoardBySlug: vi.fn<ReadingRepository["findBoardBySlug"]>().mockResolvedValue({
           id: "board:job",
           slug: "job",
           name: "Jobs and Offers",
           description: "Signals for roles, openings, and practical next steps.",
         }),
-        listThreadsPageByBoard: vi.fn().mockResolvedValue([
+        listThreadsPageByBoard: vi.fn<ListThreadsPageByBoard>().mockResolvedValue([
           {
             id: "thread:2",
             boardId: "board:job",
@@ -114,7 +157,7 @@ describe("publicReadingService", () => {
             lastReplyAt: null,
           },
         ]),
-        findUsersByIds: vi.fn().mockResolvedValue(
+        findUsersByIds: vi.fn<FindUsersByIds>().mockResolvedValue(
           new Map([
             [
               "user:robot-1",
@@ -138,7 +181,7 @@ describe("publicReadingService", () => {
             ],
           ]),
         ),
-      } as any,
+      }),
     });
 
     await expect(service.getBoardThreadsFeed({ boardIdOrSlug: "job", limit: 2 })).resolves.toEqual({
@@ -170,8 +213,8 @@ describe("publicReadingService", () => {
 
   it("returns thread detail", async () => {
     const service = createPublicReadingService({
-      repository: {
-        findThreadByRouteId: vi.fn().mockResolvedValue({
+      repository: createRepository({
+        findThreadByRouteId: vi.fn<FindThreadByRouteId>().mockResolvedValue({
           id: "thread:first-offer",
           boardId: "board:job",
           authorUserId: "user:robot-1",
@@ -183,20 +226,20 @@ describe("publicReadingService", () => {
           replyCount: 2,
           lastReplyAt: "2026-05-01T08:10:00.000Z",
         }),
-        findBoardById: vi.fn().mockResolvedValue({
+        findBoardById: vi.fn<ReadingRepository["findBoardById"]>().mockResolvedValue({
           id: "board:job",
           slug: "job",
           name: "Jobs and Offers",
           description: "Signals for roles, openings, and practical next steps.",
         }),
-        findUserById: vi.fn().mockResolvedValue({
+        findUserById: vi.fn<ReadingRepository["findUserById"]>().mockResolvedValue({
           id: "user:robot-1",
           username: "robot-1",
           displayName: "Robot 1",
           userType: "bot",
           status: "active",
         }),
-      } as any,
+      }),
     });
 
     await expect(service.getThread("first-offer")).resolves.toEqual({
@@ -216,10 +259,10 @@ describe("publicReadingService", () => {
     });
   });
 
-  it("returns thread replies feed sorted by replyIndex asc", async () => {
+  it("returns thread replies feed DTO with pagination metadata", async () => {
     const service = createPublicReadingService({
-      repository: {
-        findThreadByRouteId: vi.fn().mockResolvedValue({
+      repository: createRepository({
+        findThreadByRouteId: vi.fn<FindThreadByRouteId>().mockResolvedValue({
           id: "thread:first-offer",
           boardId: "board:job",
           authorUserId: "user:robot-1",
@@ -231,20 +274,20 @@ describe("publicReadingService", () => {
           replyCount: 2,
           lastReplyAt: "2026-05-01T08:10:00.000Z",
         }),
-        findBoardById: vi.fn().mockResolvedValue({
+        findBoardById: vi.fn<ReadingRepository["findBoardById"]>().mockResolvedValue({
           id: "board:job",
           slug: "job",
           name: "Jobs and Offers",
           description: "Signals for roles, openings, and practical next steps.",
         }),
-        findUserById: vi.fn().mockResolvedValue({
+        findUserById: vi.fn<ReadingRepository["findUserById"]>().mockResolvedValue({
           id: "user:robot-1",
           username: "robot-1",
           displayName: "Robot 1",
           userType: "bot",
           status: "active",
         }),
-        listRepliesPageByThread: vi.fn().mockResolvedValue([
+        listRepliesPageByThread: vi.fn<ListRepliesPageByThread>().mockResolvedValue([
           {
             id: "reply:1",
             threadId: "thread:first-offer",
@@ -270,7 +313,7 @@ describe("publicReadingService", () => {
             publishedAt: "2026-05-01T08:15:00.000Z",
           },
         ]),
-        findUsersByIds: vi.fn().mockResolvedValue(
+        findUsersByIds: vi.fn<FindUsersByIds>().mockResolvedValue(
           new Map([
             [
               "user:alice",
@@ -294,7 +337,7 @@ describe("publicReadingService", () => {
             ],
           ]),
         ),
-      } as any,
+      }),
     });
 
     await expect(service.getThreadRepliesFeed({ threadId: "first-offer", limit: 2 })).resolves.toEqual({
