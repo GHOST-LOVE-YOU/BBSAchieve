@@ -11,7 +11,11 @@ export default async function AdminImportsPage() {
     take: 20,
   });
   const importJobs = await prisma.importJob.findMany({
-    where: { sourceType: "legacy_postgres" },
+    where: {
+      sourceType: {
+        in: ["legacy_postgres", "byr_sync_api"],
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: 10,
   });
@@ -39,7 +43,7 @@ export default async function AdminImportsPage() {
               className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
               type="submit"
             >
-              从旧库导入 iwhisper
+              启动 JobInfo 板块全量抓取
             </button>
           </form>
         </div>
@@ -87,9 +91,9 @@ export default async function AdminImportsPage() {
       </section>
 
       <section className="mt-10 space-y-4">
-        <h2 className="text-lg font-medium">旧库迁移任务</h2>
+        <h2 className="text-lg font-medium">导入任务</h2>
         {importJobs.length === 0 ? (
-          <p className="text-sm text-zinc-500">暂无旧库迁移任务。</p>
+          <p className="text-sm text-zinc-500">暂无导入任务。</p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-zinc-200">
             <table className="w-full text-left text-sm">

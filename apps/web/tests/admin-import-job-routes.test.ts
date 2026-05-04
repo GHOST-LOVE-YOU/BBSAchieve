@@ -54,9 +54,31 @@ describe("admin import job routes", () => {
 
     const response = await startPOST(request);
 
-    expect(routeMocks.createBoardFullSyncJob).toHaveBeenCalled();
+    expect(routeMocks.createBoardFullSyncJob).toHaveBeenCalledWith(routeMocks.prisma, {
+      boardName: "JobInfo",
+      fullSyncWindowMinutes: 60 * 24 * 365 * 10,
+    });
     expect(routeMocks.scheduleBoardFullSync).toHaveBeenCalled();
     await expect(response.json()).resolves.toEqual({ ok: true, jobId: "job-1" });
+  });
+
+  it("returns 400 for an unknown board full-sync request", async () => {
+    const formData = new FormData();
+    formData.set("boardName", "UnknownBoard");
+    const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync", {
+      method: "POST",
+      body: formData,
+    });
+
+    const response = await startPOST(request);
+
+    expect(routeMocks.createBoardFullSyncJob).not.toHaveBeenCalled();
+    expect(routeMocks.scheduleBoardFullSync).not.toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "Board full sync is not enabled",
+    });
   });
 
   it("resumes a paused job by marking it running and kicking off the runner", async () => {
