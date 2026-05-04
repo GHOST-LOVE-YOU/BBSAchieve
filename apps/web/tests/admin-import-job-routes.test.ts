@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const routeMocks = vi.hoisted(() => ({
-  createBoardFullSyncJob: vi.fn(),
+  createBoardBatchFullSyncJob: vi.fn(),
   findJobById: vi.fn(),
   markJobFailed: vi.fn(),
   markJobPaused: vi.fn(),
@@ -9,6 +9,7 @@ const routeMocks = vi.hoisted(() => ({
   markJobCancelled: vi.fn(),
   markJobSucceeded: vi.fn(),
   updateJobProgress: vi.fn(),
+  scheduleBoardBatchFullSync: vi.fn(),
   scheduleBoardFullSync: vi.fn(),
   prisma: {},
 }));
@@ -18,7 +19,7 @@ vi.mock("@/src/server/db/client", () => ({
 }));
 
 vi.mock("@/src/server/imports/importJobStore", () => ({
-  createBoardFullSyncJob: routeMocks.createBoardFullSyncJob,
+  createBoardBatchFullSyncJob: routeMocks.createBoardBatchFullSyncJob,
   findJobById: routeMocks.findJobById,
   markJobFailed: routeMocks.markJobFailed,
   markJobPaused: routeMocks.markJobPaused,
@@ -32,7 +33,11 @@ vi.mock("@/src/server/imports/scheduleBoardFullSync", () => ({
   scheduleBoardFullSync: routeMocks.scheduleBoardFullSync,
 }));
 
-import { POST as startPOST } from "../app/admin/api/import-jobs/byr-board-full-sync/route";
+vi.mock("@/src/server/imports/scheduleBoardBatchFullSync", () => ({
+  scheduleBoardBatchFullSync: routeMocks.scheduleBoardBatchFullSync,
+}));
+
+import { POST as startPOST } from "../app/admin/api/import-jobs/byr-board-full-sync-batch/route";
 import { POST as resumePOST } from "../app/admin/api/import-jobs/[jobId]/resume/route";
 import { POST as stopPOST } from "../app/admin/api/import-jobs/[jobId]/stop/route";
 
@@ -43,41 +48,44 @@ describe("admin import job routes", () => {
     vi.clearAllMocks();
   });
 
-  it("starts a board full-sync job for a hard-coded board", async () => {
-    routeMocks.createBoardFullSyncJob.mockResolvedValue({ id: "job-1" });
+  it("creates one batch job from multiple selected boards and reorders them by catalog order", async () => {
+    routeMocks.createBoardBatchFullSyncJob.mockResolvedValue({ id: "job-batch-1" });
     const formData = new FormData();
-    formData.set("boardName", "JobInfo");
-    const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync", {
+    formData.append("boardNames", "JobInfo");
+    formData.append("boardNames", "IWhisper");
+    const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync-batch", {
       method: "POST",
       body: formData,
     });
 
     const response = await startPOST(request);
 
-    expect(routeMocks.createBoardFullSyncJob).toHaveBeenCalledWith(routeMocks.prisma, {
-      boardName: "JobInfo",
-      fullSyncWindowMinutes: 60 * 24 * 365 * 10,
-    });
-    expect(routeMocks.scheduleBoardFullSync).toHaveBeenCalled();
-    await expect(response.json()).resolves.toEqual({ ok: true, jobId: "job-1" });
+    expect(routeMocks.createBoardBatchFullSyncJob).toHaveBeenCalledWith(
+      routeMocks.prisma,
+      {
+        selectedBoardNames: ["JobInfo", "IWhisper"],
+        orderedBoardNames: ["IWhisper", "JobInfo"],
+      },
+    );
+    expect(routeMocks.scheduleBoardBatchFullSync).toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({ ok: true, jobId: "job-batch-1" });
   });
 
-  it("returns 400 for an unknown board full-sync request", async () => {
+  it("returns 400 when no boards are selected", async () => {
     const formData = new FormData();
-    formData.set("boardName", "UnknownBoard");
-    const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync", {
+    const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync-batch", {
       method: "POST",
       body: formData,
     });
 
     const response = await startPOST(request);
 
-    expect(routeMocks.createBoardFullSyncJob).not.toHaveBeenCalled();
-    expect(routeMocks.scheduleBoardFullSync).not.toHaveBeenCalled();
+    expect(routeMocks.createBoardBatchFullSyncJob).not.toHaveBeenCalled();
+    expect(routeMocks.scheduleBoardBatchFullSync).not.toHaveBeenCalled();
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       ok: false,
-      error: "Board full sync is not enabled",
+      error: "At least one board must be selected",
     });
   });
 
