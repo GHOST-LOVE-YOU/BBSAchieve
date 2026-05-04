@@ -1,5 +1,34 @@
 import { runByrSyncImport } from "@/app/admin/api/imports/byr-sync/route";
 
+function readBoardFullSyncMetadata(metadataJson: unknown) {
+  const metadata =
+    metadataJson && typeof metadataJson === "object"
+      ? (metadataJson as Record<string, unknown>)
+      : {};
+  const missingFields: string[] = [];
+  const boardName = metadata.boardName;
+  const fullSyncWindowMinutes = metadata.fullSyncWindowMinutes;
+
+  if (typeof boardName !== "string" || boardName.trim().length === 0) {
+    missingFields.push("boardName");
+  }
+
+  if (typeof fullSyncWindowMinutes !== "number") {
+    missingFields.push("fullSyncWindowMinutes");
+  }
+
+  if (missingFields.length > 0) {
+    throw new Error(
+      `missing board full sync metadata: ${missingFields.join(", ")}`,
+    );
+  }
+
+  return {
+    boardName,
+    fullSyncWindowMinutes,
+  };
+}
+
 export async function runBoardFullSyncJob(
   deps: {
     findJobById: (jobId: string) => Promise<any>;
@@ -29,10 +58,7 @@ export async function runBoardFullSyncJob(
 
   try {
     await deps.markJobRunning(input.jobId);
-    const metadata = (job.metadataJson ?? {}) as {
-      boardName: string;
-      fullSyncWindowMinutes: number;
-    };
+    const metadata = readBoardFullSyncMetadata(job.metadataJson);
     const importResult = await runByrSyncImport({
       prisma: deps.prisma,
       boardName: metadata.boardName,

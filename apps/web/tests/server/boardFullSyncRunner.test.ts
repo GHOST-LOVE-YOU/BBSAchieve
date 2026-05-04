@@ -112,6 +112,26 @@ describe("runBoardFullSyncJob", () => {
     expect(runnerMocks.markJobFailed).toHaveBeenCalledWith("job-1", "sync boom");
   });
 
+  it("marks the job failed when required metadata is missing", async () => {
+    const deps = {
+      ...makeDeps(),
+      findJobById: vi.fn(async () => ({
+        id: "job-1",
+        sourceLabel: "JobInfo",
+        metadataJson: { boardName: "JobInfo" },
+      })),
+    };
+
+    const result = await runBoardFullSyncJob(deps as never, makeInput());
+
+    expect(result).toEqual({ status: "failed" });
+    expect(runnerMocks.runByrSyncImport).not.toHaveBeenCalled();
+    expect(runnerMocks.markJobFailed).toHaveBeenCalledWith(
+      "job-1",
+      "missing board full sync metadata: fullSyncWindowMinutes",
+    );
+  });
+
   it("releases the throttle after a successful run", async () => {
     const releaseThrottle = vi.fn();
     runnerMocks.runByrSyncImport.mockResolvedValueOnce({ importedThreads: 1 });
