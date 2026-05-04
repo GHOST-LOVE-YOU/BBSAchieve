@@ -360,4 +360,36 @@ describe("runBoardBatchFullSyncJob", () => {
     );
     expect(result.status).toBe("succeeded");
   });
+
+  it("returns cancelled when the final success write loses to a concurrent cancel", async () => {
+    const markJobSucceeded = vi.fn(async () => ({ count: 0 }));
+    const deps = makeDeps({
+      markJobSucceeded,
+    });
+
+    const result = await runBoardBatchFullSyncJob(deps as never, {
+      jobId: "batch-1",
+      ...makeThrottle(),
+    });
+
+    expect(markJobSucceeded).toHaveBeenCalledWith("batch-1");
+    expect(result.status).toBe("cancelled");
+  });
+
+  it("returns cancelled when the final failure write loses to a concurrent cancel", async () => {
+    const runByrSyncImport = vi.fn().mockRejectedValue(new Error("JobInfo exploded"));
+    const markJobFailed = vi.fn(async () => ({ count: 0 }));
+    const deps = makeDeps({
+      runByrSyncImport,
+      markJobFailed,
+    });
+
+    const result = await runBoardBatchFullSyncJob(deps as never, {
+      jobId: "batch-1",
+      ...makeThrottle(),
+    });
+
+    expect(markJobFailed).toHaveBeenCalledWith("batch-1", "JobInfo exploded");
+    expect(result.status).toBe("cancelled");
+  });
 });

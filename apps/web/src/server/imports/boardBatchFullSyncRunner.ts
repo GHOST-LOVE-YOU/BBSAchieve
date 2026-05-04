@@ -141,15 +141,31 @@ export async function runBoardBatchFullSyncJob(
           metadataJson: current,
           progressNote: `板块 ${boardName} 失败`,
         });
-        await deps.markJobFailed(
+        const failedResult = await deps.markJobFailed(
           input.jobId,
           error instanceof Error ? error.message : "Unknown batch full sync error",
         );
+        if (
+          failedResult &&
+          typeof failedResult === "object" &&
+          "count" in failedResult &&
+          failedResult.count === 0
+        ) {
+          return { status: "cancelled" as const };
+        }
         return { status: "failed" as const };
       }
     }
 
-    await deps.markJobSucceeded(input.jobId);
+    const succeededResult = await deps.markJobSucceeded(input.jobId);
+    if (
+      succeededResult &&
+      typeof succeededResult === "object" &&
+      "count" in succeededResult &&
+      succeededResult.count === 0
+    ) {
+      return { status: "cancelled" as const };
+    }
     return { status: "succeeded" as const };
   } finally {
     input.releaseThrottle();

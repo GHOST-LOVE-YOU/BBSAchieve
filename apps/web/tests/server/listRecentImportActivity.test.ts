@@ -37,6 +37,7 @@ describe("listRecentImportActivity", () => {
         sourceLabel: "multi-board full sync",
         status: "running",
         createdAt: new Date("2026-05-02T09:30:00.000Z"),
+        updatedAt: new Date("2026-05-02T09:35:00.000Z"),
         startedAt: new Date("2026-05-02T09:35:00.000Z"),
         finishedAt: null,
         processedThreads: 4,
@@ -80,7 +81,7 @@ describe("listRecentImportActivity", () => {
       },
     });
     expect(importJobFindMany).toHaveBeenCalledWith({
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
       take: 20,
       select: {
         id: true,
@@ -88,6 +89,7 @@ describe("listRecentImportActivity", () => {
         sourceLabel: true,
         status: true,
         createdAt: true,
+        updatedAt: true,
         startedAt: true,
         finishedAt: true,
         processedThreads: true,
@@ -128,6 +130,7 @@ describe("listRecentImportActivity", () => {
             sourceLabel: "multi-board full sync",
             status: "failed",
             createdAt: new Date("2026-05-04T10:00:00.000Z"),
+            updatedAt: new Date("2026-05-04T10:03:00.000Z"),
             startedAt: new Date("2026-05-04T10:02:00.000Z"),
             finishedAt: new Date("2026-05-04T10:03:00.000Z"),
             processedThreads: 0,
@@ -173,6 +176,7 @@ describe("listRecentImportActivity", () => {
             sourceLabel: "multi-board full sync",
             status: "paused",
             createdAt: new Date("2026-05-04T10:00:00.000Z"),
+            updatedAt: new Date("2026-05-04T10:03:00.000Z"),
             startedAt: new Date("2026-05-04T10:02:00.000Z"),
             finishedAt: new Date("2026-05-04T10:03:00.000Z"),
             processedThreads: 0,
@@ -218,6 +222,7 @@ describe("listRecentImportActivity", () => {
             sourceLabel: "multi-board full sync",
             status: "pending",
             createdAt: new Date("2026-05-04T11:00:00.000Z"),
+            updatedAt: new Date("2026-05-04T11:00:00.000Z"),
             startedAt: null,
             finishedAt: null,
             processedThreads: 0,
@@ -242,6 +247,50 @@ describe("listRecentImportActivity", () => {
       id: "import-job:job-3",
       status: "pending",
       detail: "等待全局抓取窗口，当前板块 IWhisper",
+    });
+  });
+
+  it("keeps recently resumed batch jobs in the candidate set by selecting jobs with updatedAt", async () => {
+    const importJobFindMany = vi.fn(async () => [
+      {
+        id: "job-resumed",
+        jobType: "byr_board_full_sync_batch",
+        sourceLabel: "multi-board full sync",
+        status: "running",
+        createdAt: new Date("2026-04-01T08:00:00.000Z"),
+        updatedAt: new Date("2026-05-05T09:30:00.000Z"),
+        startedAt: new Date("2026-04-01T08:05:00.000Z"),
+        finishedAt: null,
+        processedThreads: 8,
+        processedReplies: 20,
+        progressNote: null,
+        errorMessage: null,
+        metadataJson: {
+          selectedBoardNames: ["JobInfo"],
+          orderedBoardNames: ["JobInfo"],
+          completedBoardNames: [],
+          currentBoardName: "JobInfo",
+          failedBoardName: null,
+          currentBoardIndex: 0,
+          perBoardStats: {},
+        },
+      },
+    ]);
+
+    const result = await listRecentImportActivity({
+      import: { findMany: vi.fn(async () => []) } as any,
+      importJob: { findMany: importJobFindMany } as any,
+    });
+
+    expect(importJobFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { updatedAt: "desc" },
+      }),
+    );
+    expect(result[0]).toMatchObject({
+      id: "import-job:job-resumed",
+      happenedAt: "2026-05-05T09:30:00.000Z",
+      detail: "当前板块 JobInfo",
     });
   });
 });

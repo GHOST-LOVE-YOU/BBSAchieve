@@ -22,6 +22,13 @@ export function scheduleBoardBatchFullSyncRun(input: {
   alreadyMarkedRunning?: boolean;
 }) {
   setTimeout(() => {
+    const failUnexpectedRun = async (error: unknown) => {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown batch full sync error";
+      await markJobFailed(prisma, input.jobId, errorMessage);
+      console.error("scheduleBoardBatchFullSync background run failed", error);
+    };
+
     void runBoardBatchFullSyncJob(
       {
         prisma,
@@ -48,8 +55,6 @@ export function scheduleBoardBatchFullSyncRun(input: {
           }),
         releaseThrottle: () => releaseGlobalSyncThrottle(`manual:${input.jobId}`),
       },
-    ).catch((error) => {
-      console.error("scheduleBoardBatchFullSync background run failed", error);
-    });
+    ).catch(failUnexpectedRun);
   }, 0);
 }

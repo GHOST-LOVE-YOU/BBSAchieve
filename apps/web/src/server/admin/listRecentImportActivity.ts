@@ -20,6 +20,7 @@ type ImportJobActivityRow = {
   sourceLabel: string | null;
   status: string;
   createdAt: Date;
+  updatedAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
   processedThreads: number;
@@ -111,7 +112,7 @@ export async function listRecentImportActivity(
       },
     }),
     client.importJob.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
       take: 20,
       select: {
         id: true,
@@ -119,6 +120,7 @@ export async function listRecentImportActivity(
         sourceLabel: true,
         status: true,
         createdAt: true,
+        updatedAt: true,
         startedAt: true,
         finishedAt: true,
         processedThreads: true,
@@ -146,7 +148,7 @@ export async function listRecentImportActivity(
       kind: "import_job" as const,
       title: job.sourceLabel || job.jobType,
       status: job.status,
-      happenedAt: toIsoString(job.finishedAt ?? job.startedAt ?? job.createdAt),
+      happenedAt: toIsoString(job.finishedAt ?? job.updatedAt ?? job.startedAt ?? job.createdAt),
       detail:
         job.jobType === "byr_board_full_sync_batch"
           ? getBatchJobDetail(job)

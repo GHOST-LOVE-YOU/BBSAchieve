@@ -6,6 +6,7 @@ const schedulerMocks = vi.hoisted(() => ({
     importJob: {
       findUnique: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -24,6 +25,7 @@ describe("scheduleBoardBatchFullSync", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     schedulerMocks.runBoardBatchFullSyncJob.mockReset();
+    schedulerMocks.prisma.importJob.updateMany.mockReset();
   });
 
   afterEach(() => {
@@ -52,6 +54,32 @@ describe("scheduleBoardBatchFullSync", () => {
         acquireThrottle: expect.any(Function),
         releaseThrottle: expect.any(Function),
       }),
+    );
+  });
+
+  it("marks the job failed when the background runner throws unexpectedly", async () => {
+    const error = new Error("background boom");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    schedulerMocks.runBoardBatchFullSyncJob.mockRejectedValue(error);
+    schedulerMocks.prisma.importJob.updateMany.mockResolvedValue({ count: 1 });
+
+    scheduleBoardBatchFullSync("job-batch-1");
+    await vi.runAllTimersAsync();
+
+    expect(schedulerMocks.prisma.importJob.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "job-batch-1",
+        status: "running",
+      },
+      data: {
+        status: "failed",
+        finishedAt: expect.any(Date),
+        errorMessage: "background boom",
+      },
+    });
+    expect(consoleError).toHaveBeenCalledWith(
+      "scheduleBoardBatchFullSync background run failed",
+      error,
     );
   });
 });
