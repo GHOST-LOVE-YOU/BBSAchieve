@@ -68,7 +68,10 @@ function asBoardBatchJobMetadata(value: unknown): BoardBatchJobMetadata | null {
 }
 
 function getBatchJobDetail(job: ImportJobActivityRow): string {
-  if (job.progressNote) {
+  if (
+    job.progressNote &&
+    (job.status === "paused" || job.status === "pending")
+  ) {
     return job.progressNote;
   }
 

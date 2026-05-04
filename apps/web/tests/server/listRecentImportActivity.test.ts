@@ -117,7 +117,7 @@ describe("listRecentImportActivity", () => {
     });
   });
 
-  it("renders batch jobs with failed board detail from metadata", async () => {
+  it("renders failed batch jobs from metadata even when the runner leaves a progress note", async () => {
     const result = await listRecentImportActivity({
       import: { findMany: vi.fn(async () => []) } as any,
       importJob: {
@@ -132,7 +132,7 @@ describe("listRecentImportActivity", () => {
             finishedAt: new Date("2026-05-04T10:03:00.000Z"),
             processedThreads: 0,
             processedReplies: 0,
-            progressNote: null,
+            progressNote: "板块 JobInfo 失败",
             errorMessage: "JobInfo exploded",
             metadataJson: {
               selectedBoardNames: ["IWhisper", "JobInfo"],
