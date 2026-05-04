@@ -2,17 +2,8 @@ import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { Link } from "expo-router";
 
-import { getBoardSummaries } from "@bbs/state";
-import { createReadingFlowDeps } from "@bbs/state/runtime";
-
-type BoardSummary = {
-  id: string;
-  slug: string;
-  name: string;
-  description: string;
-  threadCount: number;
-  latestThreadTitle: string | null;
-};
+import { fetchBoards } from "@/features/reading/client";
+import type { BoardSummary } from "@/features/reading/types";
 
 function getStatusText(message: string | null) {
   return message ? `读取失败：${message}` : "读取失败";
@@ -25,19 +16,25 @@ export default function HomeScreen() {
   useEffect(() => {
     let active = true;
 
-    void getBoardSummaries(createReadingFlowDeps()).then((result) => {
-      if (!active) {
-        return;
-      }
+    void fetchBoards()
+      .then((result) => {
+        if (!active) {
+          return;
+        }
 
-      if (result.status !== "success") {
-        setErrorMessage(result.message);
-        return;
-      }
+        setBoards(result.boards);
+        setErrorMessage(null);
+      })
+      .catch((error: unknown) => {
+        if (!active) {
+          return;
+        }
 
-      setBoards(result.boards);
-      setErrorMessage(null);
-    });
+        const message = error instanceof Error ? error.message : null;
+
+        setBoards([]);
+        setErrorMessage(message);
+      });
 
     return () => {
       active = false;

@@ -196,9 +196,9 @@ npx eas-cli@latest build --platform android --profile production
 
 ## 环境变量
 
-当前 `apps/mobile` 目录下还没有自定义 `.env` 文件。
+当前移动端公共阅读链路依赖 `EXPO_PUBLIC_WEB_BASE_URL`，用于请求 Web 暴露的公开阅读 API。
 
-如果后续需要为移动端新增环境变量，建议在本目录创建：
+建议在 `apps/mobile` 目录创建：
 
 ```bash
 apps/mobile/.env
@@ -207,16 +207,27 @@ apps/mobile/.env
 Expo 前端可读取的变量应使用 `EXPO_PUBLIC_` 前缀，例如：
 
 ```env
-EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+EXPO_PUBLIC_WEB_BASE_URL=http://127.0.0.1:3000
 ```
 
 代码中可通过下面方式读取：
 
 ```ts
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+const webBaseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL;
 ```
 
-不要把密钥、令牌等敏感信息放进前端环境变量。
+当前首页会请求：
+
+```txt
+GET {EXPO_PUBLIC_WEB_BASE_URL}/api/public/boards
+```
+
+注意事项：
+
+- `EXPO_PUBLIC_WEB_BASE_URL` 必须指向可被移动端访问到的 Web 服务地址。
+- 可以写成 `http://127.0.0.1:3000` 或 `http://192.168.x.x:3000`，代码会自动去掉末尾多余的 `/`。
+- 如果没有配置这个变量，移动端公共阅读 client 会直接抛出错误：`Missing EXPO_PUBLIC_WEB_BASE_URL for mobile public reading API`。
+- 不要把密钥、令牌等敏感信息放进前端环境变量。
 
 ## 常见问题
 
