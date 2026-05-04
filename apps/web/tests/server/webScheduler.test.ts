@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
+import { getScheduledBoardTasks } from "@/src/server/boardSync/boardRegistry";
 import { scheduledTasks } from "@/src/server/scheduler/taskRegistry";
 
 const enabledTaskCount = scheduledTasks.filter((task) => task.enabled).length;
@@ -29,6 +30,7 @@ describe("startWebScheduler", () => {
   });
 
   it("registers one enabled task per explicitly scheduled board", async () => {
+    expect(scheduledTasks).toEqual(getScheduledBoardTasks());
     expect(enabledTaskCount).toBe(scheduledBoardNames.length);
     expect(scheduledTasks.map((task) => task.boardName)).toEqual(
       scheduledBoardNames,

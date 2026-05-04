@@ -2,9 +2,16 @@ import { describe, expect, it, vi } from "vitest";
 
 import { listScheduledTasks } from "@/src/server/admin/listScheduledTasks";
 import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
+import { getScheduledBoardTasks } from "@/src/server/boardSync/boardRegistry";
 import { scheduledTasks } from "@/src/server/scheduler/taskRegistry";
 
 describe("listScheduledTasks", () => {
+  it("uses the registry-derived scheduled task set without extra task definitions", () => {
+    expect(scheduledTasks).toEqual(getScheduledBoardTasks());
+    expect(scheduledTasks.every((task) => task.enabled)).toBe(true);
+    expect(scheduledTasks.some((task) => task.taskKey === "byr_board_full_sync_batch")).toBe(false);
+  });
+
   it("only includes boards explicitly enabled for scheduled sync", () => {
     expect(scheduledTasks.map((task) => task.boardName)).toEqual(
       boardCatalog
