@@ -65,6 +65,8 @@ uv run byr-sync-cache
 
 - `GET /api/sync/updates?board_name=IWhisper&window_minutes=30`
 
+`/api/sync/updates` 既服务最近窗口同步，也服务 Web 端首次全量抓取。全量抓取不会新增独立接口，而是通过更大的 `window_minutes` 复用同一条同步链路。为避免影响主站，抓取循环会在多页请求之间执行固定等待。
+
 `/api/sync/updates` 会从第 1 页开始按最近活动顺序翻页，并在遇到窗口外主题后停止继续翻页。版面列表中的 `HH:MM:SS` 按当天时间解析，`YYYY-MM-DD` 按当日 `23:59:59` 解析。
 
 同步接口会复用本地北邮人账号登录态，因此 `BBS_USERNAME` 和 `BBS_PASSWORD` 仍然需要在 `backend/.env` 中配置。`BYR_SYNC_API_TOKEN` 用于保护同步接口，`BYR_SYNC_REDIS_URL` 需要指向可用的 Redis 连接地址。

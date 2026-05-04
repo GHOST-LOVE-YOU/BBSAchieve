@@ -1,4 +1,4 @@
-import type { ImportJobStatus, ImportSourceType, PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 
 export type ImportJobStore = Pick<PrismaClient, "importJob">;
 
@@ -6,24 +6,6 @@ export type BoardFullSyncJobInput = {
   boardName: string;
   fullSyncWindowMinutes: number;
   requestedBy?: string | null;
-};
-
-export type LegacyImportJob = {
-  id: string;
-  jobType: string;
-  sourceType: ImportSourceType;
-  sourceLabel: string;
-  status: ImportJobStatus;
-  cursorThreadKey: string | null;
-  lastProcessedAt: Date | null;
-  startedAt: Date | null;
-  finishedAt: Date | null;
-  processedThreads: number;
-  processedReplies: number;
-  skippedThreads: number;
-  skippedReplies: number;
-  errorMessage: string | null;
-  progressNote: string | null;
 };
 
 export type JobProgressUpdate = {
@@ -35,29 +17,6 @@ export type JobProgressUpdate = {
   progressNote?: string | null;
   lastProcessedAt?: Date | null;
 };
-
-export function createLegacyImportJob(
-  prisma: ImportJobStore,
-) {
-  return prisma.importJob.create({
-    data: {
-      jobType: "legacy_iwhisper_migration",
-      sourceType: "legacy_postgres",
-      sourceLabel: "legacy iwhisper",
-      status: "pending",
-      cursorThreadKey: null,
-      lastProcessedAt: null,
-      startedAt: null,
-      finishedAt: null,
-      processedThreads: 0,
-      processedReplies: 0,
-      skippedThreads: 0,
-      skippedReplies: 0,
-      errorMessage: null,
-      progressNote: null,
-    },
-  });
-}
 
 export function createBoardFullSyncJob(
   prisma: ImportJobStore,

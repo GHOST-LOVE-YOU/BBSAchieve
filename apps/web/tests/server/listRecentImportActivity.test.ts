@@ -29,8 +29,8 @@ describe("listRecentImportActivity", () => {
     const importJobFindMany = vi.fn(async () => [
       {
         id: "job-1",
-        jobType: "legacy_iwhisper_migration",
-        sourceLabel: "旧库 iwhisper",
+        jobType: "byr_board_full_sync",
+        sourceLabel: "JobInfo",
         status: "running",
         createdAt: new Date("2026-05-02T09:30:00.000Z"),
         startedAt: new Date("2026-05-02T09:35:00.000Z"),
@@ -83,7 +83,7 @@ describe("listRecentImportActivity", () => {
     ]);
     expect(result[0]).toMatchObject({
       kind: "import_job",
-      title: "旧库 iwhisper",
+      title: "JobInfo",
       status: "running",
       happenedAt: "2026-05-02T09:35:00.000Z",
     });

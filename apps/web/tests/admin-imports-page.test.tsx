@@ -39,7 +39,7 @@ describe("admin imports page", () => {
     cleanup();
   });
 
-  it("renders board full-sync actions instead of legacy iwhisper import", async () => {
+  it("renders board full-sync actions without old import controls", async () => {
     prismaMock.import.findMany.mockResolvedValue([]);
     prismaMock.importJob.findMany.mockResolvedValue([
       {
@@ -69,7 +69,7 @@ describe("admin imports page", () => {
     expect(boardFullSyncButtons.map((button) => button.textContent)).toEqual(
       fullSyncBoards.map((board) => `开始抓取 ${board.boardName} 全量内容`),
     );
-    expect(screen.queryByRole("button", { name: "从旧库导入 iwhisper" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
     expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
 
     const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
@@ -155,7 +155,7 @@ describe("admin imports page", () => {
     expect(screen.getByText("Sync API request failed: 401")).toBeTruthy();
     expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
     expect(screen.getByText("byr_board_full_sync")).toBeTruthy();
-    expect(screen.queryByText("legacy_iwhisper_migration")).toBeNull();
+    expect(screen.queryByText(/legacy_/u)).toBeNull();
     expect(screen.getByText("running")).toBeTruthy();
     expect(screen.getByText("2026-05-02T10:00:00.000Z|post-2")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();

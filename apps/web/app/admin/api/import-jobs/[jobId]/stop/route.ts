@@ -4,7 +4,6 @@ import { prisma } from "@/src/server/db/client";
 import {
   findJobById,
   markJobCancelled,
-  markJobPaused,
 } from "@/src/server/imports/importJobStore";
 
 export async function POST(
@@ -26,14 +25,15 @@ export async function POST(
       );
     }
 
-    if (job.jobType === "byr_board_full_sync") {
-      await markJobCancelled(prisma, jobId);
-      return NextResponse.json({ ok: true, jobId, status: "cancelled" });
+    if (job.jobType !== "byr_board_full_sync") {
+      return NextResponse.json(
+        { ok: false, error: "Only board full sync jobs can be stopped" },
+        { status: 409 },
+      );
     }
 
-    await markJobPaused(prisma, jobId);
-
-    return NextResponse.json({ ok: true, jobId, status: "paused" });
+    await markJobCancelled(prisma, jobId);
+    return NextResponse.json({ ok: true, jobId, status: "cancelled" });
   } catch (error) {
     return NextResponse.json(
       {

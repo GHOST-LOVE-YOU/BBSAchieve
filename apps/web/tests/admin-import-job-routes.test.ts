@@ -81,24 +81,25 @@ describe("admin import job routes", () => {
     });
   });
 
-  it("resumes a paused job by marking it running and kicking off the runner", async () => {
+  it("rejects resuming a non-board full-sync job", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-2",
+      jobType: "some_other_job",
       status: "paused",
       cursorThreadKey: "cursor-2",
     });
-    routeMocks.markJobRunning.mockResolvedValue({});
 
     const response = await resumePOST(request, {
       params: Promise.resolve({ jobId: "job-2" }),
     });
 
     expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-2");
-    expect(routeMocks.markJobRunning).toHaveBeenCalledWith(routeMocks.prisma, "job-2", "cursor-2");
-    expect(response.status).toBe(200);
+    expect(routeMocks.markJobRunning).not.toHaveBeenCalled();
+    expect(routeMocks.scheduleBoardFullSync).not.toHaveBeenCalled();
+    expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
-      ok: true,
-      jobId: "job-2",
+      ok: false,
+      error: "Only board full sync jobs can be resumed",
     });
   });
 
@@ -178,27 +179,25 @@ describe("admin import job routes", () => {
     });
   });
 
-  it("stops a non-board full-sync job by pausing it", async () => {
+  it("rejects stopping a non-board full-sync job", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-4",
       status: "running",
-      jobType: "legacy_iwhisper_migration",
+      jobType: "some_other_job",
       cursorThreadKey: "cursor-4",
     });
-    routeMocks.markJobPaused.mockResolvedValue({});
 
     const response = await stopPOST(request, {
       params: Promise.resolve({ jobId: "job-4" }),
     });
 
     expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-4");
-    expect(routeMocks.markJobPaused).toHaveBeenCalledWith(routeMocks.prisma, "job-4");
+    expect(routeMocks.markJobPaused).not.toHaveBeenCalled();
     expect(routeMocks.markJobCancelled).not.toHaveBeenCalled();
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
-      ok: true,
-      jobId: "job-4",
-      status: "paused",
+      ok: false,
+      error: "Only board full sync jobs can be stopped",
     });
   });
 });
