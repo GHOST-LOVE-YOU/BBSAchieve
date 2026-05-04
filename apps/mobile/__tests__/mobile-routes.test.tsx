@@ -64,17 +64,103 @@ describe("mobile routes", () => {
   });
 
   it("renders board detail thread titles", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: "board:job",
+          slug: "job",
+          name: "求职广场",
+          description: "Reading path for mirrored posts",
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              id: "thread:first-offer",
+              title: "First offer from the mirror",
+              authorName: "Alice",
+              publishedAt: "2026-05-04T00:00:00.000Z",
+              replyCount: 2,
+              lastReplyAt: "2026-05-04T01:00:00.000Z",
+            },
+          ],
+          page: {
+            limit: 20,
+            nextCursor: null,
+            hasMore: false,
+          },
+        }),
+      } as Response);
+
     renderMobileRoute("/boards/job");
 
     expect(await screen.findByText("First offer from the mirror")).toBeTruthy();
     expect(screen.getByText("Reading path for mirrored posts")).toBeTruthy();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://web.example.com/api/public/boards/job",
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://web.example.com/api/public/boards/job/threads?limit=20",
+    );
   });
 
   it("renders thread detail body and replies", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          board: {
+            id: "board:job",
+            slug: "job",
+            name: "求职广场",
+          },
+          thread: {
+            id: "thread:first-offer",
+            title: "First offer from the mirror",
+            body: "A new listing has been mirrored and is ready to read.",
+            authorName: "Alice",
+            publishedAt: "2026-05-04T00:00:00.000Z",
+            replyCount: 2,
+          },
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              id: "reply:first",
+              body: "The mirror keeps the reading flow stable.",
+              authorName: "Bob",
+              publishedAt: "2026-05-04T01:00:00.000Z",
+              replyIndex: 1,
+            },
+          ],
+          page: {
+            limit: 20,
+            nextCursor: null,
+            hasMore: false,
+          },
+        }),
+      } as Response);
+
     renderMobileRoute("/threads/first-offer");
 
     expect(await screen.findByText("A new listing has been mirrored and is ready to read.")).toBeTruthy();
     expect(screen.getByText("The mirror keeps the reading flow stable.")).toBeTruthy();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://web.example.com/api/public/threads/first-offer",
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://web.example.com/api/public/threads/first-offer/replies?limit=20",
+    );
   });
 
   it("shows visible copy when the board route is missing its parameter", async () => {
@@ -91,9 +177,43 @@ describe("mobile routes", () => {
   });
 
   it("shows visible copy when a thread does not exist", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+    } as Response);
+
     renderMobileRoute("/threads/missing-thread");
 
     expect(await screen.findByText("帖子不存在")).toBeTruthy();
+  });
+
+  it("shows visible copy when a board does not exist", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+    } as Response);
+
+    renderMobileRoute("/boards/missing-board");
+
+    expect(await screen.findByText("版面不存在")).toBeTruthy();
+  });
+
+  it("shows visible copy when initial board loading fails", async () => {
+    fetchMock.mockRejectedValue(new Error("网络异常"));
+
+    renderMobileRoute("/boards/job");
+
+    expect(await screen.findByText("读取失败：网络异常")).toBeTruthy();
+  });
+
+  it("shows visible copy when initial thread loading fails", async () => {
+    fetchMock.mockRejectedValue(new Error("服务不可用"));
+
+    renderMobileRoute("/threads/first-offer");
+
+    expect(await screen.findByText("读取失败：服务不可用")).toBeTruthy();
   });
 
   it("renders binding placeholder", async () => {

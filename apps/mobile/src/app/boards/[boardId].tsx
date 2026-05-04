@@ -1,24 +1,7 @@
-import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { FlatList, Text, View } from "react-native";
 import { Link, useLocalSearchParams } from "expo-router";
 
-import { getBoardDetail } from "@bbs/state";
-import { createReadingFlowDeps } from "@bbs/state/runtime";
-
-type BoardDetail = {
-  id: string;
-  slug: string;
-  name: string;
-  description: string;
-};
-
-type ThreadSummary = {
-  id: string;
-  title: string;
-  authorName: string;
-  publishedAt: string;
-  replyCount: number;
-};
+import { useBoardThreadsFeed } from "@/features/reading/useBoardThreadsFeed";
 
 function getStatusText(status: "loading" | "notFound" | "error", message: string | null) {
   if (status === "notFound") {
@@ -34,79 +17,65 @@ function getStatusText(status: "loading" | "notFound" | "error", message: string
 
 export default function BoardPage() {
   const { boardId } = useLocalSearchParams<{ boardId?: string | string[] }>();
-  const [board, setBoard] = useState<BoardDetail | null>(null);
-  const [threads, setThreads] = useState<ThreadSummary[]>([]);
-  const [status, setStatus] = useState<"loading" | "notFound" | "error" | "success">("loading");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
   const boardIdValue = Array.isArray(boardId) ? boardId[0] : boardId;
+  const {
+    board,
+    items,
+    initialStatus,
+    initialError,
+    loadMoreError,
+    isLoadingMore,
+    hasMore,
+    loadMore,
+  } = useBoardThreadsFeed(boardIdValue);
 
-  useEffect(() => {
-    let active = true;
-
-    if (!boardIdValue) {
-      setBoard(null);
-      setThreads([]);
-      setStatus("notFound");
-      setErrorMessage(null);
-      return () => {
-        active = false;
-      };
-    }
-
-    void getBoardDetail(boardIdValue, createReadingFlowDeps()).then((result) => {
-      if (!active) {
-        return;
-      }
-
-      if (result.status !== "success") {
-        setBoard(null);
-        setThreads([]);
-        setStatus(result.status);
-        setErrorMessage(result.status === "error" ? result.message : null);
-        return;
-      }
-
-      setBoard(result.board);
-      setThreads(result.threads);
-      setStatus("success");
-      setErrorMessage(null);
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [boardIdValue]);
-
-  if (status !== "success") {
+  if (initialStatus !== "success") {
     return (
       <View style={{ flex: 1, padding: 24, gap: 16 }}>
         <Text style={{ fontSize: 28, fontWeight: "600" }}>版面帖子</Text>
-        <Text>{getStatusText(status, errorMessage)}</Text>
+        <Text>{getStatusText(initialStatus, initialError)}</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, padding: 24, gap: 16 }}>
-      <Text style={{ fontSize: 28, fontWeight: "600" }}>{board?.name ?? "版面帖子"}</Text>
-      {board ? <Text>{board.description}</Text> : null}
-      <View style={{ gap: 12 }}>
-        {threads.map((thread) => (
-          <View key={thread.id} style={{ gap: 4 }}>
-            <Link
-              href={{
-                pathname: "/threads/[threadId]",
-                params: { threadId: thread.id.replace(/^thread:/, "") },
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: "500" }}>{thread.title}</Text>
-            </Link>
-            <Text>{thread.authorName}</Text>
-            <Text>回复数：{thread.replyCount}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
+    <FlatList
+      contentContainerStyle={{ padding: 24, gap: 16 }}
+      data={items}
+      keyExtractor={(item) => item.id}
+      ListHeaderComponent={
+        <View style={{ gap: 8 }}>
+          <Text style={{ fontSize: 28, fontWeight: "600" }}>{board?.name ?? "版面帖子"}</Text>
+          {board ? <Text>{board.description}</Text> : null}
+        </View>
+      }
+      ListFooterComponent={
+        loadMoreError ? (
+          <Text accessibilityRole="alert" style={{ paddingTop: 8 }}>
+            读取失败：{loadMoreError}
+          </Text>
+        ) : null
+      }
+      onEndReached={() => {
+        if (hasMore && !isLoadingMore) {
+          void loadMore();
+        }
+      }}
+      onEndReachedThreshold={0.2}
+      renderItem={({ item }) => (
+        <View style={{ gap: 4 }}>
+          <Link
+            href={{
+              pathname: "/threads/[threadId]",
+              params: { threadId: item.id.replace(/^thread:/, "") },
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: "500" }}>{item.title}</Text>
+          </Link>
+          <Text>{item.authorName}</Text>
+          <Text>回复数：{item.replyCount}</Text>
+        </View>
+      )}
+    />
   );
 }
