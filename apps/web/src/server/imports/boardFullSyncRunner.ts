@@ -1,6 +1,13 @@
 import { runByrSyncImport } from "@/app/admin/api/imports/byr-sync/route";
 
-function readBoardFullSyncMetadata(metadataJson: unknown) {
+type BoardFullSyncMetadata = {
+  boardName: string;
+  fullSyncWindowMinutes: number;
+};
+
+function readBoardFullSyncMetadata(
+  metadataJson: unknown,
+): BoardFullSyncMetadata {
   const metadata =
     metadataJson && typeof metadataJson === "object"
       ? (metadataJson as Record<string, unknown>)
@@ -23,13 +30,19 @@ function readBoardFullSyncMetadata(metadataJson: unknown) {
     );
   }
 
-  if (!Number.isFinite(fullSyncWindowMinutes) || fullSyncWindowMinutes <= 0) {
+  const validatedBoardName = boardName as string;
+  const validatedFullSyncWindowMinutes = fullSyncWindowMinutes as number;
+
+  if (
+    !Number.isFinite(validatedFullSyncWindowMinutes) ||
+    validatedFullSyncWindowMinutes <= 0
+  ) {
     throw new Error("invalid board full sync metadata: fullSyncWindowMinutes");
   }
 
   return {
-    boardName,
-    fullSyncWindowMinutes,
+    boardName: validatedBoardName,
+    fullSyncWindowMinutes: validatedFullSyncWindowMinutes,
   };
 }
 
