@@ -4,6 +4,7 @@ import {
   createBoardFullSyncJob,
   markJobCancelled,
   markJobPaused,
+  markJobRunning,
 } from "@/src/server/imports/importJobStore";
 
 describe("createBoardFullSyncJob", () => {
@@ -56,6 +57,42 @@ describe("markJobPaused", () => {
           status: "paused",
           progressNote: "waiting for next window",
           finishedAt: now,
+        }),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("markJobRunning", () => {
+  it("updates running only when the job is not already cancelled", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const now = new Date("2026-05-04T07:02:00.000Z");
+
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    try {
+      await markJobRunning(
+        {
+          importJob: { updateMany },
+        } as any,
+        "job-1",
+        "cursor-1",
+      );
+
+      expect(updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "job-1",
+          status: {
+            not: "cancelled",
+          },
+        },
+        data: expect.objectContaining({
+          status: "running",
+          startedAt: now,
+          cursorThreadKey: "cursor-1",
         }),
       });
     } finally {

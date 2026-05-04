@@ -130,6 +130,32 @@ describe("admin import job routes", () => {
     });
   });
 
+  it("does not resume a board full-sync job if the running transition is rejected after cancellation", async () => {
+    routeMocks.findJobById.mockResolvedValue({
+      id: "job-board-2",
+      jobType: "byr_board_full_sync",
+      status: "paused",
+      cursorThreadKey: null,
+      metadataJson: {
+        boardName: "JobInfo",
+      },
+    });
+    routeMocks.markJobRunning.mockResolvedValue({ count: 0 });
+
+    const response = await resumePOST(request, {
+      params: Promise.resolve({ jobId: "job-board-2" }),
+    });
+
+    expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-board-2");
+    expect(routeMocks.markJobRunning).toHaveBeenCalledWith(routeMocks.prisma, "job-board-2");
+    expect(routeMocks.scheduleBoardFullSync).not.toHaveBeenCalled();
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "Job was cancelled before resume",
+    });
+  });
+
   it("stops a board full-sync job by cancelling it", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-3",

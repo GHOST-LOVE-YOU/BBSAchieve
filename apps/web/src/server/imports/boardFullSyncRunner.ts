@@ -37,7 +37,7 @@ export async function runBoardFullSyncJob(
   deps: {
     findJobById: (jobId: string) => Promise<any>;
     markJobPaused: (jobId: string, progressNote: string) => Promise<unknown>;
-    markJobRunning: (jobId: string) => Promise<unknown>;
+    markJobRunning: (jobId: string) => Promise<{ count: number } | unknown>;
     markJobSucceeded: (jobId: string) => Promise<unknown>;
     markJobFailed: (jobId: string, errorMessage: string) => Promise<unknown>;
     prisma: any;
@@ -64,7 +64,15 @@ export async function runBoardFullSyncJob(
   }
 
   try {
-    await deps.markJobRunning(input.jobId);
+    const runningResult = await deps.markJobRunning(input.jobId);
+    if (
+      runningResult &&
+      typeof runningResult === "object" &&
+      "count" in runningResult &&
+      runningResult.count === 0
+    ) {
+      return { status: "cancelled" as const };
+    }
     const metadata = readBoardFullSyncMetadata(job.metadataJson);
     const importResult = await runByrSyncImport({
       prisma: deps.prisma,

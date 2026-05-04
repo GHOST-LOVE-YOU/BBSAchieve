@@ -116,7 +116,18 @@ export async function POST(
         );
       }
 
-      await markJobRunning(prisma, jobId);
+      const runningResult = await markJobRunning(prisma, jobId);
+      if (
+        runningResult &&
+        typeof runningResult === "object" &&
+        "count" in runningResult &&
+        runningResult.count === 0
+      ) {
+        return NextResponse.json(
+          { ok: false, error: "Job was cancelled before resume" },
+          { status: 409 },
+        );
+      }
       scheduleBoardFullSyncResume(jobId, boardName);
       return NextResponse.json({ ok: true, jobId });
     }

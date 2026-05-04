@@ -93,8 +93,11 @@ export function markJobRunning(
   jobId: string,
   cursorThreadKey?: string | null,
 ) {
-  return prisma.importJob.update({
-    where: { id: jobId },
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: { not: "cancelled" },
+    },
     data: {
       status: "running",
       startedAt: new Date(),

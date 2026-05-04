@@ -106,6 +106,18 @@ describe("runBoardFullSyncJob", () => {
     expect(runnerMocks.markJobRunning).toHaveBeenCalledWith("job-1");
   });
 
+  it("returns cancelled when the running transition is rejected because the job was cancelled", async () => {
+    const deps = {
+      ...makeDeps(),
+      markJobRunning: vi.fn(async () => ({ count: 0 })),
+    };
+
+    const result = await runBoardFullSyncJob(deps as never, makeInput());
+
+    expect(result).toEqual({ status: "cancelled" });
+    expect(runnerMocks.runByrSyncImport).not.toHaveBeenCalled();
+  });
+
   it("runs sync import with board metadata and marks the job succeeded", async () => {
     runnerMocks.runByrSyncImport.mockResolvedValueOnce({ importedThreads: 1 });
 
