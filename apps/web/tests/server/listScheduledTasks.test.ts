@@ -1,8 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { listScheduledTasks } from "@/src/server/admin/listScheduledTasks";
+import { scheduledTasks } from "@/src/server/scheduler/taskRegistry";
 
 describe("listScheduledTasks", () => {
+  it("queries latest runs for all code-defined tasks", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+
+    await listScheduledTasks({
+      scheduledTaskRun: { findMany },
+    } as never);
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        taskKey: {
+          in: scheduledTasks.map((task) => task.taskKey),
+        },
+      },
+      orderBy: { startedAt: "desc" },
+    });
+  });
+
   it("returns all code-defined tasks with their latest run", async () => {
     const findMany = vi.fn().mockResolvedValue([
       {
@@ -26,7 +44,7 @@ describe("listScheduledTasks", () => {
     expect(findMany).toHaveBeenCalledWith({
       where: {
         taskKey: {
-          in: ["iwhisper_recent_sync"],
+          in: scheduledTasks.map((task) => task.taskKey),
         },
       },
       orderBy: { startedAt: "desc" },
@@ -76,7 +94,7 @@ describe("listScheduledTasks", () => {
     expect(findMany).toHaveBeenCalledWith({
       where: {
         taskKey: {
-          in: ["iwhisper_recent_sync"],
+          in: scheduledTasks.map((task) => task.taskKey),
         },
       },
       orderBy: { startedAt: "desc" },
