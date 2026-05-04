@@ -82,6 +82,22 @@ describe("runBoardFullSyncJob", () => {
     expect(runnerMocks.runByrSyncImport).not.toHaveBeenCalled();
   });
 
+  it("returns cancelled before starting when the job is already cancelled", async () => {
+    const deps = {
+      ...makeDeps(),
+      findJobById: vi.fn(async () => ({
+        ...makeJob(),
+        status: "cancelled",
+      })),
+    };
+
+    const result = await runBoardFullSyncJob(deps as never, makeInput());
+
+    expect(result).toEqual({ status: "cancelled" });
+    expect(runnerMocks.markJobRunning).not.toHaveBeenCalled();
+    expect(runnerMocks.runByrSyncImport).not.toHaveBeenCalled();
+  });
+
   it("marks the job running after acquiring the throttle", async () => {
     runnerMocks.runByrSyncImport.mockResolvedValueOnce({ importedThreads: 1 });
 

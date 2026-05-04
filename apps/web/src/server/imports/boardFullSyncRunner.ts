@@ -53,6 +53,9 @@ export async function runBoardFullSyncJob(
   if (!job) {
     throw new Error(`missing import job ${input.jobId}`);
   }
+  if (job.status === "cancelled") {
+    return { status: "cancelled" as const };
+  }
 
   const throttle = input.acquireThrottle();
   if (!throttle.acquired) {
