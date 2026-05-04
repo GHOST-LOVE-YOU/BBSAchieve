@@ -121,6 +121,17 @@ describe("public api routes", () => {
     await expect(response.json()).resolves.toEqual({ error: "Invalid limit" });
   });
 
+  it("returns 400 when board thread feed limit is not an integer", async () => {
+    const response = await getBoardThreadsFeed(
+      new Request("http://localhost/api/public/boards/job/threads?limit=1.5"),
+      { params: Promise.resolve({ boardIdOrSlug: "job" }) },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Invalid limit" });
+    expect(publicReadingServiceMock.getBoardThreadsFeed).not.toHaveBeenCalled();
+  });
+
   it("returns board threads feed json", async () => {
     publicReadingServiceMock.getBoardThreadsFeed.mockResolvedValue({
       items: [
@@ -247,6 +258,19 @@ describe("public api routes", () => {
         hasMore: false,
       },
     });
+  });
+
+  it("returns 400 when thread replies feed limit is not an integer", async () => {
+    const response = await getThreadRepliesFeed(
+      new Request(
+        "http://localhost/api/public/threads/first-offer/replies?limit=10abc",
+      ),
+      { params: Promise.resolve({ threadId: "first-offer" }) },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Invalid limit" });
+    expect(publicReadingServiceMock.getThreadRepliesFeed).not.toHaveBeenCalled();
   });
 
   it("returns 404 when thread replies feed is missing", async () => {

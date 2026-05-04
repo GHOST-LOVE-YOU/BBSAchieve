@@ -4,7 +4,13 @@ import { createPublicReadingService } from "@/src/server/reading/publicReadingSe
 
 function parseLimit(url: URL) {
   const raw = url.searchParams.get("limit");
-  return raw == null ? undefined : Number.parseInt(raw, 10);
+  if (raw == null) {
+    return undefined;
+  }
+  if (!/^\d+$/.test(raw)) {
+    throw new Error("Invalid limit");
+  }
+  return Number.parseInt(raw, 10);
 }
 
 export async function GET(
