@@ -177,6 +177,45 @@ describe("updateJobProgress", () => {
       },
     });
   });
+
+  it("persists metadataJson when batch progress updates include recovery state", async () => {
+    const update = vi.fn(async () => ({ id: "job-1" }));
+    const metadataJson = {
+      selectedBoardNames: ["JobInfo", "IWhisper"],
+      orderedBoardNames: ["IWhisper", "JobInfo"],
+      completedBoardNames: ["IWhisper"],
+      currentBoardName: "JobInfo",
+      failedBoardName: "JobInfo",
+      currentBoardIndex: 1,
+      perBoardStats: {
+        IWhisper: {
+          processedThreads: 2,
+          processedReplies: 5,
+        },
+      },
+    };
+
+    await updateJobProgress(
+      {
+        importJob: { update },
+      } as any,
+      "job-1",
+      {
+        processedThreads: 2,
+        processedReplies: 5,
+        metadataJson,
+      },
+    );
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "job-1" },
+      data: {
+        processedThreads: 2,
+        processedReplies: 5,
+        metadataJson,
+      },
+    });
+  });
 });
 
 describe("markJobFailed", () => {

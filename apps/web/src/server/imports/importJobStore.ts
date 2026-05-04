@@ -23,6 +23,7 @@ export type JobProgressUpdate = {
   skippedReplies?: number;
   progressNote?: string | null;
   lastProcessedAt?: Date | null;
+  metadataJson?: unknown;
 };
 
 export function createBoardFullSyncJob(
@@ -163,6 +164,9 @@ export function updateJobProgress(
       ...(progress.lastProcessedAt === undefined
         ? {}
         : { lastProcessedAt: progress.lastProcessedAt }),
+      ...(progress.metadataJson === undefined
+        ? {}
+        : { metadataJson: progress.metadataJson }),
     },
   });
 }
