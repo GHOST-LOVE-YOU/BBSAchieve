@@ -83,7 +83,6 @@ export function createBoardFullSyncJob(
         boardName: input.boardName,
         fullSyncWindowMinutes: input.fullSyncWindowMinutes,
         requestedBy: input.requestedBy ?? null,
-        throttlePolicy: "global-single-flight",
       },
     },
   });
