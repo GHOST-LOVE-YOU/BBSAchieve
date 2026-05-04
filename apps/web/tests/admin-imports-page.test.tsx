@@ -26,9 +26,9 @@ vi.mock("next/link", () => ({
 
 import AdminImportsPage from "../app/admin/imports/page";
 import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
-import { boardSyncBoards } from "@/src/server/boardSync/boardRegistry";
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 
-const fullSyncBoards = boardSyncBoards.filter((board) => board.fullSyncEnabled);
+const fullSyncBoards = boardCatalog.filter((board) => board.fullSyncEnabled);
 
 describe("admin imports page", () => {
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe("admin imports page", () => {
     cleanup();
   });
 
-  it("renders board full-sync actions without old import controls", async () => {
+  it("renders board full-sync batch selection without old import controls", async () => {
     prismaMock.import.findMany.mockResolvedValue([]);
     prismaMock.importJob.findMany.mockResolvedValue([
       {
@@ -62,17 +62,17 @@ describe("admin imports page", () => {
 
     render(await AdminImportsPage());
 
-    const batchStartButton = screen.getByRole("button", {
-      name: "开始抓取全部首页板块全量内容",
-    });
+    const batchStartButton = screen.getByRole("button", { name: "开始全量抓取" });
 
-    expect(batchStartButton.textContent).toBe("开始抓取全部首页板块全量内容");
-    expect(
-      screen.getByText(
-        `当前将按首页目录顺序抓取：${fullSyncBoards.map((board) => board.boardName).join("、")}`,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
+    for (const board of fullSyncBoards) {
+      const checkbox = screen.getByRole("checkbox", { name: board.boardName });
+      expect(checkbox).toBeTruthy();
+      expect(checkbox.getAttribute("name")).toBe("boardNames");
+      expect(checkbox.getAttribute("value")).toBe(board.boardName);
+    }
     expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
+    expect(screen.queryByRole("button", { name: /开始抓取 .* 全量内容/u })).toBeNull();
     expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
     expect(screen.getByRole("button", { name: "停止" })).toBeTruthy();
     expect(screen.getByText("waiting for slot")).toBeTruthy();
@@ -83,9 +83,11 @@ describe("admin imports page", () => {
     );
     expect(
       Array.from(
-        batchForm?.querySelectorAll<HTMLInputElement>('input[name="boardNames"]') ?? [],
+        batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
+          [],
       ).map((input) => input.value),
     ).toEqual(fullSyncBoards.map((board) => board.boardName));
+    expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
   });
 
   it("renders a stop action for pending board full-sync jobs", async () => {
@@ -185,12 +187,11 @@ describe("admin imports page", () => {
 
     expect(screen.getByRole("heading", { name: "导入导出" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "同步北邮人数据" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "开始抓取全部首页板块全量内容" })).toBeTruthy();
-    expect(
-      screen.getByText(
-        `当前将按首页目录顺序抓取：${fullSyncBoards.map((board) => board.boardName).join("、")}`,
-      ),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "开始全量抓取" })).toBeTruthy();
+    expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
+    for (const board of fullSyncBoards) {
+      expect(screen.getByRole("checkbox", { name: board.boardName })).toBeTruthy();
+    }
     expect(screen.getByText("最近导入活动")).toBeTruthy();
     expect(screen.getByText("JobInfo · 任务")).toBeTruthy();
     expect(screen.getByText("IWhisper · 任务")).toBeTruthy();
@@ -218,15 +219,17 @@ describe("admin imports page", () => {
     });
 
     const batchForm = screen
-      .getByRole("button", { name: "开始抓取全部首页板块全量内容" })
+      .getByRole("button", { name: "开始全量抓取" })
       .closest("form");
     expect(batchForm?.getAttribute("action")).toBe(
       "/admin/api/import-jobs/byr-board-full-sync-batch",
     );
     expect(
       Array.from(
-        batchForm?.querySelectorAll<HTMLInputElement>('input[name="boardNames"]') ?? [],
+        batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
+          [],
       ).map((input) => input.value),
     ).toEqual(fullSyncBoards.map((board) => board.boardName));
+    expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
   });
 });

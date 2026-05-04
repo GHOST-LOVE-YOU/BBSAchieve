@@ -35,25 +35,54 @@ export default async function AdminImportsPage() {
               同步北邮人数据
             </button>
           </form>
-          <form action="/admin/api/import-jobs/byr-board-full-sync-batch" method="post">
-            {fullSyncBoards.map((board) => (
-              <input
-                key={board.boardName}
-                type="hidden"
-                name="boardNames"
-                value={board.boardName}
-              />
-            ))}
+          <form
+            action="/admin/api/import-jobs/byr-board-full-sync-batch"
+            method="post"
+            className="rounded-xl border border-zinc-200 p-4"
+          >
+            <fieldset className="grid gap-3">
+              <legend className="text-sm font-medium text-zinc-900">选择要全量抓取的板块</legend>
+              {fullSyncBoards.map((board) => (
+                <div
+                  key={board.boardName}
+                  className="flex items-start gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                >
+                  <input
+                    id={`board-${board.boardSlug}`}
+                    type="checkbox"
+                    name="boardNames"
+                    value={board.boardName}
+                    defaultChecked
+                    className="mt-0.5"
+                    aria-describedby={`board-${board.boardSlug}-description`}
+                  />
+                  <span className="grid gap-1">
+                    <label
+                      htmlFor={`board-${board.boardSlug}`}
+                      className="font-medium text-zinc-900"
+                    >
+                      {board.boardName}
+                    </label>
+                    <span
+                      id={`board-${board.boardSlug}-description`}
+                      className="text-zinc-500"
+                    >
+                      {board.description}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </fieldset>
             <button
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
+              className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
               type="submit"
             >
-              开始抓取全部首页板块全量内容
+              开始全量抓取
             </button>
+            <p className="mt-3 text-sm text-zinc-500">
+              当前将按首页目录顺序串行抓取：{fullSyncBoards.map((board) => board.boardName).join("、")}
+            </p>
           </form>
-          <p className="text-sm text-zinc-500">
-            当前将按首页目录顺序抓取：{fullSyncBoards.map((board) => board.boardName).join("、")}
-          </p>
         </div>
       </div>
 
