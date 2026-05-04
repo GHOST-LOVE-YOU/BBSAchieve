@@ -32,6 +32,8 @@ function makeDeps(options?: {
   markJobFailed?: ReturnType<typeof vi.fn>;
   markJobRunning?: ReturnType<typeof vi.fn>;
   markJobPaused?: ReturnType<typeof vi.fn>;
+  findJobById?: ReturnType<typeof vi.fn>;
+  getBoardFullSyncWindowMinutes?: ReturnType<typeof vi.fn>;
   status?: string;
 }) {
   const metadata =
@@ -42,11 +44,13 @@ function makeDeps(options?: {
     });
 
   return {
-    findJobById: vi.fn(async () => ({
-      id: "batch-1",
-      status: options?.status ?? "pending",
-      metadataJson: metadata,
-    })),
+    findJobById:
+      options?.findJobById ??
+      vi.fn(async () => ({
+        id: "batch-1",
+        status: options?.status ?? "pending",
+        metadataJson: metadata,
+      })),
     markJobPaused: options?.markJobPaused ?? vi.fn(async () => ({ count: 1 })),
     markJobRunning: options?.markJobRunning ?? vi.fn(async () => ({ count: 1 })),
     updateJobProgress: options?.updateJobProgress ?? vi.fn(),
@@ -66,6 +70,9 @@ function makeDeps(options?: {
           importedReplies: 7,
           skippedReplies: 1,
         }),
+    getBoardFullSyncWindowMinutes:
+      options?.getBoardFullSyncWindowMinutes ??
+      vi.fn((boardName: string) => (boardName === "IWhisper" ? 30 : 180)),
     prisma: {},
   };
 }
@@ -240,5 +247,117 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(deps.markJobRunning).not.toHaveBeenCalled();
     expect(deps.runByrSyncImport).not.toHaveBeenCalled();
     expect(result.status).toBe("paused");
+  });
+
+  it("marks a newly scheduled batch job paused when the global throttle is unavailable", async () => {
+    const markJobPaused = vi.fn(async () => ({ count: 1 }));
+    const updateJobProgress = vi.fn();
+    const deps = makeDeps({
+      markJobPaused,
+      updateJobProgress,
+    });
+
+    const result = await runBoardBatchFullSyncJob(deps as never, {
+      jobId: "batch-1",
+      acquireThrottle: () => ({
+        acquired: false,
+        holder: {
+          ownerKey: "scheduled:other",
+          triggerSource: "scheduled" as const,
+          acquiredAt: new Date("2026-05-04T10:00:00.000Z"),
+        },
+      }),
+      releaseThrottle: vi.fn(),
+    });
+
+    expect(markJobPaused).toHaveBeenCalledWith(
+      "batch-1",
+      "等待全局抓取窗口，当前板块 IWhisper",
+    );
+    expect(updateJobProgress).not.toHaveBeenCalled();
+    expect(deps.markJobRunning).not.toHaveBeenCalled();
+    expect(result.status).toBe("paused");
+  });
+
+  it("re-checks cancellation between boards so later boards do not start", async () => {
+    const metadata = createBatchJobMetadata({
+      selectedBoardNames: ["JobInfo", "IWhisper"],
+      orderedBoardNames: ["IWhisper", "JobInfo"],
+    });
+    const findJobById = vi
+      .fn()
+      .mockResolvedValueOnce({
+        id: "batch-1",
+        status: "pending",
+        metadataJson: metadata,
+      })
+      .mockResolvedValueOnce({
+        id: "batch-1",
+        status: "running",
+        metadataJson: metadata,
+      })
+      .mockResolvedValueOnce({
+        id: "batch-1",
+        status: "cancelled",
+        metadataJson: markBoardCompleted(metadata, {
+          boardName: "IWhisper",
+          processedThreads: 2,
+          processedReplies: 5,
+        }),
+      });
+    const runByrSyncImport = vi.fn().mockResolvedValue({
+      importedThreads: 2,
+      importedReplies: 5,
+      skippedReplies: 0,
+    });
+    const deps = makeDeps({
+      metadata,
+      findJobById,
+      runByrSyncImport,
+    });
+
+    const result = await runBoardBatchFullSyncJob(deps as never, {
+      jobId: "batch-1",
+      ...makeThrottle(),
+    });
+
+    expect(runByrSyncImport).toHaveBeenCalledTimes(1);
+    expect(runByrSyncImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boardName: "IWhisper",
+      }),
+    );
+    expect(deps.markJobSucceeded).not.toHaveBeenCalled();
+    expect(result.status).toBe("cancelled");
+  });
+
+  it("uses each board's configured full sync window instead of a hardcoded value", async () => {
+    const getBoardFullSyncWindowMinutes = vi
+      .fn()
+      .mockImplementation((boardName: string) => (boardName === "IWhisper" ? 45 : 90));
+    const deps = makeDeps({
+      getBoardFullSyncWindowMinutes,
+    });
+
+    const result = await runBoardBatchFullSyncJob(deps as never, {
+      jobId: "batch-1",
+      ...makeThrottle(),
+    });
+
+    expect(deps.runByrSyncImport).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        boardName: "IWhisper",
+        windowMinutes: 45,
+      }),
+    );
+    expect(deps.runByrSyncImport).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        boardName: "JobInfo",
+        windowMinutes: 90,
+      }),
+    );
+    expect(result.status).toBe("succeeded");
   });
 });

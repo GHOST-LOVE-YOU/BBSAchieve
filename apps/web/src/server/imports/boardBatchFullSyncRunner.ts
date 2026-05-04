@@ -1,4 +1,5 @@
 import { runByrSyncImport } from "@/app/admin/api/imports/byr-sync/route";
+import { getBoardFullSyncDefinition } from "@/src/server/boardSync/boardRegistry";
 
 import {
   getCurrentBoardName,
@@ -20,6 +21,7 @@ type BatchRunnerDeps = {
   markJobFailed: (jobId: string, errorMessage: string) => Promise<{ count: number } | unknown>;
   prisma: unknown;
   runByrSyncImport?: typeof runByrSyncImport;
+  getBoardFullSyncWindowMinutes?: (boardName: string) => number;
 };
 
 type BatchRunnerInput = {
@@ -34,6 +36,15 @@ export async function runBoardBatchFullSyncJob(
   input: BatchRunnerInput,
 ) {
   const runImport = deps.runByrSyncImport ?? runByrSyncImport;
+  const getBoardFullSyncWindowMinutes =
+    deps.getBoardFullSyncWindowMinutes ??
+    ((boardName: string) => {
+      const board = getBoardFullSyncDefinition(boardName);
+      if (!board) {
+        throw new Error(`Unknown board full sync configuration for "${boardName}"`);
+      }
+      return board.fullSyncWindowMinutes;
+    });
   const job = await deps.findJobById(input.jobId);
 
   if (!job) {
@@ -48,14 +59,10 @@ export async function runBoardBatchFullSyncJob(
   const throttle = input.acquireThrottle();
 
   if (!throttle.acquired) {
-    const pauseResult = input.alreadyMarkedRunning
-      ? await deps.markJobPaused(
-          input.jobId,
-          `等待全局抓取窗口，当前板块 ${getCurrentBoardName(metadata) ?? "—"}`,
-        )
-      : await deps.updateJobProgress(input.jobId, {
-          progressNote: `等待全局抓取窗口，当前板块 ${getCurrentBoardName(metadata) ?? "—"}`,
-        });
+    const pauseResult = await deps.markJobPaused(
+      input.jobId,
+      `等待全局抓取窗口，当前板块 ${getCurrentBoardName(metadata) ?? "—"}`,
+    );
 
     if (
       pauseResult &&
@@ -89,13 +96,22 @@ export async function runBoardBatchFullSyncJob(
       index < current.orderedBoardNames.length;
       index += 1
     ) {
+      const latestJob = await deps.findJobById(input.jobId);
+      if (!latestJob) {
+        throw new Error(`Batch job ${input.jobId} not found`);
+      }
+
+      if (latestJob.status === "cancelled") {
+        return { status: "cancelled" as const };
+      }
+
       const boardName = current.orderedBoardNames[index]!;
 
       try {
         const importResult = await runImport({
           prisma: deps.prisma as never,
           boardName,
-          windowMinutes: 60 * 24 * 365 * 10,
+          windowMinutes: getBoardFullSyncWindowMinutes(boardName),
           limit: null,
         });
 
