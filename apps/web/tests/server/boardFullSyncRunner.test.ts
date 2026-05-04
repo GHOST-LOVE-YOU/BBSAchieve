@@ -4,6 +4,7 @@ const runnerMocks = vi.hoisted(() => ({
   runByrSyncImport: vi.fn(),
   markJobPaused: vi.fn(),
   markJobRunning: vi.fn(),
+  updateJobProgress: vi.fn(),
   markJobSucceeded: vi.fn(),
   markJobFailed: vi.fn(),
 }));
@@ -27,6 +28,7 @@ function makeDeps() {
     findJobById: vi.fn(async () => makeJob()),
     markJobPaused: runnerMocks.markJobPaused,
     markJobRunning: runnerMocks.markJobRunning,
+    updateJobProgress: runnerMocks.updateJobProgress,
     markJobSucceeded: runnerMocks.markJobSucceeded,
     markJobFailed: runnerMocks.markJobFailed,
     prisma: { thread: {} },
@@ -121,7 +123,11 @@ describe("runBoardFullSyncJob", () => {
   });
 
   it("runs sync import with board metadata and marks the job succeeded", async () => {
-    runnerMocks.runByrSyncImport.mockResolvedValueOnce({ importedThreads: 1 });
+    runnerMocks.runByrSyncImport.mockResolvedValueOnce({
+      importedThreads: 1,
+      importedReplies: 4,
+      skippedReplies: 2,
+    });
 
     await runBoardFullSyncJob(makeDeps() as never, makeInput());
 
@@ -130,6 +136,12 @@ describe("runBoardFullSyncJob", () => {
       boardName: "JobInfo",
       windowMinutes: 999999,
       limit: null,
+    });
+    expect(runnerMocks.updateJobProgress).toHaveBeenCalledWith("job-1", {
+      processedThreads: 1,
+      processedReplies: 4,
+      skippedReplies: 2,
+      progressNote: null,
     });
     expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1");
   });

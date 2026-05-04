@@ -51,6 +51,15 @@ export async function runBoardFullSyncJob(
     findJobById: (jobId: string) => Promise<any>;
     markJobPaused: (jobId: string, progressNote: string) => Promise<unknown>;
     markJobRunning: (jobId: string) => Promise<{ count: number } | unknown>;
+    updateJobProgress: (
+      jobId: string,
+      progress: {
+        processedThreads?: number;
+        processedReplies?: number;
+        skippedReplies?: number;
+        progressNote?: string | null;
+      },
+    ) => Promise<unknown>;
     markJobSucceeded: (jobId: string) => Promise<{ count: number } | unknown>;
     markJobFailed: (jobId: string, errorMessage: string) => Promise<{ count: number } | unknown>;
     prisma: any;
@@ -106,6 +115,12 @@ export async function runBoardFullSyncJob(
       boardName: metadata.boardName,
       windowMinutes: metadata.fullSyncWindowMinutes,
       limit: null,
+    });
+    await deps.updateJobProgress(input.jobId, {
+      processedThreads: importResult.importedThreads,
+      processedReplies: importResult.importedReplies,
+      skippedReplies: importResult.skippedReplies,
+      progressNote: null,
     });
     const succeededResult = await deps.markJobSucceeded(input.jobId);
     if (

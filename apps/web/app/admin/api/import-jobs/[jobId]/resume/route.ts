@@ -8,6 +8,7 @@ import {
   markJobPaused,
   markJobRunning,
   markJobSucceeded,
+  updateJobProgress,
 } from "@/src/server/imports/importJobStore";
 import { scheduleBoardFullSync } from "@/src/server/imports/scheduleBoardFullSync";
 import {
@@ -24,6 +25,8 @@ function scheduleBoardFullSyncResume(jobId: string, boardName: string) {
         markJobPaused: (scheduledJobId, progressNote) =>
           markJobPaused(prisma, scheduledJobId, progressNote),
         markJobRunning: (scheduledJobId) => markJobRunning(prisma, scheduledJobId),
+        updateJobProgress: (scheduledJobId, progress) =>
+          updateJobProgress(prisma, scheduledJobId, progress),
         markJobSucceeded: (scheduledJobId) => markJobSucceeded(prisma, scheduledJobId),
         markJobFailed: (scheduledJobId, errorMessage) =>
           markJobFailed(prisma, scheduledJobId, errorMessage),

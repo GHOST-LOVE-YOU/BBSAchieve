@@ -9,6 +9,7 @@ import {
   markJobPaused,
   markJobRunning,
   markJobSucceeded,
+  updateJobProgress,
 } from "@/src/server/imports/importJobStore";
 import { runBoardFullSyncJob } from "@/src/server/imports/boardFullSyncRunner";
 import { scheduleBoardFullSync } from "@/src/server/imports/scheduleBoardFullSync";
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
         findJobById: (jobId) => findJobById(prisma, jobId),
         markJobPaused: (jobId, progressNote) => markJobPaused(prisma, jobId, progressNote),
         markJobRunning: (jobId) => markJobRunning(prisma, jobId),
+        updateJobProgress: (jobId, progress) => updateJobProgress(prisma, jobId, progress),
         markJobSucceeded: (jobId) => markJobSucceeded(prisma, jobId),
         markJobFailed: (jobId, errorMessage) => markJobFailed(prisma, jobId, errorMessage),
       },

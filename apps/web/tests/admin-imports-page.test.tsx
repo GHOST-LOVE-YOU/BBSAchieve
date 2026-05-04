@@ -47,10 +47,11 @@ describe("admin imports page", () => {
         jobType: "byr_board_full_sync",
         sourceType: "byr_sync_api",
         sourceLabel: "JobInfo",
-        status: "paused",
+        status: "pending",
         cursorThreadKey: null,
         processedThreads: 0,
         processedReplies: 0,
+        progressNote: "waiting for slot",
         skippedReplies: 0,
         errorMessage: null,
         startedAt: null,
@@ -71,6 +72,8 @@ describe("admin imports page", () => {
     );
     expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
     expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "停止" })).toBeTruthy();
+    expect(screen.getByText("waiting for slot")).toBeTruthy();
 
     const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
     expect(boardFullSyncForms.map((form) => form?.getAttribute("action"))).toEqual(
@@ -112,6 +115,7 @@ describe("admin imports page", () => {
         cursorThreadKey: "2026-05-02T10:00:00.000Z|post-2",
         processedThreads: 3,
         processedReplies: 8,
+        progressNote: null,
         skippedReplies: 1,
         errorMessage: null,
         startedAt: new Date("2026-05-02T09:00:00.000Z"),
@@ -135,6 +139,14 @@ describe("admin imports page", () => {
         happenedAt: "2026-05-02T08:50:00.000Z",
         detail: "帖子 3，回复 10",
       },
+      {
+        id: "import-job:job-2",
+        kind: "import_job",
+        title: "IWhisper",
+        status: "paused",
+        happenedAt: "2026-05-02T08:40:00.000Z",
+        detail: "skipped by global throttle",
+      },
     ]);
 
     render(await AdminImportsPage());
@@ -148,8 +160,10 @@ describe("admin imports page", () => {
     }
     expect(screen.getByText("最近导入活动")).toBeTruthy();
     expect(screen.getByText("JobInfo · 任务")).toBeTruthy();
+    expect(screen.getByText("IWhisper · 任务")).toBeTruthy();
     expect(screen.getByText("IWhisper updates")).toBeTruthy();
     expect(screen.getAllByText("状态：completed")).toHaveLength(2);
+    expect(screen.getByText("skipped by global throttle")).toBeTruthy();
     expect(screen.getByText("帖子：3")).toBeTruthy();
     expect(screen.getByText("回复：10")).toBeTruthy();
     expect(screen.getByText("Sync API request failed: 401")).toBeTruthy();

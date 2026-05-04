@@ -37,6 +37,7 @@ describe("listRecentImportActivity", () => {
         finishedAt: null,
         processedThreads: 4,
         processedReplies: 12,
+        progressNote: null,
         errorMessage: null,
       },
     ]);
@@ -73,6 +74,7 @@ describe("listRecentImportActivity", () => {
         finishedAt: true,
         processedThreads: true,
         processedReplies: true,
+        progressNote: true,
         errorMessage: true,
       },
     });
@@ -110,6 +112,7 @@ describe("listRecentImportActivity", () => {
             finishedAt: null,
             processedThreads: 0,
             processedReplies: 0,
+            progressNote: "skipped by global throttle",
             errorMessage: null,
           },
         ]),
@@ -121,7 +124,7 @@ describe("listRecentImportActivity", () => {
       kind: "import_job",
       title: "JobInfo",
       status: "paused",
-      detail: "帖子 0，回复 0",
+      detail: "skipped by global throttle",
     });
   });
 });

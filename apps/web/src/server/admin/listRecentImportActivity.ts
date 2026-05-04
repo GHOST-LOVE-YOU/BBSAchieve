@@ -62,6 +62,7 @@ export async function listRecentImportActivity(
         finishedAt: true,
         processedThreads: true,
         processedReplies: true,
+        progressNote: true,
         errorMessage: true,
       },
     }),
@@ -85,6 +86,7 @@ export async function listRecentImportActivity(
       status: job.status,
       happenedAt: toIsoString(job.finishedAt ?? job.startedAt ?? job.createdAt),
       detail:
+        job.progressNote ??
         job.errorMessage ??
         `帖子 ${job.processedThreads}，回复 ${job.processedReplies}`,
     })),

@@ -108,7 +108,7 @@ export default async function AdminImportsPage() {
                   <th className="px-4 py-3 font-medium">当前游标</th>
                   <th className="px-4 py-3 font-medium">已处理帖子</th>
                   <th className="px-4 py-3 font-medium">已处理回复</th>
-                  <th className="px-4 py-3 font-medium">错误摘要</th>
+                  <th className="px-4 py-3 font-medium">说明</th>
                   <th className="px-4 py-3 font-medium">操作</th>
                 </tr>
               </thead>
@@ -121,7 +121,7 @@ export default async function AdminImportsPage() {
                     <td className="px-4 py-3">{job.processedThreads}</td>
                     <td className="px-4 py-3">{job.processedReplies}</td>
                     <td className="px-4 py-3 text-red-600">
-                      {job.errorMessage ?? "—"}
+                      {job.progressNote ?? job.errorMessage ?? "—"}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2">
@@ -135,7 +135,7 @@ export default async function AdminImportsPage() {
                             </button>
                           </form>
                         ) : null}
-                        {(job.status === "running" || job.status === "paused" || job.status === "failed") ? (
+                        {(job.status === "pending" || job.status === "running" || job.status === "paused" || job.status === "failed") ? (
                           <form action={`/admin/api/import-jobs/${job.id}/stop`} method="post">
                             <button
                               className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs"
