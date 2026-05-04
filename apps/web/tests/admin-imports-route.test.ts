@@ -887,4 +887,48 @@ describe("admin byr sync route", () => {
       skippedReplies: 0,
     });
   });
+
+  it("passes an explicit unbounded limit through the shared sync import path", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "JobInfo",
+      window_minutes: 60 * 24 * 365 * 10,
+      scanned_pages: 3,
+      cutoff_at: "2026-05-03T21:40:00",
+      threads: [],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "JobInfo",
+      boards: [
+        {
+          slug: "jobinfo",
+          name: "JobInfo",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-job-2",
+      importedThreads: 0,
+      importedReplies: 0,
+      skippedReplies: 0,
+    });
+
+    await runByrSyncImport({
+      prisma: routeMocks.prisma as never,
+      boardName: "JobInfo",
+      windowMinutes: 60 * 24 * 365 * 10,
+      limit: null,
+    });
+
+    expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledWith({
+      boardName: "JobInfo",
+      windowMinutes: 60 * 24 * 365 * 10,
+      limit: null,
+    });
+  });
 });

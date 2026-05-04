@@ -37,7 +37,7 @@ describe("createBoardFullSyncJob", () => {
 });
 
 describe("markJobPaused", () => {
-  it("writes paused status, finished time, and progress note only when not cancelled", async () => {
+  it("writes paused status, finished time, and progress note only when the job is still pausable", async () => {
     const updateMany = vi.fn(async () => ({ count: 1 }));
     const now = new Date("2026-05-04T07:00:00.000Z");
 
@@ -57,7 +57,7 @@ describe("markJobPaused", () => {
         where: {
           id: "job-1",
           status: {
-            not: "cancelled",
+            in: ["pending", "running"],
           },
         },
         data: expect.objectContaining({
