@@ -1,9 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { listScheduledTasks } from "@/src/server/admin/listScheduledTasks";
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 import { scheduledTasks } from "@/src/server/scheduler/taskRegistry";
 
 describe("listScheduledTasks", () => {
+  it("only includes boards explicitly enabled for scheduled sync", () => {
+    expect(scheduledTasks.map((task) => task.boardName)).toEqual(
+      boardCatalog
+        .filter((board) => board.scheduledSyncEnabled)
+        .map((board) => board.boardName),
+    );
+  });
+
   it("queries latest runs for all code-defined tasks", async () => {
     const findMany = vi.fn().mockResolvedValue([]);
 
