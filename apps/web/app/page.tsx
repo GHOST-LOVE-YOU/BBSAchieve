@@ -1,25 +1,10 @@
 import Link from "next/link";
-
-import { getBoardSummaries } from "@bbs/state";
-import { createPrismaReadingFlowDeps } from "@bbs/state/runtime";
-
-import { createReadingRepository } from "@/src/server/reading/readingRepository";
+import { createPublicReadingService } from "@/src/server/reading/publicReadingService";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const result = await getBoardSummaries(
-    createPrismaReadingFlowDeps(createReadingRepository()),
-  );
-
-  if (result.status !== "success") {
-    return (
-      <main className="min-h-screen p-8">
-        <h1 className="text-3xl font-semibold">论坛首页</h1>
-        <p className="mt-4 text-base text-zinc-700">读取版面失败。</p>
-      </main>
-    );
-  }
+  const result = await createPublicReadingService().listBoards();
 
   return (
     <main className="min-h-screen p-8">
