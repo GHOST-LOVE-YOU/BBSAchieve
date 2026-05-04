@@ -222,7 +222,6 @@ describe("web public routes", () => {
     await expect(
       BoardPage({
         params: Promise.resolve({ boardId: "missing-board" }),
-        searchParams: Promise.resolve({}),
       }),
     ).rejects.toThrow(nextNavigation.error);
 

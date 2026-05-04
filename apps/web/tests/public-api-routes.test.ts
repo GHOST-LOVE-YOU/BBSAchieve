@@ -37,9 +37,7 @@ describe("public api routes", () => {
       ],
     });
 
-    const response = await getBoards(
-      new Request("http://localhost/api/public/boards"),
-    );
+    const response = await getBoards();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -59,9 +57,7 @@ describe("public api routes", () => {
   it("returns 500 when board list loading fails unexpectedly", async () => {
     publicReadingServiceMock.listBoards.mockRejectedValueOnce(new Error("boom"));
 
-    const response = await getBoards(
-      new Request("http://localhost/api/public/boards"),
-    );
+    const response = await getBoards();
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "boom" });

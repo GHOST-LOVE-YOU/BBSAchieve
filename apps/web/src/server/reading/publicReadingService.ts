@@ -171,11 +171,12 @@ export function createPublicReadingService(
       }
 
       const limit = normalizeLimit(input.limit);
-      const hasReplyCursor = input.cursor != null;
-      if (hasReplyCursor && !/^\d+$/.test(input.cursor)) {
+      const replyCursorInput = input.cursor;
+      const hasReplyCursor = replyCursorInput != null;
+      if (hasReplyCursor && !/^\d+$/.test(replyCursorInput)) {
         throw new Error("Invalid reply cursor");
       }
-      const replyCursor = hasReplyCursor ? Number(input.cursor) : undefined;
+      const replyCursor = hasReplyCursor ? Number(replyCursorInput) : undefined;
 
       const rows = await repository.listRepliesPageByThread({
         threadId: thread.id,
