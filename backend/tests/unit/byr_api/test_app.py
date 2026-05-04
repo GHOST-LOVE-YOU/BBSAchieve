@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from byr_api.auth import _load_sync_token
+from byr_api import app as app_module
 from byr_api.app import create_app
 from byr_sync import InMemorySyncCache
 from byr_sync.models import BackfillResult, SyncPost, SyncThread
@@ -127,6 +128,26 @@ class RaisingSyncService:
         max_backfill_window: int,
     ) -> BackfillResult:
         raise ValueError("Requested rewind exceeds max backfill window")
+
+
+def test_build_sync_service_injects_real_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured_kwargs: dict[str, object] = {}
+
+    class FakeSyncServiceCtor:
+        def __init__(self, **kwargs: object) -> None:
+            captured_kwargs.update(kwargs)
+
+    monkeypatch.setenv("BYR_SYNC_REQUEST_INTERVAL_MS", "250")
+    monkeypatch.setattr(app_module, "ByrAuthClient", lambda: object())
+    monkeypatch.setattr(app_module, "BoardService", lambda auth_client: object())
+    monkeypatch.setattr(app_module, "ThreadService", lambda auth_client: object())
+    monkeypatch.setattr(app_module.RedisSyncCache, "from_env", classmethod(lambda cls: object()))
+    monkeypatch.setattr(app_module, "SyncService", FakeSyncServiceCtor)
+
+    app_module.build_sync_service()
+
+    assert captured_kwargs["request_interval_seconds"] == 0.25
+    assert captured_kwargs["sleep"] is app_module.time.sleep
 
 
 def test_healthcheck_requires_no_token() -> None:

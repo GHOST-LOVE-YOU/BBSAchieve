@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 
@@ -28,6 +29,7 @@ def build_sync_service() -> SyncService:
         board_service=board_service,
         thread_service=thread_service,
         cache=cache,
+        sleep=time.sleep,
         request_interval_seconds=max(interval_ms, 0) / 1000,
     )
 
