@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const routeMocks = vi.hoisted(() => ({
+const publicReadingServiceMock = vi.hoisted(() => ({
   listBoards: vi.fn(),
   getBoard: vi.fn(),
   getBoardThreadsFeed: vi.fn(),
@@ -9,7 +9,7 @@ const routeMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/src/server/reading/publicReadingService", () => ({
-  createPublicReadingService: () => routeMocks,
+  createPublicReadingService: () => publicReadingServiceMock,
 }));
 
 import { GET as getBoards } from "../app/api/public/boards/route";
@@ -24,7 +24,7 @@ describe("public api routes", () => {
   });
 
   it("returns boards as anonymous json", async () => {
-    routeMocks.listBoards.mockResolvedValue({
+    publicReadingServiceMock.listBoards.mockResolvedValue({
       boards: [
         {
           id: "board:job",
@@ -57,7 +57,7 @@ describe("public api routes", () => {
   });
 
   it("returns 404 when board detail is missing", async () => {
-    routeMocks.getBoard.mockResolvedValue(null);
+    publicReadingServiceMock.getBoard.mockResolvedValue(null);
 
     const response = await getBoard(
       new Request("http://localhost/api/public/boards/missing"),
@@ -73,7 +73,9 @@ describe("public api routes", () => {
   });
 
   it("returns 400 when thread feed limit is invalid", async () => {
-    routeMocks.getBoardThreadsFeed.mockRejectedValue(new Error("Invalid limit"));
+    publicReadingServiceMock.getBoardThreadsFeed.mockRejectedValueOnce(
+      new Error("Invalid limit"),
+    );
 
     const response = await getBoardThreadsFeed(
       new Request("http://localhost/api/public/boards/job/threads?limit=21"),
@@ -85,7 +87,7 @@ describe("public api routes", () => {
   });
 
   it("returns thread detail json", async () => {
-    routeMocks.getThread.mockResolvedValue({
+    publicReadingServiceMock.getThread.mockResolvedValue({
       board: {
         id: "board:job",
         slug: "job",
@@ -107,10 +109,25 @@ describe("public api routes", () => {
     );
 
     expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      board: {
+        id: "board:job",
+        slug: "job",
+        name: "Jobs and Offers",
+      },
+      thread: {
+        id: "thread:first-offer",
+        title: "First offer from the mirror",
+        body: "A new listing has been mirrored and is ready to read.",
+        authorName: "Robot 1",
+        publishedAt: "2026-05-01T08:00:00.000Z",
+        replyCount: 2,
+      },
+    });
   });
 
   it("returns 404 when thread replies feed is missing", async () => {
-    routeMocks.getThreadRepliesFeed.mockResolvedValue(null);
+    publicReadingServiceMock.getThreadRepliesFeed.mockResolvedValue(null);
 
     const response = await getThreadRepliesFeed(
       new Request("http://localhost/api/public/threads/missing/replies?limit=20"),
