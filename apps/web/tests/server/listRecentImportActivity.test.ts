@@ -29,14 +29,15 @@ describe("listRecentImportActivity", () => {
     const importJobFindMany = vi.fn(async () => [
       {
         id: "job-1",
-        jobType: "legacy_iwhisper_migration",
-        sourceLabel: "旧库 iwhisper",
+        jobType: "byr_board_full_sync",
+        sourceLabel: "JobInfo",
         status: "running",
         createdAt: new Date("2026-05-02T09:30:00.000Z"),
         startedAt: new Date("2026-05-02T09:35:00.000Z"),
         finishedAt: null,
         processedThreads: 4,
         processedReplies: 12,
+        progressNote: null,
         errorMessage: null,
       },
     ]);
@@ -73,6 +74,7 @@ describe("listRecentImportActivity", () => {
         finishedAt: true,
         processedThreads: true,
         processedReplies: true,
+        progressNote: true,
         errorMessage: true,
       },
     });
@@ -83,7 +85,7 @@ describe("listRecentImportActivity", () => {
     ]);
     expect(result[0]).toMatchObject({
       kind: "import_job",
-      title: "旧库 iwhisper",
+      title: "JobInfo",
       status: "running",
       happenedAt: "2026-05-02T09:35:00.000Z",
     });
@@ -92,6 +94,66 @@ describe("listRecentImportActivity", () => {
       title: "北邮人同步",
       status: "completed",
       happenedAt: "2026-05-02T09:10:00.000Z",
+    });
+  });
+
+  it("renders board full-sync jobs with board names as titles", async () => {
+    const result = await listRecentImportActivity({
+      import: { findMany: vi.fn(async () => []) } as any,
+      importJob: {
+        findMany: vi.fn(async () => [
+          {
+            id: "job-1",
+            jobType: "byr_board_full_sync",
+            sourceLabel: "JobInfo",
+            status: "paused",
+            createdAt: new Date("2026-05-04T10:00:00.000Z"),
+            startedAt: null,
+            finishedAt: null,
+            processedThreads: 0,
+            processedReplies: 0,
+            progressNote: "skipped by global throttle",
+            errorMessage: null,
+          },
+        ]),
+      } as any,
+    });
+
+    expect(result[0]).toMatchObject({
+      id: "import-job:job-1",
+      kind: "import_job",
+      title: "JobInfo",
+      status: "paused",
+      detail: "skipped by global throttle",
+    });
+  });
+
+  it("prefers progress notes over zeroed counters for pending jobs", async () => {
+    const result = await listRecentImportActivity({
+      import: { findMany: vi.fn(async () => []) } as any,
+      importJob: {
+        findMany: vi.fn(async () => [
+          {
+            id: "job-2",
+            jobType: "byr_board_full_sync",
+            sourceLabel: "IWhisper",
+            status: "pending",
+            createdAt: new Date("2026-05-04T11:00:00.000Z"),
+            startedAt: null,
+            finishedAt: null,
+            processedThreads: 0,
+            processedReplies: 0,
+            progressNote: "skipped by global throttle",
+            errorMessage: null,
+          },
+        ]),
+      } as any,
+    });
+
+    expect(result[0]).toMatchObject({
+      id: "import-job:job-2",
+      status: "pending",
+      detail: "skipped by global throttle",
     });
   });
 });

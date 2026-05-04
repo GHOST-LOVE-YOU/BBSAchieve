@@ -35,7 +35,7 @@ docker build -f Dockerfile.web -t bbs-web:local .
 
 ## Docker 运行
 
-运行前请准备好运行时依赖的环境变量，例如 `BYR_SYNC_API_BASE_URL`、`BYR_SYNC_API_TOKEN`、`LEGACY_DATABASE_URL`、`DATABASE_URL`、`WEB_SCHEDULER_ENABLED`、`WEB_SCHEDULER_RUN_ON_BOOT`。
+运行前请准备好运行时依赖的环境变量，例如 `BYR_SYNC_API_BASE_URL`、`BYR_SYNC_API_TOKEN`、`DATABASE_URL`、`WEB_SCHEDULER_ENABLED`、`WEB_SCHEDULER_RUN_ON_BOOT`。
 
 其中：
 
@@ -46,7 +46,6 @@ docker build -f Dockerfile.web -t bbs-web:local .
 docker run --rm -p 3000:3000 \
   -e BYR_SYNC_API_BASE_URL=__ASK_USER_BEFORE_RUNNING__ \
   -e BYR_SYNC_API_TOKEN=__ASK_USER_BEFORE_RUNNING__ \
-  -e LEGACY_DATABASE_URL=__ASK_USER_BEFORE_RUNNING__ \
   -e DATABASE_URL=__ASK_USER_BEFORE_RUNNING__ \
   -e WEB_SCHEDULER_ENABLED=true \
   -e WEB_SCHEDULER_RUN_ON_BOOT=false \
@@ -59,4 +58,4 @@ docker run --rm -p 3000:3000 \
 
 ## 管理入口
 
-管理员可以通过 `/admin/scheduled-tasks` 页面查看当前硬编码定时任务、最近执行状态，并手动触发“立即执行一次”。该页面也可以从 `/admin` 总览入口进入。
+管理员可以通过 `/admin/imports` 发起硬编码板块的首次全量抓取，通过 `/admin/scheduled-tasks` 查看每个板块的定时同步状态。旧库 `iwhisper` 导入入口已经移除。

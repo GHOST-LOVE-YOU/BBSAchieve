@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/src/server/db/client";
-import { findJobById, markJobPaused } from "@/src/server/imports/importJobStore";
+import {
+  findJobById,
+  markJobCancelled,
+} from "@/src/server/imports/importJobStore";
 
 export async function POST(
   _request: Request,
@@ -15,16 +18,33 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "Job not found" }, { status: 404 });
     }
 
-    if (job.status !== "running" && job.status !== "paused" && job.status !== "failed") {
+    if (!["pending", "running", "paused", "failed"].includes(job.status)) {
       return NextResponse.json(
         { ok: false, error: `Job is not stoppable from ${job.status}` },
         { status: 409 },
       );
     }
 
-    await markJobPaused(prisma, jobId);
+    if (job.jobType !== "byr_board_full_sync") {
+      return NextResponse.json(
+        { ok: false, error: "Only board full sync jobs can be stopped" },
+        { status: 409 },
+      );
+    }
 
-    return NextResponse.json({ ok: true, jobId, status: "paused" });
+    const cancelResult = await markJobCancelled(prisma, jobId);
+    if (
+      cancelResult &&
+      typeof cancelResult === "object" &&
+      "count" in cancelResult &&
+      cancelResult.count === 0
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Job is no longer stoppable" },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ ok: true, jobId, status: "cancelled" });
   } catch (error) {
     return NextResponse.json(
       {

@@ -1,8 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { listScheduledTasks } from "@/src/server/admin/listScheduledTasks";
+import { scheduledTasks } from "@/src/server/scheduler/taskRegistry";
 
 describe("listScheduledTasks", () => {
+  it("queries latest runs for all code-defined tasks", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+
+    await listScheduledTasks({
+      scheduledTaskRun: { findMany },
+    } as never);
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        taskKey: {
+          in: scheduledTasks.map((task) => task.taskKey),
+        },
+      },
+      orderBy: { startedAt: "desc" },
+    });
+  });
+
   it("returns all code-defined tasks with their latest run", async () => {
     const findMany = vi.fn().mockResolvedValue([
       {
@@ -26,22 +44,36 @@ describe("listScheduledTasks", () => {
     expect(findMany).toHaveBeenCalledWith({
       where: {
         taskKey: {
-          in: ["iwhisper_recent_sync"],
+          in: scheduledTasks.map((task) => task.taskKey),
         },
       },
       orderBy: { startedAt: "desc" },
     });
-    expect(result[0]).toMatchObject({
-      taskKey: "iwhisper_recent_sync",
-      title: "IWhisper 最近内容同步",
-      intervalMinutes: 20,
-      windowMinutes: 30,
-      latestRun: {
-        status: "succeeded",
-        importedThreads: 2,
-        importedReplies: 3,
-      },
-    });
+    expect(result.map((task) => task.taskKey)).toEqual(
+      scheduledTasks.map((task) => task.taskKey),
+    );
+    expect(result).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          taskKey: "iwhisper_recent_sync",
+          title: "IWhisper 最近内容同步",
+          intervalMinutes: 20,
+          windowMinutes: 30,
+          latestRun: expect.objectContaining({
+            status: "succeeded",
+            importedThreads: 2,
+            importedReplies: 3,
+          }),
+        }),
+        expect.objectContaining({
+          taskKey: "job-info_recent_sync",
+          title: "JobInfo 最近内容同步",
+          intervalMinutes: 120,
+          windowMinutes: 180,
+          latestRun: null,
+        }),
+      ]),
+    );
   });
 
   it("returns the latest run for a task even when older global runs crowd out a top-20 slice", async () => {
@@ -76,7 +108,7 @@ describe("listScheduledTasks", () => {
     expect(findMany).toHaveBeenCalledWith({
       where: {
         taskKey: {
-          in: ["iwhisper_recent_sync"],
+          in: scheduledTasks.map((task) => task.taskKey),
         },
       },
       orderBy: { startedAt: "desc" },

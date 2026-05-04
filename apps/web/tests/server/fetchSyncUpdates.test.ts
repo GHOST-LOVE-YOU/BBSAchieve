@@ -99,4 +99,66 @@ describe("fetchSyncUpdates", () => {
       threads: [],
     });
   });
+
+  it("includes the limit query param when explicitly provided", async () => {
+    vi.stubEnv("BYR_SYNC_API_BASE_URL", "https://sync.example.test");
+    vi.stubEnv("BYR_SYNC_API_TOKEN", "secret-token");
+
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        board_name: "JobInfo",
+        window_minutes: 999999,
+        scanned_pages: 3,
+        cutoff_at: "2026-05-03T21:40:00",
+        threads: [],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSyncUpdates({
+      boardName: "JobInfo",
+      windowMinutes: 999999,
+      limit: 200,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://sync.example.test/api/sync/updates?board_name=JobInfo&window_minutes=999999&limit=200",
+      {
+        cache: "no-store",
+        method: "GET",
+        headers: { "X-Sync-Token": "secret-token" },
+      },
+    );
+  });
+
+  it("omits the limit query param when explicitly requesting unbounded sync", async () => {
+    vi.stubEnv("BYR_SYNC_API_BASE_URL", "https://sync.example.test");
+    vi.stubEnv("BYR_SYNC_API_TOKEN", "secret-token");
+
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        board_name: "JobInfo",
+        window_minutes: 999999,
+        scanned_pages: 3,
+        cutoff_at: "2026-05-03T21:40:00",
+        threads: [],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSyncUpdates({
+      boardName: "JobInfo",
+      windowMinutes: 999999,
+      limit: null,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://sync.example.test/api/sync/updates?board_name=JobInfo&window_minutes=999999",
+      {
+        cache: "no-store",
+        method: "GET",
+        headers: { "X-Sync-Token": "secret-token" },
+      },
+    );
+  });
 });

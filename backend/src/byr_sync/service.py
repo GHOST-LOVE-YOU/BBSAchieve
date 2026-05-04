@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import re
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
@@ -89,16 +90,25 @@ class SyncService:
         board_service: BoardServiceLike,
         thread_service: ThreadServiceLike | None,
         cache: ThreadProgressCacheLike,
+        *,
+        sleep: Callable[[float], None] | None = None,
+        request_interval_seconds: float = 0.0,
     ) -> None:
         self.board_service = board_service
         self.thread_service = thread_service
         self.cache = cache
+        self.sleep = sleep or (lambda _seconds: None)
+        self.request_interval_seconds = request_interval_seconds
+
+    def _sleep_between_requests(self) -> None:
+        if self.request_interval_seconds > 0:
+            self.sleep(self.request_interval_seconds)
 
     def list_updates(
         self,
         *,
         board_name: str,
-        limit: int,
+        limit: int | None,
         window_minutes: int | None = None,
         now: datetime | None = None,
     ) -> SyncUpdateResult:
@@ -128,6 +138,7 @@ class SyncService:
                 )
             )
             if should_fetch_thread_page:
+                self._sleep_between_requests()
                 page = 1 if cached is None else max(1, ((cached_reply_count + 1) // 10) + 1)
                 thread_page = self.thread_service.fetch_page(
                     board_name=board_name,
@@ -183,6 +194,7 @@ class SyncService:
             raise ValueError("Thread service is required for backfill")
 
         page = max(1, ((start_floor - 1) // 10) + 1)
+        self._sleep_between_requests()
         thread_page = self.thread_service.fetch_page(
             board_name=board_name,
             article_id=article_id,
@@ -219,6 +231,7 @@ class SyncService:
         if self.thread_service is None:
             raise ValueError("Thread service is required for fetching original post")
 
+        self._sleep_between_requests()
         thread_page = self.thread_service.fetch_page(
             board_name=board_name,
             article_id=article_id,
@@ -250,6 +263,7 @@ class SyncService:
         if start_floor < 1:
             raise ValueError("Start floor must be greater than or equal to 1")
 
+        self._sleep_between_requests()
         first_page = self.thread_service.fetch_page(
             board_name=board_name,
             article_id=article_id,
@@ -258,6 +272,7 @@ class SyncService:
         posts = list(first_page.posts)
         total_pages = max(1, getattr(first_page, "total_pages", 1))
         for page in range(2, total_pages + 1):
+            self._sleep_between_requests()
             page_result = self.thread_service.fetch_page(
                 board_name=board_name,
                 article_id=article_id,
@@ -293,12 +308,14 @@ class SyncService:
         self,
         *,
         board_name: str,
-        limit: int,
+        limit: int | None,
         window_minutes: int | None,
         now: datetime,
     ) -> tuple[list[BoardThreadLike], int]:
         if window_minutes is None:
             board_page = self.board_service.fetch_page(board_name=board_name, page=1)
+            if limit is None:
+                return list(board_page.threads), 1
             return board_page.threads[:limit], 1
 
         cutoff = now - timedelta(minutes=window_minutes)
@@ -306,18 +323,19 @@ class SyncService:
         page = 1
         reached_out_of_window = False
 
-        while len(collected) < limit:
+        while limit is None or len(collected) < limit:
             board_page = self.board_service.fetch_page(board_name=board_name, page=page)
             for thread in board_page.threads:
                 observed_time = self._resolve_thread_observed_time(thread, now=now)
                 if observed_time >= cutoff:
                     collected.append(thread)
-                    if len(collected) >= limit:
+                    if limit is not None and len(collected) >= limit:
                         return collected, page
                 else:
                     reached_out_of_window = True
             if reached_out_of_window or not board_page.has_next_page:
                 break
+            self._sleep_between_requests()
             page += 1
 
         return collected, page

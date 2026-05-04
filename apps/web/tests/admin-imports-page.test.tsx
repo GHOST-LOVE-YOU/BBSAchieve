@@ -1,14 +1,11 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   import: {
     findMany: vi.fn(),
   },
   importJob: {
-    findMany: vi.fn(),
-  },
-  recentActivity: {
     findMany: vi.fn(),
   },
 }));
@@ -29,9 +26,97 @@ vi.mock("next/link", () => ({
 
 import AdminImportsPage from "../app/admin/imports/page";
 import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
+import { boardSyncBoards } from "@/src/server/boardSync/boardRegistry";
+
+const fullSyncBoards = boardSyncBoards.filter((board) => board.fullSyncEnabled);
 
 describe("admin imports page", () => {
-  it("renders the sync entry, recent activity, and recent imports", async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("renders board full-sync actions without old import controls", async () => {
+    prismaMock.import.findMany.mockResolvedValue([]);
+    prismaMock.importJob.findMany.mockResolvedValue([
+      {
+        id: "job-1",
+        jobType: "byr_board_full_sync",
+        sourceType: "byr_sync_api",
+        sourceLabel: "JobInfo",
+        status: "pending",
+        cursorThreadKey: null,
+        processedThreads: 0,
+        processedReplies: 0,
+        progressNote: "waiting for slot",
+        skippedReplies: 0,
+        errorMessage: null,
+        startedAt: null,
+        finishedAt: null,
+      },
+    ]);
+    vi.mocked(listRecentImportActivity).mockResolvedValue([]);
+
+    render(await AdminImportsPage());
+
+    const boardFullSyncButtons = screen.getAllByRole("button", {
+      name: /开始抓取 .* 全量内容/u,
+    });
+
+    expect(boardFullSyncButtons).toHaveLength(fullSyncBoards.length);
+    expect(boardFullSyncButtons.map((button) => button.textContent)).toEqual(
+      fullSyncBoards.map((board) => `开始抓取 ${board.boardName} 全量内容`),
+    );
+    expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
+    expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "停止" })).toBeTruthy();
+    expect(screen.getByText("waiting for slot")).toBeTruthy();
+
+    const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
+    expect(boardFullSyncForms.map((form) => form?.getAttribute("action"))).toEqual(
+      fullSyncBoards.map(() => "/admin/api/import-jobs/byr-board-full-sync"),
+    );
+    expect(
+      boardFullSyncForms.map((form) =>
+        form?.querySelector<HTMLInputElement>('input[name="boardName"]')?.value,
+      ),
+    ).toEqual(fullSyncBoards.map((board) => board.boardName));
+  });
+
+  it("renders a stop action for pending board full-sync jobs", async () => {
+    prismaMock.import.findMany.mockResolvedValue([]);
+    prismaMock.importJob.findMany.mockResolvedValue([
+      {
+        id: "job-pending",
+        jobType: "byr_board_full_sync",
+        sourceType: "byr_sync_api",
+        sourceLabel: "IWhisper",
+        status: "pending",
+        cursorThreadKey: null,
+        processedThreads: 0,
+        processedReplies: 0,
+        progressNote: "skipped by global throttle",
+        skippedReplies: 0,
+        errorMessage: null,
+        startedAt: null,
+        finishedAt: null,
+      },
+    ]);
+    vi.mocked(listRecentImportActivity).mockResolvedValue([]);
+
+    render(await AdminImportsPage());
+
+    const stopButton = screen.getByRole("button", { name: "停止" });
+    expect(stopButton.closest("form")?.getAttribute("action")).toBe(
+      "/admin/api/import-jobs/job-pending/stop",
+    );
+    expect(screen.getByText("skipped by global throttle")).toBeTruthy();
+  });
+
+  it("renders the sync entry, recent activity, and import jobs including board full-sync tasks", async () => {
     prismaMock.import.findMany.mockResolvedValue([
       {
         id: "import-1",
@@ -53,30 +138,17 @@ describe("admin imports page", () => {
     prismaMock.importJob.findMany.mockResolvedValue([
       {
         id: "job-1",
-        jobType: "legacy_iwhisper_migration",
-        sourceType: "legacy_postgres",
-        sourceLabel: "legacy iwhisper",
+        jobType: "byr_board_full_sync",
+        sourceType: "byr_sync_api",
+        sourceLabel: "JobInfo",
         status: "running",
         cursorThreadKey: "2026-05-02T10:00:00.000Z|post-2",
         processedThreads: 3,
         processedReplies: 8,
+        progressNote: null,
         skippedReplies: 1,
         errorMessage: null,
         startedAt: new Date("2026-05-02T09:00:00.000Z"),
-        finishedAt: null,
-      },
-      {
-        id: "job-2",
-        jobType: "legacy_iwhisper_migration",
-        sourceType: "legacy_postgres",
-        sourceLabel: "legacy iwhisper",
-        status: "paused",
-        cursorThreadKey: null,
-        processedThreads: 0,
-        processedReplies: 0,
-        skippedReplies: 0,
-        errorMessage: "LEGACY_DATABASE_URL missing",
-        startedAt: new Date("2026-05-01T09:00:00.000Z"),
         finishedAt: null,
       },
     ]);
@@ -84,7 +156,7 @@ describe("admin imports page", () => {
       {
         id: "import-job:job-1",
         kind: "import_job",
-        title: "legacy iwhisper",
+        title: "JobInfo",
         status: "running",
         happenedAt: "2026-05-02T09:00:00.000Z",
         detail: "帖子 3，回复 8",
@@ -97,28 +169,63 @@ describe("admin imports page", () => {
         happenedAt: "2026-05-02T08:50:00.000Z",
         detail: "帖子 3，回复 10",
       },
+      {
+        id: "import-job:job-2",
+        kind: "import_job",
+        title: "IWhisper",
+        status: "paused",
+        happenedAt: "2026-05-02T08:40:00.000Z",
+        detail: "skipped by global throttle",
+      },
     ]);
 
     render(await AdminImportsPage());
 
-    expect(screen.getByText("导入导出")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "导入导出" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "同步北邮人数据" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "从旧库导入 iwhisper" })).toBeTruthy();
+    for (const board of fullSyncBoards) {
+      expect(
+        screen.getByRole("button", { name: `开始抓取 ${board.boardName} 全量内容` }),
+      ).toBeTruthy();
+    }
     expect(screen.getByText("最近导入活动")).toBeTruthy();
-    expect(screen.getByText("legacy iwhisper · 任务")).toBeTruthy();
+    expect(screen.getByText("JobInfo · 任务")).toBeTruthy();
+    expect(screen.getByText("IWhisper · 任务")).toBeTruthy();
     expect(screen.getByText("IWhisper updates")).toBeTruthy();
     expect(screen.getAllByText("状态：completed")).toHaveLength(2);
+    expect(screen.getByText("skipped by global throttle")).toBeTruthy();
     expect(screen.getByText("帖子：3")).toBeTruthy();
     expect(screen.getByText("回复：10")).toBeTruthy();
     expect(screen.getByText("Sync API request failed: 401")).toBeTruthy();
-    expect(screen.getByText("旧库迁移任务")).toBeTruthy();
-    expect(screen.getAllByText("legacy_iwhisper_migration")).toHaveLength(2);
+    expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
+    expect(screen.getByText("byr_board_full_sync")).toBeTruthy();
+    expect(screen.queryByText(/legacy_/u)).toBeNull();
     expect(screen.getByText("running")).toBeTruthy();
     expect(screen.getByText("2026-05-02T10:00:00.000Z|post-2")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();
     expect(screen.getByText("8")).toBeTruthy();
-    expect(screen.getByText("LEGACY_DATABASE_URL missing")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "继续" })).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "停止" })).toHaveLength(2);
+    expect(screen.queryByText("LEGACY_DATABASE_URL missing")).toBeNull();
+    expect(screen.queryByRole("button", { name: "继续" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "停止" })).toHaveLength(1);
+
+    expect(prismaMock.importJob.findMany).toHaveBeenCalledWith({
+      where: { jobType: "byr_board_full_sync" },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+
+    const boardFullSyncButtons = screen.getAllByRole("button", {
+      name: /开始抓取 .* 全量内容/u,
+    });
+    expect(boardFullSyncButtons).toHaveLength(fullSyncBoards.length);
+    const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
+    expect(boardFullSyncForms.map((form) => form?.getAttribute("action"))).toEqual(
+      fullSyncBoards.map(() => "/admin/api/import-jobs/byr-board-full-sync"),
+    );
+    expect(
+      boardFullSyncForms.map((form) =>
+        form?.querySelector<HTMLInputElement>('input[name="boardName"]')?.value,
+      ),
+    ).toEqual(fullSyncBoards.map((board) => board.boardName));
   });
 });

@@ -1,23 +1,11 @@
-import type { ImportJobStatus, ImportSourceType, PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 
 export type ImportJobStore = Pick<PrismaClient, "importJob">;
 
-export type LegacyImportJob = {
-  id: string;
-  jobType: string;
-  sourceType: ImportSourceType;
-  sourceLabel: string;
-  status: ImportJobStatus;
-  cursorThreadKey: string | null;
-  lastProcessedAt: Date | null;
-  startedAt: Date | null;
-  finishedAt: Date | null;
-  processedThreads: number;
-  processedReplies: number;
-  skippedThreads: number;
-  skippedReplies: number;
-  errorMessage: string | null;
-  progressNote: string | null;
+export type BoardFullSyncJobInput = {
+  boardName: string;
+  fullSyncWindowMinutes: number;
+  requestedBy?: string | null;
 };
 
 export type JobProgressUpdate = {
@@ -30,14 +18,15 @@ export type JobProgressUpdate = {
   lastProcessedAt?: Date | null;
 };
 
-export function createLegacyImportJob(
+export function createBoardFullSyncJob(
   prisma: ImportJobStore,
+  input: BoardFullSyncJobInput,
 ) {
   return prisma.importJob.create({
     data: {
-      jobType: "legacy_iwhisper_migration",
-      sourceType: "legacy_postgres",
-      sourceLabel: "legacy iwhisper",
+      jobType: "byr_board_full_sync",
+      sourceType: "byr_sync_api",
+      sourceLabel: input.boardName,
       status: "pending",
       cursorThreadKey: null,
       lastProcessedAt: null,
@@ -49,6 +38,11 @@ export function createLegacyImportJob(
       skippedReplies: 0,
       errorMessage: null,
       progressNote: null,
+      metadataJson: {
+        boardName: input.boardName,
+        fullSyncWindowMinutes: input.fullSyncWindowMinutes,
+        requestedBy: input.requestedBy ?? null,
+      },
     },
   });
 }
@@ -58,12 +52,18 @@ export function markJobRunning(
   jobId: string,
   cursorThreadKey?: string | null,
 ) {
-  return prisma.importJob.update({
-    where: { id: jobId },
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: { in: ["pending", "paused", "failed"] },
+    },
     data: {
       status: "running",
       startedAt: new Date(),
+      finishedAt: null,
       cursorThreadKey: cursorThreadKey ?? null,
+      errorMessage: null,
+      progressNote: null,
     },
   });
 }
@@ -71,11 +71,29 @@ export function markJobRunning(
 export function markJobPaused(
   prisma: ImportJobStore,
   jobId: string,
+  progressNote?: string | null,
 ) {
-  return prisma.importJob.update({
-    where: { id: jobId },
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: { in: ["pending", "running"] },
+    },
     data: {
       status: "paused",
+      finishedAt: new Date(),
+      progressNote: progressNote ?? null,
+    },
+  });
+}
+
+export function markJobCancelled(prisma: ImportJobStore, jobId: string) {
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: { in: ["pending", "running", "paused", "failed"] },
+    },
+    data: {
+      status: "cancelled",
       finishedAt: new Date(),
     },
   });
@@ -124,12 +142,34 @@ export function findJobById(
 export function markJobSucceeded(
   prisma: ImportJobStore,
   jobId: string,
+  progress?: Pick<
+    JobProgressUpdate,
+    "processedThreads" | "processedReplies" | "skippedThreads" | "skippedReplies" | "progressNote"
+  >,
 ) {
-  return prisma.importJob.update({
-    where: { id: jobId },
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: "running",
+    },
     data: {
       status: "succeeded",
       finishedAt: new Date(),
+      ...(progress?.processedThreads === undefined
+        ? {}
+        : { processedThreads: progress.processedThreads }),
+      ...(progress?.processedReplies === undefined
+        ? {}
+        : { processedReplies: progress.processedReplies }),
+      ...(progress?.skippedThreads === undefined
+        ? {}
+        : { skippedThreads: progress.skippedThreads }),
+      ...(progress?.skippedReplies === undefined
+        ? {}
+        : { skippedReplies: progress.skippedReplies }),
+      ...(progress?.progressNote === undefined
+        ? {}
+        : { progressNote: progress.progressNote }),
     },
   });
 }
@@ -139,8 +179,11 @@ export function markJobFailed(
   jobId: string,
   errorMessage: string,
 ) {
-  return prisma.importJob.update({
-    where: { id: jobId },
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: "running",
+    },
     data: {
       status: "failed",
       finishedAt: new Date(),

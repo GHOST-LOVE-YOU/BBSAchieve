@@ -31,16 +31,22 @@ function parseFloorIndex(floorLabel: string): number | null {
   return match ? Number.parseInt(match[1] ?? "", 10) : null;
 }
 
+function normalizeSourceBoardSlug(boardName: string): string {
+  const trimmed = boardName.trim();
+  return trimmed.length > 0 ? trimmed.toLowerCase() : "iwhisper";
+}
+
 async function enrichThreadsWithSourceData(
   prismaClient: Pick<PrismaClient, "thread">,
   payload: Awaited<ReturnType<typeof fetchSyncUpdates>>,
 ) {
+  const sourceBoardSlug = normalizeSourceBoardSlug(payload.board_name);
   const threads = await Promise.all(
     payload.threads.map(async (thread) => {
       const existingThread = await prismaClient.thread.findUnique({
         where: {
           sourceBoardSlug_sourceThreadId: {
-            sourceBoardSlug: "iwhisper",
+            sourceBoardSlug,
             sourceThreadId: thread.article_id,
           },
         },
@@ -120,10 +126,12 @@ export async function runByrSyncImport(input: {
   prisma: ByrSyncImportPrisma;
   boardName: string;
   windowMinutes: number;
+  limit?: number | null;
 }) {
   const payload = await fetchSyncUpdates({
     boardName: input.boardName,
     windowMinutes: input.windowMinutes,
+    limit: input.limit === undefined ? 20 : input.limit,
   });
   const enrichedPayload = await enrichThreadsWithSourceData(input.prisma, payload);
   const batch = mapSyncPayload(enrichedPayload);

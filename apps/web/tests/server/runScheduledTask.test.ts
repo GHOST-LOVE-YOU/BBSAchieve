@@ -28,7 +28,10 @@ vi.mock("@/src/server/imports/importSyncBatch", () => ({
   importSyncBatch: routeMocks.importSyncBatch,
 }));
 
-import { getScheduledTask } from "@/src/server/scheduler/taskRegistry";
+import {
+  getScheduledTask,
+  scheduledTasks,
+} from "@/src/server/scheduler/taskRegistry";
 import { runScheduledTask } from "@/src/server/scheduler/runScheduledTask";
 
 const emptyBatch = {
@@ -161,6 +164,7 @@ describe("runScheduledTask", () => {
     expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledWith({
       boardName: "IWhisper",
       windowMinutes: 30,
+      limit: 20,
     });
     expect(result.status).toBe("succeeded");
     expect(result.importedThreads).toBe(2);
@@ -206,7 +210,51 @@ describe("runScheduledTask", () => {
     await firstRun;
 
     expect(secondRun.status).toBe("skipped");
-    expect(secondRun.skippedReason).toBe("previous run still active");
+    expect(secondRun.skippedReason).toBe("global throttle active");
+  });
+
+  it("skips a different scheduled task when global throttle is already held", async () => {
+    const [firstTask, secondTask] = scheduledTasks.slice(0, 2);
+    const prisma = createSchedulerPrismaMock();
+
+    routeMocks.fetchSyncUpdates.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              board_name: firstTask!.boardName,
+              window_minutes: firstTask!.windowMinutes,
+              scanned_pages: 1,
+              cutoff_at: "2026-05-04T00:00:00",
+              threads: [],
+            });
+          }, 0);
+        }),
+    );
+    routeMocks.mapSyncPayload.mockReturnValue(emptyBatch);
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-1",
+      importedThreads: 0,
+      importedReplies: 0,
+      skippedReplies: 0,
+    });
+
+    const firstRun = runScheduledTask({
+      prisma: prisma as never,
+      task: firstTask!,
+      triggerSource: "scheduled",
+    });
+
+    const secondRun = await runScheduledTask({
+      prisma: prisma as never,
+      task: secondTask!,
+      triggerSource: "scheduled",
+    });
+
+    await firstRun;
+
+    expect(secondRun.status).toBe("skipped");
+    expect(secondRun.skippedReason).toBe("global throttle active");
   });
 
   it("releases the running guard when creating the run record fails", async () => {

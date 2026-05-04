@@ -1,6 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { runByrSyncImport } from "@/app/admin/api/imports/byr-sync/route";
+import {
+  releaseGlobalSyncThrottle,
+  tryAcquireGlobalSyncThrottle,
+} from "@/src/server/syncThrottle/globalSyncThrottle";
 
 import {
   createScheduledTaskRun,
@@ -13,14 +17,18 @@ type RunScheduledTaskPrisma = Pick<PrismaClient, "thread"> &
   Pick<PrismaClient, "import" | "board" | "user" | "botProfile" | "reply"> &
   ScheduledTaskRunStore;
 
-const runningTaskKeys = new Set<string>();
-
 export async function runScheduledTask(input: {
   prisma: RunScheduledTaskPrisma;
   task: ScheduledTaskDefinition;
   triggerSource: "scheduled" | "manual";
 }) {
-  if (runningTaskKeys.has(input.task.taskKey)) {
+  const ownerKey = `${input.triggerSource}:${input.task.taskKey}`;
+  const throttle = tryAcquireGlobalSyncThrottle({
+    ownerKey,
+    triggerSource: input.triggerSource,
+  });
+
+  if (!throttle.acquired) {
     const skippedRun = await createScheduledTaskRun(input.prisma, {
       taskKey: input.task.taskKey,
       taskTitle: input.task.title,
@@ -32,11 +40,9 @@ export async function runScheduledTask(input: {
 
     return finishScheduledTaskRun(input.prisma, skippedRun.id, {
       status: "skipped",
-      skippedReason: "previous run still active",
+      skippedReason: "global throttle active",
     });
   }
-
-  runningTaskKeys.add(input.task.taskKey);
   let run:
     | Awaited<ReturnType<typeof createScheduledTaskRun>>
     | null = null;
@@ -85,6 +91,6 @@ export async function runScheduledTask(input: {
 
     return failedRun;
   } finally {
-    runningTaskKeys.delete(input.task.taskKey);
+    releaseGlobalSyncThrottle(ownerKey);
   }
 }

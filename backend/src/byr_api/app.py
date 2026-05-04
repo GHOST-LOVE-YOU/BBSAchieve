@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import time
+
 from fastapi import Depends, FastAPI, HTTPException, Query
 
 from .auth import require_sync_token
@@ -21,10 +24,13 @@ def build_sync_service() -> SyncService:
     board_service = BoardService(auth_client=auth_client)
     thread_service = ThreadService(auth_client=auth_client)
     cache = RedisSyncCache.from_env()
+    interval_ms = int(os.getenv("BYR_SYNC_REQUEST_INTERVAL_MS", "500"))
     return SyncService(
         board_service=board_service,
         thread_service=thread_service,
         cache=cache,
+        sleep=time.sleep,
+        request_interval_seconds=max(interval_ms, 0) / 1000,
     )
 
 
@@ -40,11 +46,12 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
     def sync_updates(
         board_name: str = Query(default="IWhisper"),
         window_minutes: int = Query(default=30, ge=1),
+        limit: int | None = Query(default=None, ge=1),
         _: str = Depends(require_sync_token),
     ) -> SyncUpdatesResponse:
         result = app.state.sync_service.list_updates(
             board_name=board_name,
-            limit=20,
+            limit=limit,
             window_minutes=window_minutes,
         )
         return SyncUpdatesResponse(

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/src/server/db/client";
+import { runBoardFullSyncJob } from "@/src/server/imports/boardFullSyncRunner";
 import {
   findJobById,
   markJobFailed,
@@ -9,41 +10,48 @@ import {
   markJobSucceeded,
   updateJobProgress,
 } from "@/src/server/imports/importJobStore";
-import { fetchLegacyIwhisperBatch } from "@/src/server/imports/fetchLegacyIwhisperBatch";
-import { runLegacyMigrationJob } from "@/src/server/imports/legacyMigrationRunner";
-import { importSyncBatch } from "@/src/server/imports/importSyncBatch";
-import { mapLegacyRows } from "@/src/server/imports/mapLegacyRows";
+import { scheduleBoardFullSync } from "@/src/server/imports/scheduleBoardFullSync";
+import {
+  releaseGlobalSyncThrottle,
+  tryAcquireGlobalSyncThrottle,
+} from "@/src/server/syncThrottle/globalSyncThrottle";
 
-function scheduleLegacyMigration(jobId: string) {
-  setTimeout(() => {
-    try {
-      void Promise.resolve(
-        runLegacyMigrationJob(
-          {
-            findJobById: (scheduledJobId) => findJobById(prisma, scheduledJobId),
-            markJobRunning: (scheduledJobId, cursorThreadKey) =>
-              markJobRunning(prisma, scheduledJobId, cursorThreadKey),
-            markJobPaused: (scheduledJobId) => markJobPaused(prisma, scheduledJobId),
-            updateJobProgress: (scheduledJobId, progress) =>
-              updateJobProgress(prisma, scheduledJobId, progress),
-            markJobFailed: (scheduledJobId, errorMessage) =>
-              markJobFailed(prisma, scheduledJobId, errorMessage),
-            markJobSucceeded: (scheduledJobId) =>
-              markJobSucceeded(prisma, scheduledJobId),
-            fetchBatch: (options) => fetchLegacyIwhisperBatch(options),
-            importBatch: (batch) => importSyncBatch(prisma, batch),
-            mapRows: mapLegacyRows,
-            batchSize: 50,
-          },
-          jobId,
-        ),
-      ).catch(() => {
-        // Background runner failures are persisted through job state.
-      });
-    } catch {
-      // Background runner setup failures are surfaced only through tests/logs.
-    }
-  }, 0);
+function scheduleBoardFullSyncResume(jobId: string, boardName: string) {
+  scheduleBoardFullSync(async () =>
+    runBoardFullSyncJob(
+      {
+        prisma,
+        findJobById: (scheduledJobId) => findJobById(prisma, scheduledJobId),
+        markJobPaused: (scheduledJobId, progressNote) =>
+          markJobPaused(prisma, scheduledJobId, progressNote),
+        markJobRunning: (scheduledJobId) => markJobRunning(prisma, scheduledJobId),
+        updateJobProgress: (scheduledJobId, progress) =>
+          updateJobProgress(prisma, scheduledJobId, progress),
+        markJobSucceeded: (scheduledJobId) => markJobSucceeded(prisma, scheduledJobId),
+        markJobFailed: (scheduledJobId, errorMessage) =>
+          markJobFailed(prisma, scheduledJobId, errorMessage),
+      },
+      {
+        jobId,
+        ownerKey: `manual:${boardName}`,
+        alreadyMarkedRunning: true,
+        acquireThrottle: () =>
+          tryAcquireGlobalSyncThrottle({
+            ownerKey: `manual:${boardName}`,
+            triggerSource: "manual",
+          }),
+        releaseThrottle: releaseGlobalSyncThrottle,
+      },
+    ),
+  );
+}
+
+function readBoardNameFromJob(job: { metadataJson?: unknown }) {
+  const metadata =
+    job.metadataJson && typeof job.metadataJson === "object"
+      ? (job.metadataJson as Record<string, unknown>)
+      : null;
+  return typeof metadata?.boardName === "string" ? metadata.boardName : null;
 }
 
 export async function POST(
@@ -65,8 +73,35 @@ export async function POST(
       );
     }
 
-    await markJobRunning(prisma, jobId, job.cursorThreadKey);
-    scheduleLegacyMigration(jobId);
+    if (job.jobType !== "byr_board_full_sync") {
+      return NextResponse.json(
+        { ok: false, error: "Only board full sync jobs can be resumed" },
+        { status: 409 },
+      );
+    }
+
+    const boardName = readBoardNameFromJob(job);
+
+    if (!boardName) {
+      return NextResponse.json(
+        { ok: false, error: "Board full sync job is missing boardName metadata" },
+        { status: 500 },
+      );
+    }
+
+    const runningResult = await markJobRunning(prisma, jobId);
+    if (
+      runningResult &&
+      typeof runningResult === "object" &&
+      "count" in runningResult &&
+      runningResult.count === 0
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Job is no longer resumable" },
+        { status: 409 },
+      );
+    }
+    scheduleBoardFullSyncResume(jobId, boardName);
 
     return NextResponse.json({ ok: true, jobId });
   } catch (error) {
