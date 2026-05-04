@@ -194,6 +194,7 @@ class SyncService:
             raise ValueError("Thread service is required for backfill")
 
         page = max(1, ((start_floor - 1) // 10) + 1)
+        self._sleep_between_requests()
         thread_page = self.thread_service.fetch_page(
             board_name=board_name,
             article_id=article_id,
@@ -230,6 +231,7 @@ class SyncService:
         if self.thread_service is None:
             raise ValueError("Thread service is required for fetching original post")
 
+        self._sleep_between_requests()
         thread_page = self.thread_service.fetch_page(
             board_name=board_name,
             article_id=article_id,
@@ -261,6 +263,7 @@ class SyncService:
         if start_floor < 1:
             raise ValueError("Start floor must be greater than or equal to 1")
 
+        self._sleep_between_requests()
         first_page = self.thread_service.fetch_page(
             board_name=board_name,
             article_id=article_id,
@@ -269,6 +272,7 @@ class SyncService:
         posts = list(first_page.posts)
         total_pages = max(1, getattr(first_page, "total_pages", 1))
         for page in range(2, total_pages + 1):
+            self._sleep_between_requests()
             page_result = self.thread_service.fetch_page(
                 board_name=board_name,
                 article_id=article_id,
