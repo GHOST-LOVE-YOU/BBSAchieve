@@ -118,8 +118,11 @@ describe("admin import job routes", () => {
     });
 
     expect(routeMocks.findJobById).toHaveBeenCalledWith(routeMocks.prisma, "job-board-1");
+    expect(routeMocks.markJobRunning).toHaveBeenCalledWith(routeMocks.prisma, "job-board-1");
     expect(routeMocks.scheduleBoardFullSync).toHaveBeenCalled();
-    expect(routeMocks.markJobRunning).not.toHaveBeenCalled();
+    expect(routeMocks.markJobRunning.mock.invocationCallOrder[0]).toBeLessThan(
+      routeMocks.scheduleBoardFullSync.mock.invocationCallOrder[0],
+    );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,

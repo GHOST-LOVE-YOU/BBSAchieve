@@ -116,6 +116,7 @@ export async function POST(
         );
       }
 
+      await markJobRunning(prisma, jobId);
       scheduleBoardFullSyncResume(jobId, boardName);
       return NextResponse.json({ ok: true, jobId });
     }
