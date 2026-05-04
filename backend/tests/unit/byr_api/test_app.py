@@ -15,13 +15,13 @@ from byr_sync.service import SyncService, SyncUpdateResult
 
 class FakeSyncService:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, int, int | None]] = []
+        self.calls: list[tuple[str, int | None, int | None]] = []
 
     def list_updates(
         self,
         *,
         board_name: str,
-        limit: int,
+        limit: int | None,
         window_minutes: int | None = None,
     ) -> SyncUpdateResult:
         self.calls.append((board_name, limit, window_minutes))
@@ -114,7 +114,7 @@ class RaisingSyncService:
         self,
         *,
         board_name: str,
-        limit: int,
+        limit: int | None,
         window_minutes: int | None = None,
     ) -> SyncUpdateResult:
         raise AssertionError("not used")
@@ -213,7 +213,7 @@ def test_sync_endpoint_passes_board_name_and_window_minutes(
     )
 
     assert response.status_code == 200
-    assert service.calls == [("TestBoard", 20, 15)]
+    assert service.calls == [("TestBoard", None, 15)]
     assert response.json()["board_name"] == "TestBoard"
     assert response.json()["window_minutes"] == 15
 
@@ -232,7 +232,7 @@ def test_sync_endpoint_passes_large_window_minutes(
     )
 
     assert response.status_code == 200
-    assert service.calls == [("JobInfo", 20, 5256000)]
+    assert service.calls == [("JobInfo", None, 5256000)]
 
 
 def test_sync_endpoint_passes_explicit_limit(
@@ -250,6 +250,23 @@ def test_sync_endpoint_passes_explicit_limit(
 
     assert response.status_code == 200
     assert service.calls == [("JobInfo", 200, 5256000)]
+
+
+def test_sync_endpoint_uses_no_limit_when_query_param_is_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    service = FakeSyncService()
+    client = TestClient(create_app(sync_service=service))
+
+    response = client.get(
+        "/api/sync/updates",
+        params={"board_name": "JobInfo", "window_minutes": 5256000},
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert service.calls == [("JobInfo", None, 5256000)]
 
 
 def test_sync_endpoint_returns_window_metadata(monkeypatch: pytest.MonkeyPatch) -> None:

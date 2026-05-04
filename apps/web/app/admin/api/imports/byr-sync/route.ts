@@ -126,12 +126,12 @@ export async function runByrSyncImport(input: {
   prisma: ByrSyncImportPrisma;
   boardName: string;
   windowMinutes: number;
-  limit?: number;
+  limit?: number | null;
 }) {
   const payload = await fetchSyncUpdates({
     boardName: input.boardName,
     windowMinutes: input.windowMinutes,
-    limit: input.limit,
+    limit: input.limit === undefined ? 20 : input.limit,
   });
   const enrichedPayload = await enrichThreadsWithSourceData(input.prisma, payload);
   const batch = mapSyncPayload(enrichedPayload);

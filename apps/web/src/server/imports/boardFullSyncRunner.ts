@@ -5,8 +5,6 @@ type BoardFullSyncMetadata = {
   fullSyncWindowMinutes: number;
 };
 
-const BOARD_FULL_SYNC_LIMIT = 200;
-
 function readBoardFullSyncMetadata(
   metadataJson: unknown,
 ): BoardFullSyncMetadata {
@@ -74,7 +72,18 @@ export async function runBoardFullSyncJob(
 
   const throttle = input.acquireThrottle();
   if (!throttle.acquired) {
-    await deps.markJobPaused(input.jobId, "skipped by global throttle");
+    const pauseResult = await deps.markJobPaused(
+      input.jobId,
+      "skipped by global throttle",
+    );
+    if (
+      pauseResult &&
+      typeof pauseResult === "object" &&
+      "count" in pauseResult &&
+      pauseResult.count === 0
+    ) {
+      return { status: "cancelled" as const };
+    }
     return { status: "paused" as const };
   }
 
@@ -93,7 +102,7 @@ export async function runBoardFullSyncJob(
       prisma: deps.prisma,
       boardName: metadata.boardName,
       windowMinutes: metadata.fullSyncWindowMinutes,
-      limit: BOARD_FULL_SYNC_LIMIT,
+      limit: null,
     });
     const refreshedJob = await deps.findJobById(input.jobId);
     if (refreshedJob?.status === "cancelled") {

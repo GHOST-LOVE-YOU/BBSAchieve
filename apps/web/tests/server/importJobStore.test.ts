@@ -35,8 +35,8 @@ describe("createBoardFullSyncJob", () => {
 });
 
 describe("markJobPaused", () => {
-  it("writes paused status, finished time, and progress note", async () => {
-    const update = vi.fn(async () => ({ id: "job-1" }));
+  it("writes paused status, finished time, and progress note only when not cancelled", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
     const now = new Date("2026-05-04T07:00:00.000Z");
 
     vi.useFakeTimers();
@@ -45,14 +45,19 @@ describe("markJobPaused", () => {
     try {
       await markJobPaused(
         {
-          importJob: { update },
+          importJob: { updateMany },
         } as any,
         "job-1",
         "waiting for next window",
       );
 
-      expect(update).toHaveBeenCalledWith({
-        where: { id: "job-1" },
+      expect(updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "job-1",
+          status: {
+            not: "cancelled",
+          },
+        },
         data: expect.objectContaining({
           status: "paused",
           progressNote: "waiting for next window",

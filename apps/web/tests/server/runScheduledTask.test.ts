@@ -164,6 +164,7 @@ describe("runScheduledTask", () => {
     expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledWith({
       boardName: "IWhisper",
       windowMinutes: 30,
+      limit: 20,
     });
     expect(result.status).toBe("succeeded");
     expect(result.importedThreads).toBe(2);

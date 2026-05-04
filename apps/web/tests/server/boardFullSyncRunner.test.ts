@@ -127,9 +127,37 @@ describe("runBoardFullSyncJob", () => {
       prisma: { thread: {} },
       boardName: "JobInfo",
       windowMinutes: 999999,
-      limit: 200,
+      limit: null,
     });
     expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1");
+  });
+
+  it("returns cancelled when throttle skip cannot pause a cancelled job", async () => {
+    const deps = {
+      ...makeDeps(),
+      markJobPaused: vi.fn(async () => ({ count: 0 })),
+    };
+
+    const result = await runBoardFullSyncJob(
+      deps as never,
+      makeInput({
+        acquireThrottle: () => ({
+          acquired: false,
+          holder: {
+            ownerKey: "scheduled:IWhisper",
+            triggerSource: "scheduled",
+            acquiredAt: new Date("2026-05-04T10:00:00.000Z"),
+          },
+        }),
+      }),
+    );
+
+    expect(result).toEqual({ status: "cancelled" });
+    expect(deps.markJobPaused).toHaveBeenCalledWith(
+      "job-1",
+      "skipped by global throttle",
+    );
+    expect(runnerMocks.runByrSyncImport).not.toHaveBeenCalled();
   });
 
   it("returns cancelled without marking success when the job is cancelled before completion", async () => {

@@ -692,6 +692,53 @@ def test_list_updates_collects_more_than_twenty_threads_when_limit_is_higher() -
     assert board_service.calls == [("JobInfo", 1), ("JobInfo", 2)]
 
 
+def test_list_updates_collects_past_two_hundred_threads_when_limit_is_unset() -> None:
+    page_1 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id=f"a{index}",
+                title=f"thread {index}",
+                reply_count=0,
+                post_time="21:55:00",
+                latest_reply_time="22:05:00",
+            )
+            for index in range(1, 151)
+        ],
+        has_next_page=True,
+    )
+    page_2 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id=f"a{index}",
+                title=f"thread {index}",
+                reply_count=0,
+                post_time="21:50:00",
+                latest_reply_time="22:00:00",
+            )
+            for index in range(151, 261)
+        ],
+        has_next_page=False,
+    )
+    board_service = FakePagedBoardService({1: page_1, 2: page_2})
+    service = SyncService(
+        board_service=board_service,
+        thread_service=FakeThreadService(),
+        cache=InMemorySyncCache(),
+    )
+
+    result = service.list_updates(
+        board_name="JobInfo",
+        limit=None,
+        window_minutes=30,
+        now=datetime(2026, 5, 3, 22, 10, 0),
+    )
+
+    assert len(result.threads) == 260
+    assert result.threads[0].article_id == "a1"
+    assert result.threads[-1].article_id == "a260"
+    assert board_service.calls == [("JobInfo", 1), ("JobInfo", 2)]
+
+
 def test_backfill_thread_rejects_rewind_beyond_limit() -> None:
     thread_service = FakeThreadService(
         thread_page=FakeThreadPage(

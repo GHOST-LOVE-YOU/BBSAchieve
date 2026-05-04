@@ -108,7 +108,7 @@ class SyncService:
         self,
         *,
         board_name: str,
-        limit: int,
+        limit: int | None,
         window_minutes: int | None = None,
         now: datetime | None = None,
     ) -> SyncUpdateResult:
@@ -308,12 +308,14 @@ class SyncService:
         self,
         *,
         board_name: str,
-        limit: int,
+        limit: int | None,
         window_minutes: int | None,
         now: datetime,
     ) -> tuple[list[BoardThreadLike], int]:
         if window_minutes is None:
             board_page = self.board_service.fetch_page(board_name=board_name, page=1)
+            if limit is None:
+                return list(board_page.threads), 1
             return board_page.threads[:limit], 1
 
         cutoff = now - timedelta(minutes=window_minutes)
@@ -321,13 +323,13 @@ class SyncService:
         page = 1
         reached_out_of_window = False
 
-        while len(collected) < limit:
+        while limit is None or len(collected) < limit:
             board_page = self.board_service.fetch_page(board_name=board_name, page=page)
             for thread in board_page.threads:
                 observed_time = self._resolve_thread_observed_time(thread, now=now)
                 if observed_time >= cutoff:
                     collected.append(thread)
-                    if len(collected) >= limit:
+                    if limit is not None and len(collected) >= limit:
                         return collected, page
                 else:
                     reached_out_of_window = True

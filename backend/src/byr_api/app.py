@@ -46,7 +46,7 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
     def sync_updates(
         board_name: str = Query(default="IWhisper"),
         window_minutes: int = Query(default=30, ge=1),
-        limit: int = Query(default=20, ge=1),
+        limit: int | None = Query(default=None, ge=1),
         _: str = Depends(require_sync_token),
     ) -> SyncUpdatesResponse:
         result = app.state.sync_service.list_updates(

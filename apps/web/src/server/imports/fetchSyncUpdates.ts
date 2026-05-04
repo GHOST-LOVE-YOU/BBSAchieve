@@ -8,7 +8,7 @@ function getRequiredEnv(name: string): string | null {
 export async function fetchSyncUpdates(input: {
   boardName: string;
   windowMinutes: number;
-  limit?: number;
+  limit?: number | null;
 }): Promise<ByrSyncUpdatesPayload> {
   const baseUrl = getRequiredEnv("BYR_SYNC_API_BASE_URL");
   const token = getRequiredEnv("BYR_SYNC_API_TOKEN");
@@ -21,7 +21,7 @@ export async function fetchSyncUpdates(input: {
     board_name: input.boardName,
     window_minutes: String(input.windowMinutes),
   });
-  if (input.limit !== undefined) {
+  if (input.limit != null) {
     params.set("limit", String(input.limit));
   }
 

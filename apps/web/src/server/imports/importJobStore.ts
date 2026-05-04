@@ -70,8 +70,11 @@ export function markJobPaused(
   jobId: string,
   progressNote?: string | null,
 ) {
-  return prisma.importJob.update({
-    where: { id: jobId },
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: { not: "cancelled" },
+    },
     data: {
       status: "paused",
       finishedAt: new Date(),

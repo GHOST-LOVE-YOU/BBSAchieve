@@ -85,6 +85,7 @@ describe("admin byr sync route", () => {
     expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledWith({
       boardName: "IWhisper",
       windowMinutes: 30,
+      limit: 20,
     });
     expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
     expect(routeMocks.fetchSyncThreadSnapshot).not.toHaveBeenCalled();
@@ -864,6 +865,7 @@ describe("admin byr sync route", () => {
     expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledWith({
       boardName: "JobInfo",
       windowMinutes: 180,
+      limit: 20,
     });
     expect(routeMocks.prisma.thread.findUnique).toHaveBeenCalledWith({
       where: {
