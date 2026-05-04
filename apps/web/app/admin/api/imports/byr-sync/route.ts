@@ -52,12 +52,21 @@ async function enrichThreadsWithSourceData(
       });
       let posts = thread.posts;
       const persistedReplyCount = existingThread?.replyCount ?? 0;
+      const expectedStartFloor = persistedReplyCount + 1;
+
+      if (posts.length === 0 && thread.reply_count >= expectedStartFloor) {
+        const snapshot = await fetchSyncThreadSnapshot({
+          boardName: payload.board_name,
+          articleId: thread.article_id,
+          startFloor: existingThread ? expectedStartFloor : 1,
+        });
+        posts = snapshot.posts;
+      }
 
       const seenFloors = posts
         .map((post) => parseFloorIndex(post.floor_label))
         .filter((value): value is number => value !== null && value > 0);
       const minSeenFloor = seenFloors.length > 0 ? Math.min(...seenFloors) : null;
-      const expectedStartFloor = persistedReplyCount + 1;
 
       if (
         minSeenFloor !== null &&

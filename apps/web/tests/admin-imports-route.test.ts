@@ -468,6 +468,218 @@ describe("admin byr sync route", () => {
     expect(response.status).toBe(200);
   });
 
+  it("backfills replies when updates contain no posts and the local thread is behind", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue({
+      id: "thread-1",
+      body: "已有主贴正文",
+      replyCount: 2,
+    });
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
+      threads: [
+        {
+          article_id: "8843915",
+          title: "空增量补拉测试",
+          reply_count: 4,
+          posts: [],
+        },
+      ],
+    });
+    routeMocks.fetchSyncThreadSnapshot.mockResolvedValue({
+      article_id: "8843915",
+      start_floor: 3,
+      posts: [
+        {
+          post_id: "p3",
+          floor_label: "第3楼",
+          author_display_name: "IWhisper#333",
+          posted_at: "Sun May 3 00:08:00 2026",
+          body: "reply 3",
+        },
+        {
+          post_id: "p4",
+          floor_label: "第4楼",
+          author_display_name: "IWhisper#444",
+          posted_at: "Sun May 3 00:09:00 2026",
+          body: "reply 4",
+        },
+      ],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-5a",
+      importedThreads: 1,
+      importedReplies: 2,
+      skippedReplies: 0,
+    });
+
+    const response = await POST();
+
+    expect(routeMocks.fetchSyncThreadSnapshot).toHaveBeenCalledWith({
+      boardName: "IWhisper",
+      articleId: "8843915",
+      startFloor: 3,
+    });
+    expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
+    expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
+      board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
+      threads: [
+        {
+          article_id: "8843915",
+          title: "空增量补拉测试",
+          reply_count: 4,
+          posts: [
+            {
+              post_id: "p3",
+              floor_label: "第3楼",
+              author_display_name: "IWhisper#333",
+              posted_at: "Sun May 3 00:08:00 2026",
+              body: "reply 3",
+            },
+            {
+              post_id: "p4",
+              floor_label: "第4楼",
+              author_display_name: "IWhisper#444",
+              posted_at: "Sun May 3 00:09:00 2026",
+              body: "reply 4",
+            },
+          ],
+        },
+      ],
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("backfills a missing thread from floor 1 when updates contain no posts", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
+      threads: [
+        {
+          article_id: "8843915",
+          title: "首次导入空增量测试",
+          reply_count: 2,
+          posts: [],
+        },
+      ],
+    });
+    routeMocks.fetchSyncThreadSnapshot.mockResolvedValue({
+      article_id: "8843915",
+      start_floor: 1,
+      posts: [
+        {
+          post_id: "8843915",
+          floor_label: "楼主",
+          author_display_name: "IWhisper#111",
+          posted_at: "Sun May 3 00:07:00 2026",
+          body: "opening post",
+        },
+        {
+          post_id: "p1",
+          floor_label: "第1楼",
+          author_display_name: "IWhisper#222",
+          posted_at: "Sun May 3 00:08:00 2026",
+          body: "reply 1",
+        },
+        {
+          post_id: "p2",
+          floor_label: "第2楼",
+          author_display_name: "IWhisper#333",
+          posted_at: "Sun May 3 00:09:00 2026",
+          body: "reply 2",
+        },
+      ],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-5b",
+      importedThreads: 1,
+      importedReplies: 2,
+      skippedReplies: 0,
+    });
+
+    const response = await POST();
+
+    expect(routeMocks.fetchSyncThreadSnapshot).toHaveBeenCalledWith({
+      boardName: "IWhisper",
+      articleId: "8843915",
+      startFloor: 1,
+    });
+    expect(routeMocks.fetchSyncOriginalPost).not.toHaveBeenCalled();
+    expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
+      board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
+      threads: [
+        {
+          article_id: "8843915",
+          title: "首次导入空增量测试",
+          reply_count: 2,
+          posts: [
+            {
+              post_id: "8843915",
+              floor_label: "楼主",
+              author_display_name: "IWhisper#111",
+              posted_at: "Sun May 3 00:07:00 2026",
+              body: "opening post",
+            },
+            {
+              post_id: "p1",
+              floor_label: "第1楼",
+              author_display_name: "IWhisper#222",
+              posted_at: "Sun May 3 00:08:00 2026",
+              body: "reply 1",
+            },
+            {
+              post_id: "p2",
+              floor_label: "第2楼",
+              author_display_name: "IWhisper#333",
+              posted_at: "Sun May 3 00:09:00 2026",
+              body: "reply 2",
+            },
+          ],
+        },
+      ],
+    });
+    expect(response.status).toBe(200);
+  });
+
   it("does not backfill when updates contain no posts but local reply count is already caught up", async () => {
     routeMocks.prisma.thread.findUnique.mockResolvedValue({
       id: "thread-1",
