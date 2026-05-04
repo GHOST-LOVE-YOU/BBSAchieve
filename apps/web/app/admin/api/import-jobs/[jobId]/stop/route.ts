@@ -25,9 +25,9 @@ export async function POST(
       );
     }
 
-    if (job.jobType !== "byr_board_full_sync") {
+    if (job.jobType !== "byr_board_full_sync_batch") {
       return NextResponse.json(
-        { ok: false, error: "Only board full sync jobs can be stopped" },
+        { ok: false, error: "Only batch full sync jobs can be stopped" },
         { status: 409 },
       );
     }

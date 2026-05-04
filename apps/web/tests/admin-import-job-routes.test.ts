@@ -199,11 +199,11 @@ describe("admin import job routes", () => {
     });
   });
 
-  it("stops a board full-sync job by cancelling it", async () => {
+  it("stops a batch full-sync job by cancelling it", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-3",
       status: "running",
-      jobType: "byr_board_full_sync",
+      jobType: "byr_board_full_sync_batch",
     });
     routeMocks.markJobCancelled.mockResolvedValue({});
 
@@ -221,11 +221,11 @@ describe("admin import job routes", () => {
     });
   });
 
-  it("does not stop a board full-sync job if the cancel transition is rejected at write time", async () => {
+  it("does not stop a batch full-sync job if the cancel transition is rejected at write time", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-5",
       status: "running",
-      jobType: "byr_board_full_sync",
+      jobType: "byr_board_full_sync_batch",
     });
     routeMocks.markJobCancelled.mockResolvedValue({ count: 0 });
 
@@ -242,11 +242,11 @@ describe("admin import job routes", () => {
     });
   });
 
-  it("rejects stopping a non-board full-sync job", async () => {
+  it("rejects stopping a non-batch full-sync job", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-4",
       status: "running",
-      jobType: "some_other_job",
+      jobType: "byr_board_full_sync",
       cursorThreadKey: "cursor-4",
     });
 
@@ -260,7 +260,7 @@ describe("admin import job routes", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
       ok: false,
-      error: "Only board full sync jobs can be stopped",
+      error: "Only batch full sync jobs can be stopped",
     });
   });
 });
