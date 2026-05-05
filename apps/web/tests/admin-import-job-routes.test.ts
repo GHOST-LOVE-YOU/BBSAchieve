@@ -37,6 +37,7 @@ vi.mock("@/src/server/imports/scheduleBoardBatchFullSync", () => ({
 import { POST as startPOST } from "../app/admin/api/import-jobs/byr-board-full-sync-batch/route";
 import { POST as resumePOST } from "../app/admin/api/import-jobs/[jobId]/resume/route";
 import { POST as stopPOST } from "../app/admin/api/import-jobs/[jobId]/stop/route";
+import { boardSyncBoards } from "@/src/server/boardSync/boardRegistry";
 
 describe("admin import job routes", () => {
   const request = new Request("http://localhost/admin/api/import-jobs");
@@ -103,6 +104,37 @@ describe("admin import job routes", () => {
       ok: false,
       error: "Unknown board selection",
     });
+  });
+
+  it("returns 400 for a board that is not enabled for manual full sync", async () => {
+    const board = boardSyncBoards.find((item) => item.boardName === "JobInfo");
+    expect(board).toBeTruthy();
+    const previousValue = board?.fullSyncEnabled;
+    if (board) {
+      board.fullSyncEnabled = false;
+    }
+    const formData = new FormData();
+    formData.append("boardNames", "JobInfo");
+    const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync-batch", {
+      method: "POST",
+      body: formData,
+    });
+
+    try {
+      const response = await startPOST(request);
+
+      expect(routeMocks.createBoardBatchFullSyncJob).not.toHaveBeenCalled();
+      expect(routeMocks.scheduleBoardBatchFullSync).not.toHaveBeenCalled();
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        ok: false,
+        error: "Board is not enabled for full sync",
+      });
+    } finally {
+      if (board && previousValue !== undefined) {
+        board.fullSyncEnabled = previousValue;
+      }
+    }
   });
 
   it("rejects resuming a non-batch full-sync job even when it has a terminal status", async () => {

@@ -45,17 +45,14 @@ describe("admin imports page", () => {
     cleanup();
   });
 
-  it("renders board full-sync batch selection without old import controls", async () => {
-    vi.doMock("@/src/server/boardSync/boardRegistry", async () => {
-      const actual = await vi.importActual<typeof import("@/src/server/boardSync/boardRegistry")>(
-        "@/src/server/boardSync/boardRegistry",
-      );
-
-      return {
-        ...actual,
-        boardSyncBoards: actual.boardSyncBoards.filter((board) => board.boardName === "IWhisper"),
-      };
-    });
+  it("renders only boards enabled for manual full sync in the batch selection", async () => {
+    const { boardCatalog: runtimeBoardCatalog } = await import("@/src/server/boardSync/boardCatalog");
+    const board = runtimeBoardCatalog.find((item) => item.boardName === "JobInfo");
+    expect(board).toBeTruthy();
+    const previousValue = board?.fullSyncEnabled;
+    if (board) {
+      board.fullSyncEnabled = false;
+    }
     prismaMock.import.findMany.mockResolvedValue([]);
     prismaMock.importJob.findMany.mockResolvedValue([
       {
@@ -76,34 +73,40 @@ describe("admin imports page", () => {
     ]);
     vi.mocked(listRecentImportActivity).mockResolvedValue([]);
 
-    await renderAdminImportsPage();
+    try {
+      await renderAdminImportsPage();
 
-    const batchStartButton = screen.getByRole("button", { name: "开始全量抓取" });
+      const batchStartButton = screen.getByRole("button", { name: "开始全量抓取" });
 
-    expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
-    for (const board of selectableBoards) {
-      const checkbox = screen.getByRole("checkbox", { name: board.boardName });
-      expect(checkbox).toBeTruthy();
-      expect(checkbox.getAttribute("name")).toBe("boardNames");
-      expect(checkbox.getAttribute("value")).toBe(board.boardName);
+      expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
+      const enabledBoard = screen.getByRole("checkbox", { name: "IWhisper" });
+      expect(enabledBoard).toBeTruthy();
+      expect(enabledBoard.getAttribute("name")).toBe("boardNames");
+      expect(enabledBoard.getAttribute("value")).toBe("IWhisper");
+      expect(screen.queryByRole("checkbox", { name: "JobInfo" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
+      expect(screen.queryByRole("button", { name: /开始抓取 .* 全量内容/u })).toBeNull();
+      expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "停止" })).toBeTruthy();
+      expect(screen.getByText("waiting for slot")).toBeTruthy();
+      expect(screen.getByText("当前将按首页目录顺序串行抓取：IWhisper")).toBeTruthy();
+
+      const batchForm = batchStartButton.closest("form");
+      expect(batchForm?.getAttribute("action")).toBe(
+        "/admin/api/import-jobs/byr-board-full-sync-batch",
+      );
+      expect(
+        Array.from(
+          batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
+            [],
+        ).map((input) => input.value),
+      ).toEqual(["IWhisper"]);
+      expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
+    } finally {
+      if (board && previousValue !== undefined) {
+        board.fullSyncEnabled = previousValue;
+      }
     }
-    expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
-    expect(screen.queryByRole("button", { name: /开始抓取 .* 全量内容/u })).toBeNull();
-    expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "停止" })).toBeTruthy();
-    expect(screen.getByText("waiting for slot")).toBeTruthy();
-
-    const batchForm = batchStartButton.closest("form");
-    expect(batchForm?.getAttribute("action")).toBe(
-      "/admin/api/import-jobs/byr-board-full-sync-batch",
-    );
-    expect(
-      Array.from(
-        batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
-          [],
-      ).map((input) => input.value),
-    ).toEqual(selectableBoards.map((board) => board.boardName));
-    expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
   });
 
   it("renders a stop action for pending board full-sync jobs", async () => {
@@ -206,7 +209,11 @@ describe("admin imports page", () => {
     expect(screen.getByRole("button", { name: "开始全量抓取" })).toBeTruthy();
     expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
     for (const board of selectableBoards) {
-      expect(screen.getByRole("checkbox", { name: board.boardName })).toBeTruthy();
+      if (board.fullSyncEnabled) {
+        expect(screen.getByRole("checkbox", { name: board.boardName })).toBeTruthy();
+      } else {
+        expect(screen.queryByRole("checkbox", { name: board.boardName })).toBeNull();
+      }
     }
     expect(screen.getByText("最近导入活动")).toBeTruthy();
     expect(screen.getByText("JobInfo · 任务")).toBeTruthy();

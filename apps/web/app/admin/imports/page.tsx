@@ -7,7 +7,7 @@ import { listRecentImportActivity } from "@/src/server/admin/listRecentImportAct
 export const dynamic = "force-dynamic";
 
 export default async function AdminImportsPage() {
-  const selectableBoards = boardCatalog;
+  const selectableBoards = boardCatalog.filter((board) => board.fullSyncEnabled);
   const imports = await prisma.import.findMany({
     orderBy: { startedAt: "desc" },
     take: 20,

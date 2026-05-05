@@ -166,6 +166,58 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(result.status).toBe("failed");
   });
 
+  it("treats progress persistence failures after a successful board import as a failure on the same board", async () => {
+    const updateJobProgress = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("progress write exploded"))
+      .mockResolvedValueOnce(undefined);
+    const markJobFailed = vi.fn(async () => ({ count: 1 }));
+    const markJobSucceeded = vi.fn(async () => ({ count: 1 }));
+    const deps = makeDeps({
+      updateJobProgress,
+      markJobFailed,
+      markJobSucceeded,
+    });
+
+    const result = await runBoardBatchFullSyncJob(deps as never, {
+      jobId: "batch-1",
+      ...makeThrottle(),
+    });
+
+    expect(deps.runByrSyncImport).toHaveBeenCalledTimes(1);
+    expect(deps.runByrSyncImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boardName: "IWhisper",
+      }),
+    );
+    expect(updateJobProgress).toHaveBeenNthCalledWith(
+      1,
+      "batch-1",
+      expect.objectContaining({
+        metadataJson: expect.objectContaining({
+          currentBoardName: "JobInfo",
+          failedBoardName: null,
+          completedBoardNames: ["IWhisper"],
+        }),
+      }),
+    );
+    expect(updateJobProgress).toHaveBeenNthCalledWith(
+      2,
+      "batch-1",
+      expect.objectContaining({
+        metadataJson: expect.objectContaining({
+          currentBoardName: "IWhisper",
+          failedBoardName: "IWhisper",
+          completedBoardNames: [],
+        }),
+        progressNote: "板块 IWhisper 失败",
+      }),
+    );
+    expect(markJobFailed).toHaveBeenCalledWith("batch-1", "progress write exploded");
+    expect(markJobSucceeded).not.toHaveBeenCalled();
+    expect(result.status).toBe("failed");
+  });
+
   it("resumes from the failed current board and skips boards already completed", async () => {
     const metadata = markBoardCompleted(
       createBatchJobMetadata({

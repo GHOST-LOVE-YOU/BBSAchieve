@@ -16,12 +16,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "At least one board must be selected" }, { status: 400 });
   }
 
+  const fullSyncBoards = boardSyncBoards.filter((board) => board.fullSyncEnabled);
   const knownBoardNames = new Set(boardSyncBoards.map((board) => board.boardName));
+  const enabledBoardNames = new Set(fullSyncBoards.map((board) => board.boardName));
+
   if (selectedBoardNames.some((name) => !knownBoardNames.has(name))) {
     return NextResponse.json({ ok: false, error: "Unknown board selection" }, { status: 400 });
   }
+  if (selectedBoardNames.some((name) => !enabledBoardNames.has(name))) {
+    return NextResponse.json(
+      { ok: false, error: "Board is not enabled for full sync" },
+      { status: 400 },
+    );
+  }
 
-  const orderedBoardNames = boardSyncBoards
+  const orderedBoardNames = fullSyncBoards
     .map((board) => board.boardName)
     .filter((name) => selectedBoardNames.includes(name));
 

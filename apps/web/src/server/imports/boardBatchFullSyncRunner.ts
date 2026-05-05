@@ -43,6 +43,9 @@ export async function runBoardBatchFullSyncJob(
       if (!board) {
         throw new Error(`Unknown board full sync configuration for "${boardName}"`);
       }
+      if (!board.fullSyncEnabled) {
+        throw new Error(`Board "${boardName}" is not enabled for full sync`);
+      }
       return board.fullSyncWindowMinutes;
     });
   const job = await deps.findJobById(input.jobId);
@@ -115,30 +118,31 @@ export async function runBoardBatchFullSyncJob(
           limit: null,
         });
 
-        current = markBoardCompleted(current, {
+        const nextMetadata = markBoardCompleted(current, {
           boardName,
           processedThreads: importResult.importedThreads,
           processedReplies: importResult.importedReplies,
         });
 
         await deps.updateJobProgress(input.jobId, {
-          metadataJson: current,
-          processedThreads: Object.values(current.perBoardStats).reduce(
+          metadataJson: nextMetadata,
+          processedThreads: Object.values(nextMetadata.perBoardStats).reduce(
             (sum, stat) => sum + stat.processedThreads,
             0,
           ),
-          processedReplies: Object.values(current.perBoardStats).reduce(
+          processedReplies: Object.values(nextMetadata.perBoardStats).reduce(
             (sum, stat) => sum + stat.processedReplies,
             0,
           ),
-          progressNote: current.currentBoardName
-            ? `当前板块 ${current.currentBoardName}`
+          progressNote: nextMetadata.currentBoardName
+            ? `当前板块 ${nextMetadata.currentBoardName}`
             : "全部板块已完成",
         });
+        current = nextMetadata;
       } catch (error) {
-        current = markBoardFailed(current, boardName);
+        const failedMetadata = markBoardFailed(current, boardName);
         await deps.updateJobProgress(input.jobId, {
-          metadataJson: current,
+          metadataJson: failedMetadata,
           progressNote: `板块 ${boardName} 失败`,
         });
         const failedResult = await deps.markJobFailed(

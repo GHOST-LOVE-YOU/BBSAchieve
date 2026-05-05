@@ -78,6 +78,10 @@ function getBatchJobDetail(job: ImportJobActivityRow): string {
 
   const metadata = asBoardBatchJobMetadata(job.metadataJson);
 
+  if (metadata?.failedBoardName && job.errorMessage) {
+    return `失败板块 ${metadata.failedBoardName}：${job.errorMessage}`;
+  }
+
   if (metadata?.failedBoardName) {
     return `失败板块 ${metadata.failedBoardName}`;
   }

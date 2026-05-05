@@ -119,7 +119,7 @@ describe("listRecentImportActivity", () => {
     });
   });
 
-  it("renders failed batch jobs from metadata even when the runner leaves a progress note", async () => {
+  it("renders failed batch jobs with both board context and the underlying error message", async () => {
     const result = await listRecentImportActivity({
       import: { findMany: vi.fn(async () => []) } as any,
       importJob: {
@@ -161,7 +161,7 @@ describe("listRecentImportActivity", () => {
       kind: "import_job",
       title: "multi-board full sync",
       status: "failed",
-      detail: "失败板块 JobInfo",
+      detail: "失败板块 JobInfo：JobInfo exploded",
     });
   });
 
