@@ -8,6 +8,14 @@ npx pnpm@10.11.0 --filter @bbs/web prisma:migrate
 npx pnpm@10.11.0 --filter @bbs/web dev
 ```
 
+如果低配机器访问 `localhost:3000` 时 CPU 或内存被开发服务器打满，可以改用 Webpack 开发模式：
+
+```bash
+npx pnpm@10.11.0 --filter @bbs/web dev:webpack
+```
+
+当前项目使用 Next.js 16，`next dev` 默认启用 Turbopack。`dev:webpack` 只影响本地开发服务器，不改变生产构建和运行方式。
+
 默认会连接 `apps/web/.env` 中的本地 PostgreSQL：
 
 ```env
