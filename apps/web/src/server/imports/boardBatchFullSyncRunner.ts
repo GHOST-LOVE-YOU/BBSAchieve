@@ -124,21 +124,46 @@ export async function runBoardBatchFullSyncJob(
           processedReplies: importResult.importedReplies,
         });
 
-        await deps.updateJobProgress(input.jobId, {
-          metadataJson: nextMetadata,
-          processedThreads: Object.values(nextMetadata.perBoardStats).reduce(
-            (sum, stat) => sum + stat.processedThreads,
-            0,
-          ),
-          processedReplies: Object.values(nextMetadata.perBoardStats).reduce(
-            (sum, stat) => sum + stat.processedReplies,
-            0,
-          ),
-          progressNote: nextMetadata.currentBoardName
-            ? `当前板块 ${nextMetadata.currentBoardName}`
-            : "全部板块已完成",
-        });
-        current = nextMetadata;
+        try {
+          await deps.updateJobProgress(input.jobId, {
+            metadataJson: nextMetadata,
+            processedThreads: Object.values(nextMetadata.perBoardStats).reduce(
+              (sum, stat) => sum + stat.processedThreads,
+              0,
+            ),
+            processedReplies: Object.values(nextMetadata.perBoardStats).reduce(
+              (sum, stat) => sum + stat.processedReplies,
+              0,
+            ),
+            progressNote: nextMetadata.currentBoardName
+              ? `当前板块 ${nextMetadata.currentBoardName}`
+              : "全部板块已完成",
+          });
+          current = nextMetadata;
+        } catch (error) {
+          const failedMetadata = nextMetadata.currentBoardName
+            ? markBoardFailed(nextMetadata, nextMetadata.currentBoardName)
+            : nextMetadata;
+          await deps.updateJobProgress(input.jobId, {
+            metadataJson: failedMetadata,
+            progressNote: failedMetadata.failedBoardName
+              ? `板块 ${failedMetadata.failedBoardName} 失败`
+              : "全部板块已完成",
+          });
+          const failedResult = await deps.markJobFailed(
+            input.jobId,
+            error instanceof Error ? error.message : "Unknown batch full sync error",
+          );
+          if (
+            failedResult &&
+            typeof failedResult === "object" &&
+            "count" in failedResult &&
+            failedResult.count === 0
+          ) {
+            return { status: "cancelled" as const };
+          }
+          return { status: "failed" as const };
+        }
       } catch (error) {
         const failedMetadata = markBoardFailed(current, boardName);
         await deps.updateJobProgress(input.jobId, {

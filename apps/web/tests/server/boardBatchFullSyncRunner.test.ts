@@ -166,7 +166,7 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(result.status).toBe("failed");
   });
 
-  it("treats progress persistence failures after a successful board import as a failure on the same board", async () => {
+  it("preserves completed boards when progress persistence fails after a successful board import", async () => {
     const updateJobProgress = vi
       .fn()
       .mockRejectedValueOnce(new Error("progress write exploded"))
@@ -206,11 +206,11 @@ describe("runBoardBatchFullSyncJob", () => {
       "batch-1",
       expect.objectContaining({
         metadataJson: expect.objectContaining({
-          currentBoardName: "IWhisper",
-          failedBoardName: "IWhisper",
-          completedBoardNames: [],
+          currentBoardName: "JobInfo",
+          failedBoardName: "JobInfo",
+          completedBoardNames: ["IWhisper"],
         }),
-        progressNote: "板块 IWhisper 失败",
+        progressNote: "板块 JobInfo 失败",
       }),
     );
     expect(markJobFailed).toHaveBeenCalledWith("batch-1", "progress write exploded");
