@@ -9,8 +9,16 @@ const publicReadingMock = vi.hoisted(() => ({
   getThreadRepliesFeed: vi.fn(),
 }));
 
+const pageGuardMock = vi.hoisted(() => ({
+  requireWebPageUser: vi.fn(),
+}));
+
 vi.mock("@/src/server/reading/publicReadingService", () => ({
   createPublicReadingService: () => publicReadingMock,
+}));
+
+vi.mock("@/src/server/auth/pageGuards", () => ({
+  requireWebPageUser: pageGuardMock.requireWebPageUser,
 }));
 
 vi.mock("next/link", () => ({
@@ -43,6 +51,11 @@ import ThreadPage from "../app/threads/[threadId]/page";
 describe("web public routes", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    pageGuardMock.requireWebPageUser.mockResolvedValue({
+      provider: "kinde",
+      subject: "kp_test",
+      orgCodes: [],
+    });
   });
 
   afterEach(() => {
@@ -171,6 +184,36 @@ describe("web public routes", () => {
 
     expect(screen.getByText("First offer from the mirror")).toBeTruthy();
     expect(screen.getByText("Reply 1")).toBeTruthy();
+  });
+
+  it("requires login before rendering thread detail", async () => {
+    publicReadingMock.getThread.mockResolvedValue({
+      board: {
+        id: "board:job",
+        slug: "job",
+        name: "Jobs and Offers",
+      },
+      thread: {
+        id: "thread:first-offer",
+        title: "First offer from the mirror",
+        body: "A new listing has been mirrored and is ready to read.",
+        authorName: "Robot 1",
+        publishedAt: "2026-05-01T08:00:00.000Z",
+        replyCount: 2,
+      },
+    });
+    publicReadingMock.getThreadRepliesFeed.mockResolvedValue({
+      items: [],
+      page: { limit: 20, nextCursor: null, hasMore: false },
+    });
+
+    render(
+      await ThreadPage({
+        params: Promise.resolve({ threadId: "first-offer" }),
+      }),
+    );
+
+    expect(pageGuardMock.requireWebPageUser).toHaveBeenCalledWith("/threads/first-offer");
   });
 
   it("renders thread detail for prisma uuid route params", async () => {

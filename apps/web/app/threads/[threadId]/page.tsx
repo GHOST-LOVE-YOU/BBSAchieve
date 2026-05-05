@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { requireWebPageUser } from "@/src/server/auth/pageGuards";
 import { createPublicReadingService } from "@/src/server/reading/publicReadingService";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export default async function ThreadPage({
   params: Promise<{ threadId: string }>;
 }) {
   const { threadId } = await params;
+  await requireWebPageUser(`/threads/${threadId}`);
   const service = createPublicReadingService();
   try {
     const threadResult = await service.getThread(threadId);
