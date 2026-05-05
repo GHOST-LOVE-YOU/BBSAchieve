@@ -14,7 +14,7 @@ export default async function AdminImportsPage() {
   });
   const importJobs = await prisma.importJob.findMany({
     where: { jobType: "byr_board_full_sync_batch" },
-    orderBy: { createdAt: "desc" },
+    orderBy: { updatedAt: "desc" },
     take: 20,
   });
   const recentActivity = await listRecentImportActivity(prisma);

@@ -40,6 +40,16 @@ vi.mock("@/src/server/imports/importSyncBatch", () => ({
 import { POST } from "../app/admin/api/imports/byr-sync/route";
 import { runByrSyncImport } from "../app/admin/api/imports/byr-sync/route";
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("admin byr sync route", () => {
   beforeEach(() => {
     routeMocks.fetchSyncOriginalPost.mockReset();
@@ -840,7 +850,7 @@ describe("admin byr sync route", () => {
       sourceLabel: "JobInfo",
       boards: [
         {
-          slug: "jobinfo",
+          slug: "job-info",
           name: "JobInfo",
           description: "",
         },
@@ -870,7 +880,7 @@ describe("admin byr sync route", () => {
     expect(routeMocks.prisma.thread.findUnique).toHaveBeenCalledWith({
       where: {
         sourceBoardSlug_sourceThreadId: {
-          sourceBoardSlug: "jobinfo",
+          sourceBoardSlug: "job-info",
           sourceThreadId: "3001",
         },
       },
@@ -902,7 +912,7 @@ describe("admin byr sync route", () => {
       sourceLabel: "JobInfo",
       boards: [
         {
-          slug: "jobinfo",
+          slug: "job-info",
           name: "JobInfo",
           description: "",
         },
@@ -929,6 +939,116 @@ describe("admin byr sync route", () => {
       boardName: "JobInfo",
       windowMinutes: 60 * 24 * 365 * 10,
       limit: null,
+    });
+  });
+
+  it("enriches threads serially so later thread lookups wait for earlier ones", async () => {
+    const firstLookup = createDeferred<{
+      id: string;
+      body: string;
+      replyCount: number;
+    } | null>();
+
+    routeMocks.prisma.thread.findUnique
+      .mockImplementationOnce(() => firstLookup.promise)
+      .mockResolvedValueOnce(null);
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 1,
+      cutoff_at: "2026-05-03T21:40:00",
+      threads: [
+        {
+          article_id: "t-1",
+          title: "first thread",
+          reply_count: 0,
+          posts: [
+            {
+              post_id: "t-1-op",
+              floor_label: "楼主",
+              author_display_name: "IWhisper#001",
+              posted_at: "Sun May 3 00:00:00 2026",
+              body: "opening 1",
+            },
+          ],
+        },
+        {
+          article_id: "t-2",
+          title: "second thread",
+          reply_count: 0,
+          posts: [
+            {
+              post_id: "t-2-op",
+              floor_label: "楼主",
+              author_display_name: "IWhisper#002",
+              posted_at: "Sun May 3 00:01:00 2026",
+              body: "opening 2",
+            },
+          ],
+        },
+      ],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-serial",
+      importedThreads: 2,
+      importedReplies: 0,
+      skippedReplies: 0,
+    });
+
+    const importPromise = runByrSyncImport({
+      prisma: routeMocks.prisma as never,
+      boardName: "IWhisper",
+      windowMinutes: 30,
+    });
+
+    await Promise.resolve();
+
+    expect(routeMocks.prisma.thread.findUnique).toHaveBeenCalledTimes(1);
+    expect(routeMocks.prisma.thread.findUnique).toHaveBeenNthCalledWith(1, {
+      where: {
+        sourceBoardSlug_sourceThreadId: {
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "t-1",
+        },
+      },
+      select: {
+        id: true,
+        body: true,
+        replyCount: true,
+      },
+    });
+
+    firstLookup.resolve(null);
+
+    await importPromise;
+
+    expect(routeMocks.prisma.thread.findUnique).toHaveBeenCalledTimes(2);
+    expect(routeMocks.prisma.thread.findUnique).toHaveBeenNthCalledWith(2, {
+      where: {
+        sourceBoardSlug_sourceThreadId: {
+          sourceBoardSlug: "iwhisper",
+          sourceThreadId: "t-2",
+        },
+      },
+      select: {
+        id: true,
+        body: true,
+        replyCount: true,
+      },
     });
   });
 });

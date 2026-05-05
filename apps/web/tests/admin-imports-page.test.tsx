@@ -237,7 +237,7 @@ describe("admin imports page", () => {
 
     expect(prismaMock.importJob.findMany).toHaveBeenCalledWith({
       where: { jobType: "byr_board_full_sync_batch" },
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
       take: 20,
     });
 

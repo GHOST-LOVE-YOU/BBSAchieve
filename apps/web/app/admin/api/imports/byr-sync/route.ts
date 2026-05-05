@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { PrismaClient } from "@prisma/client";
 
 import { prisma } from "@/src/server/db/client";
+import { resolveBoardIdentity } from "@/src/server/boardSync/resolveBoardIdentity";
 import { fetchSyncOriginalPost } from "@/src/server/imports/fetchSyncOriginalPost";
 import { fetchSyncThreadSnapshot } from "@/src/server/imports/fetchSyncThreadSnapshot";
 import { fetchSyncUpdates } from "@/src/server/imports/fetchSyncUpdates";
@@ -31,18 +32,14 @@ function parseFloorIndex(floorLabel: string): number | null {
   return match ? Number.parseInt(match[1] ?? "", 10) : null;
 }
 
-function normalizeSourceBoardSlug(boardName: string): string {
-  const trimmed = boardName.trim();
-  return trimmed.length > 0 ? trimmed.toLowerCase() : "iwhisper";
-}
-
 async function enrichThreadsWithSourceData(
   prismaClient: Pick<PrismaClient, "thread">,
   payload: Awaited<ReturnType<typeof fetchSyncUpdates>>,
 ) {
-  const sourceBoardSlug = normalizeSourceBoardSlug(payload.board_name);
-  const threads = await Promise.all(
-    payload.threads.map(async (thread) => {
+  const sourceBoardSlug = resolveBoardIdentity(payload.board_name).slug;
+  const threads = [];
+
+  for (const thread of payload.threads) {
       const existingThread = await prismaClient.thread.findUnique({
         where: {
           sourceBoardSlug_sourceThreadId: {
@@ -98,10 +95,11 @@ async function enrichThreadsWithSourceData(
         !hasOriginalPostInPosts && (!existingThread || existingThread.body.trim().length === 0);
 
       if (!needsOriginalPost) {
-        return {
+        threads.push({
           ...thread,
           posts,
-        };
+        });
+        continue;
       }
 
       const originalPost = await fetchSyncOriginalPost({
@@ -109,12 +107,11 @@ async function enrichThreadsWithSourceData(
         articleId: thread.article_id,
       });
       const postIds = new Set(posts.map((post) => post.post_id));
-      return {
+      threads.push({
         ...thread,
         posts: postIds.has(originalPost.post_id) ? posts : [originalPost, ...posts],
-      };
-    }),
-  );
+      });
+  }
 
   return {
     ...payload,
