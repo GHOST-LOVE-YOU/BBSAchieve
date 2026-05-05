@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
@@ -25,7 +26,10 @@ vi.mock("next/link", () => ({
 }));
 
 import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
-import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
+import {
+  boardCatalog,
+  boardCatalogSections,
+} from "@/src/server/boardSync/boardCatalog";
 
 const selectableBoards = boardCatalog;
 
@@ -45,9 +49,13 @@ describe("admin imports page", () => {
     cleanup();
   });
 
-  it("renders only boards enabled for manual full sync in the batch selection", async () => {
-    const { boardCatalog: runtimeBoardCatalog } = await import("@/src/server/boardSync/boardCatalog");
-    const board = runtimeBoardCatalog.find((item) => item.boardName === "JobInfo");
+  it("renders grouped homepage sections with unchecked board checkboxes", async () => {
+    const { boardCatalogSections: runtimeBoardCatalogSections } = await import(
+      "@/src/server/boardSync/boardCatalog"
+    );
+    const board = runtimeBoardCatalogSections
+      .flatMap((section) => [...section.boards])
+      .find((item) => item.boardName === "JobInfo");
     expect(board).toBeTruthy();
     const previousValue = board?.fullSyncEnabled;
     if (board) {
@@ -79,17 +87,27 @@ describe("admin imports page", () => {
       const batchStartButton = screen.getByRole("button", { name: "开始全量抓取" });
 
       expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
+      expect(screen.getByText("以下目录来自首页固化板块清单")).toBeTruthy();
+      expect(screen.getByText("只会抓取已勾选板块，执行顺序按首页目录顺序。")).toBeTruthy();
+      expect(screen.getByText("当前已选择 0 个板块")).toBeTruthy();
+      expect(screen.getByText(boardCatalogSections[0]!.sectionName)).toBeTruthy();
       const enabledBoard = screen.getByRole("checkbox", { name: "IWhisper" });
       expect(enabledBoard).toBeTruthy();
+      expect((enabledBoard as HTMLInputElement).checked).toBe(false);
       expect(enabledBoard.getAttribute("name")).toBe("boardNames");
       expect(enabledBoard.getAttribute("value")).toBe("IWhisper");
       expect(screen.queryByRole("checkbox", { name: "JobInfo" })).toBeNull();
+      expect(screen.getAllByRole("button", { name: "全选本分区" })).toHaveLength(
+        boardCatalogSections.length,
+      );
+      expect(screen.getAllByRole("button", { name: "取消本分区" })).toHaveLength(
+        boardCatalogSections.length,
+      );
       expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
       expect(screen.queryByRole("button", { name: /开始抓取 .* 全量内容/u })).toBeNull();
       expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
       expect(screen.getByRole("button", { name: "停止" })).toBeTruthy();
       expect(screen.getByText("waiting for slot")).toBeTruthy();
-      expect(screen.getByText("当前将按首页目录顺序串行抓取：IWhisper")).toBeTruthy();
 
       const batchForm = batchStartButton.closest("form");
       const syncForm = screen
@@ -109,7 +127,7 @@ describe("admin imports page", () => {
           batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
             [],
         ).map((input) => input.value),
-      ).toEqual(["IWhisper"]);
+      ).toEqual(["IWhisper", "Talking"]);
       expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
     } finally {
       if (board && previousValue !== undefined) {
@@ -221,13 +239,25 @@ describe("admin imports page", () => {
     expect(screen.getByRole("button", { name: "同步北邮人数据" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "开始全量抓取" })).toBeTruthy();
     expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
+    for (const section of boardCatalogSections) {
+      expect(screen.getByText(section.sectionName)).toBeTruthy();
+    }
     for (const board of selectableBoards) {
       if (board.fullSyncEnabled) {
-        expect(screen.getByRole("checkbox", { name: board.boardName })).toBeTruthy();
+        const checkbox = screen.getByRole("checkbox", { name: board.boardName });
+        expect(checkbox).toBeTruthy();
+        expect((checkbox as HTMLInputElement).checked).toBe(false);
       } else {
         expect(screen.queryByRole("checkbox", { name: board.boardName })).toBeNull();
       }
     }
+    expect(screen.getAllByRole("button", { name: "全选本分区" })).toHaveLength(
+      boardCatalogSections.length,
+    );
+    expect(screen.getAllByRole("button", { name: "取消本分区" })).toHaveLength(
+      boardCatalogSections.length,
+    );
+    expect(screen.getByText("当前已选择 0 个板块")).toBeTruthy();
     expect(screen.getByText("最近导入活动")).toBeTruthy();
     expect(screen.getByText("JobInfo · 任务")).toBeTruthy();
     expect(screen.getByText("IWhisper · 任务")).toBeTruthy();
@@ -270,5 +300,29 @@ describe("admin imports page", () => {
       ).map((input) => input.value),
     ).toEqual(selectableBoards.map((board) => board.boardName));
     expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
+  });
+
+  it("selects and clears boards within a section", async () => {
+    prismaMock.import.findMany.mockResolvedValue([]);
+    prismaMock.importJob.findMany.mockResolvedValue([]);
+    vi.mocked(listRecentImportActivity).mockResolvedValue([]);
+
+    const user = userEvent.setup();
+    await renderAdminImportsPage();
+
+    const iwhisperCheckbox = screen.getByRole("checkbox", { name: "IWhisper" });
+    const talkingCheckbox = screen.getByRole("checkbox", { name: "Talking" });
+
+    await user.click(screen.getAllByRole("button", { name: "全选本分区" })[0]!);
+
+    expect((iwhisperCheckbox as HTMLInputElement).checked).toBe(true);
+    expect((talkingCheckbox as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText("当前已选择 2 个板块")).toBeTruthy();
+
+    await user.click(screen.getAllByRole("button", { name: "取消本分区" })[0]!);
+
+    expect((iwhisperCheckbox as HTMLInputElement).checked).toBe(false);
+    expect((talkingCheckbox as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText("当前已选择 0 个板块")).toBeTruthy();
   });
 });
