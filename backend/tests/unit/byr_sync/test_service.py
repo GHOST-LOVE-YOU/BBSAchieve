@@ -506,6 +506,14 @@ def test_parse_board_time_treats_clock_time_as_today() -> None:
     assert parsed == datetime(2026, 5, 3, 22, 3, 42)
 
 
+def test_parse_board_time_treats_late_clock_time_as_previous_day_across_midnight() -> None:
+    reference_now = datetime(2026, 5, 4, 0, 10, 0)
+
+    parsed = SyncService._parse_board_time("23:55:00", now=reference_now)
+
+    assert parsed == datetime(2026, 5, 3, 23, 55, 0)
+
+
 def test_parse_board_time_treats_date_only_as_end_of_day() -> None:
     parsed = SyncService._parse_board_time(
         "2026-05-02",
@@ -547,7 +555,19 @@ def test_list_updates_scans_until_first_page_with_out_of_window_thread() -> None
         ],
         has_next_page=True,
     )
-    board_service = FakePagedBoardService({1: page_1, 2: page_2})
+    page_3 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id="a3",
+                title="out of window",
+                reply_count=0,
+                post_time="20:00:00",
+                latest_reply_time="20:10:00",
+            ),
+        ],
+        has_next_page=False,
+    )
+    board_service = FakePagedBoardService({1: page_1, 2: page_2, 3: page_3})
     service = SyncService(
         board_service=board_service,
         thread_service=FakeThreadService(),
@@ -562,7 +582,73 @@ def test_list_updates_scans_until_first_page_with_out_of_window_thread() -> None
     )
 
     assert [thread.article_id for thread in result.threads] == ["a1", "a2"]
-    assert board_service.calls == [("IWhisper", 1), ("IWhisper", 2)]
+    assert board_service.calls == [("IWhisper", 1), ("IWhisper", 2), ("IWhisper", 3)]
+
+
+def test_list_updates_keeps_scanning_when_a_page_mixes_old_sticky_threads_with_recent_threads() -> None:
+    page_1 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id="sticky-old",
+                title="sticky old thread",
+                reply_count=0,
+                post_time="2026-05-01",
+                latest_reply_time="2026-05-01",
+            ),
+            FakeBoardThread(
+                article_id="recent-1",
+                title="recent thread 1",
+                reply_count=0,
+                post_time="21:50:00",
+                latest_reply_time="22:05:00",
+            ),
+        ],
+        has_next_page=True,
+    )
+    page_2 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id="recent-2",
+                title="recent thread 2",
+                reply_count=0,
+                post_time="21:48:00",
+                latest_reply_time="22:00:00",
+            ),
+        ],
+        has_next_page=True,
+    )
+    page_3 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id="old-3",
+                title="old thread 3",
+                reply_count=0,
+                post_time="20:00:00",
+                latest_reply_time="20:10:00",
+            ),
+        ],
+        has_next_page=False,
+    )
+    board_service = FakePagedBoardService({1: page_1, 2: page_2, 3: page_3})
+    service = SyncService(
+        board_service=board_service,
+        thread_service=FakeThreadService(),
+        cache=InMemorySyncCache(),
+    )
+
+    result = service.list_updates(
+        board_name="IWhisper",
+        limit=20,
+        window_minutes=30,
+        now=datetime(2026, 5, 3, 22, 10, 0),
+    )
+
+    assert [thread.article_id for thread in result.threads] == ["recent-1", "recent-2"]
+    assert board_service.calls == [
+        ("IWhisper", 1),
+        ("IWhisper", 2),
+        ("IWhisper", 3),
+    ]
 
 
 def test_list_updates_uses_post_time_when_reply_time_is_empty() -> None:
@@ -910,3 +996,86 @@ def test_backfill_thread_trims_posts_before_start_floor() -> None:
     )
 
     assert [post.post_id for post in result.posts] == ["p22", "p23", "p24"]
+
+
+def test_backfill_thread_continues_fetching_later_pages_until_the_gap_is_filled() -> None:
+    thread_service = FakeThreadService(
+        thread_pages={
+            3: FakeThreadPage(
+                posts=[
+                    FakeThreadPost(
+                        post_id="p20",
+                        floor_label="20楼",
+                        author_display_name="alice",
+                        posted_at="Sat Apr 26 13:05:36 2026",
+                        body="old reply",
+                    ),
+                    FakeThreadPost(
+                        post_id="p21",
+                        floor_label="21楼",
+                        author_display_name="alice",
+                        posted_at="Sat Apr 26 13:10:36 2026",
+                        body="old reply",
+                    ),
+                    FakeThreadPost(
+                        post_id="p22",
+                        floor_label="22楼",
+                        author_display_name="alice",
+                        posted_at="Sat Apr 26 13:15:36 2026",
+                        body="new reply",
+                    ),
+                    FakeThreadPost(
+                        post_id="p23",
+                        floor_label="23楼",
+                        author_display_name="alice",
+                        posted_at="Sat Apr 26 13:20:36 2026",
+                        body="new reply",
+                    ),
+                ],
+                total_pages=4,
+            ),
+            4: FakeThreadPage(
+                posts=[
+                    FakeThreadPost(
+                        post_id="p24",
+                        floor_label="24楼",
+                        author_display_name="alice",
+                        posted_at="Sat Apr 26 13:25:36 2026",
+                        body="new reply",
+                    ),
+                    FakeThreadPost(
+                        post_id="p25",
+                        floor_label="25楼",
+                        author_display_name="alice",
+                        posted_at="Sat Apr 26 13:30:36 2026",
+                        body="new reply",
+                    ),
+                ],
+                total_pages=4,
+            ),
+        }
+    )
+    cache = InMemorySyncCache()
+    cache.save_thread_progress(
+        board_name="test_board",
+        article_id="123",
+        reply_count=25,
+    )
+    service = SyncService(
+        board_service=FakeBoardService([]),
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    result = service.backfill_thread(
+        board_name="test_board",
+        article_id="123",
+        start_floor=22,
+        max_backfill_window=30,
+    )
+
+    assert [post.post_id for post in result.posts] == ["p22", "p23", "p24", "p25"]
+    assert thread_service.calls == [
+        ("test_board", "123", 3),
+        ("test_board", "123", 4),
+    ]

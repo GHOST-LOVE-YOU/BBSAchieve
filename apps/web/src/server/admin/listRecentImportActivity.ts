@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { prisma } from "../db/client";
+import type { BoardBatchJobMetadata } from "../imports/boardBatchJobMetadata";
 
 export type RecentImportActivity = {
   id: string;
@@ -12,6 +13,22 @@ export type RecentImportActivity = {
 };
 
 type RecentImportActivityClient = Pick<PrismaClient, "import" | "importJob">;
+
+type ImportJobActivityRow = {
+  id: string;
+  jobType: string;
+  sourceLabel: string | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  processedThreads: number;
+  processedReplies: number;
+  progressNote: string | null;
+  errorMessage: string | null;
+  metadataJson?: unknown;
+};
 
 function toIsoString(value: Date | null | undefined): string {
   return value ? value.toISOString() : new Date(0).toISOString();
@@ -29,6 +46,55 @@ function compareRecentActivityDesc(
   }
 
   return left.id === right.id ? 0 : left.id > right.id ? -1 : 1;
+}
+
+function asBoardBatchJobMetadata(value: unknown): BoardBatchJobMetadata | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const metadata = value as Partial<BoardBatchJobMetadata>;
+  if (
+    !Array.isArray(metadata.selectedBoardNames) ||
+    !Array.isArray(metadata.orderedBoardNames) ||
+    !Array.isArray(metadata.completedBoardNames) ||
+    typeof metadata.currentBoardIndex !== "number" ||
+    typeof metadata.perBoardStats !== "object" ||
+    metadata.perBoardStats === null
+  ) {
+    return null;
+  }
+
+  return metadata as BoardBatchJobMetadata;
+}
+
+function getBatchJobDetail(job: ImportJobActivityRow): string {
+  if (
+    job.progressNote &&
+    (job.status === "paused" || job.status === "pending")
+  ) {
+    return job.progressNote;
+  }
+
+  const metadata = asBoardBatchJobMetadata(job.metadataJson);
+
+  if (metadata?.failedBoardName && job.errorMessage) {
+    return `失败板块 ${metadata.failedBoardName}：${job.errorMessage}`;
+  }
+
+  if (metadata?.failedBoardName) {
+    return `失败板块 ${metadata.failedBoardName}`;
+  }
+
+  if (metadata?.currentBoardName) {
+    return `当前板块 ${metadata.currentBoardName}`;
+  }
+
+  if (job.errorMessage) {
+    return job.errorMessage;
+  }
+
+  return `帖子 ${job.processedThreads}，回复 ${job.processedReplies}`;
 }
 
 export async function listRecentImportActivity(
@@ -50,7 +116,7 @@ export async function listRecentImportActivity(
       },
     }),
     client.importJob.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
       take: 20,
       select: {
         id: true,
@@ -58,12 +124,14 @@ export async function listRecentImportActivity(
         sourceLabel: true,
         status: true,
         createdAt: true,
+        updatedAt: true,
         startedAt: true,
         finishedAt: true,
         processedThreads: true,
         processedReplies: true,
         progressNote: true,
         errorMessage: true,
+        metadataJson: true,
       },
     }),
   ]);
@@ -84,11 +152,15 @@ export async function listRecentImportActivity(
       kind: "import_job" as const,
       title: job.sourceLabel || job.jobType,
       status: job.status,
-      happenedAt: toIsoString(job.finishedAt ?? job.startedAt ?? job.createdAt),
+      happenedAt: toIsoString(job.finishedAt ?? job.updatedAt ?? job.startedAt ?? job.createdAt),
       detail:
-        job.progressNote ??
-        job.errorMessage ??
-        `帖子 ${job.processedThreads}，回复 ${job.processedReplies}`,
+        job.jobType === "byr_board_full_sync_batch"
+          ? getBatchJobDetail(job)
+          : (
+              job.progressNote ??
+              job.errorMessage ??
+              `帖子 ${job.processedThreads}，回复 ${job.processedReplies}`
+            ),
     })),
   ].sort(compareRecentActivityDesc);
 

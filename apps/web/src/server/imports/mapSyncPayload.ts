@@ -5,9 +5,7 @@ import type {
   SyncReplyDTO,
   SyncThreadDTO,
 } from "./syncTypes";
-
-const DEFAULT_BOARD_SLUG = "iwhisper";
-const DEFAULT_BOARD_NAME = "IWhisper";
+import { resolveBoardIdentity } from "@/src/server/boardSync/resolveBoardIdentity";
 
 function isOriginalPostFloor(floorLabel: string): boolean {
   const normalized = floorLabel.trim();
@@ -31,11 +29,7 @@ function getNamedFloorIndex(floorLabel: string): number | null {
 }
 
 function normalizeBoardName(boardName: string): { slug: string; name: string } {
-  const trimmed = boardName.trim();
-  return {
-    slug: trimmed.length > 0 ? trimmed.toLowerCase() : DEFAULT_BOARD_SLUG,
-    name: trimmed.length > 0 ? trimmed : DEFAULT_BOARD_NAME,
-  };
+  return resolveBoardIdentity(boardName);
 }
 
 function parseReplyIndex(floorLabel: string): number {

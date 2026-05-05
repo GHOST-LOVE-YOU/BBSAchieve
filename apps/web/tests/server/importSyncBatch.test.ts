@@ -296,6 +296,43 @@ describe("mapSyncPayload", () => {
     ]);
   });
 
+  it("uses the canonical catalog slug for known boards", () => {
+    const batch = mapSyncPayload({
+      board_name: "JobInfo",
+      window_minutes: 180,
+      scanned_pages: 1,
+      cutoff_at: "2026-04-26T13:55:36+08:00",
+      threads: [
+        {
+          article_id: "3001",
+          title: "JobInfo thread",
+          reply_count: 0,
+          posts: [
+            {
+              post_id: "3001",
+              floor_label: "楼主",
+              author_display_name: "JobInfo#001",
+              posted_at: "Sun Apr 26 13:25:36 2026",
+              body: "Opening body",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(batch.boards).toEqual([
+      {
+        slug: "job-info",
+        name: "JobInfo",
+        description: "",
+      },
+    ]);
+    expect(batch.threads[0]).toMatchObject({
+      sourceBoardSlug: "job-info",
+      sourceThreadId: "3001",
+    });
+  });
+
   it("preserves the legacy alias", () => {
     const payload = {
       board_name: "IWhisper",

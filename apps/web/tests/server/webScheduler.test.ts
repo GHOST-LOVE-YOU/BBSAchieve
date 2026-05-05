@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
+import { getScheduledBoardTasks } from "@/src/server/boardSync/boardRegistry";
 import { scheduledTasks } from "@/src/server/scheduler/taskRegistry";
 
 const enabledTaskCount = scheduledTasks.filter((task) => task.enabled).length;
+const scheduledBoardNames = boardCatalog
+  .filter((board) => board.scheduledSyncEnabled)
+  .map((board) => board.boardName);
 
 function resetWebSchedulerState() {
   delete (
@@ -22,6 +27,14 @@ describe("startWebScheduler", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     resetWebSchedulerState();
+  });
+
+  it("registers one enabled task per explicitly scheduled board", async () => {
+    expect(scheduledTasks).toEqual(getScheduledBoardTasks());
+    expect(enabledTaskCount).toBe(scheduledBoardNames.length);
+    expect(scheduledTasks.map((task) => task.boardName)).toEqual(
+      scheduledBoardNames,
+    );
   });
 
   it("does not start when WEB_SCHEDULER_ENABLED is false", async () => {

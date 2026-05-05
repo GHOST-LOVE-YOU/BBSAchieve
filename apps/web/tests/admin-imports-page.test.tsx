@@ -24,14 +24,20 @@ vi.mock("next/link", () => ({
   },
 }));
 
-import AdminImportsPage from "../app/admin/imports/page";
 import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
-import { boardSyncBoards } from "@/src/server/boardSync/boardRegistry";
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 
-const fullSyncBoards = boardSyncBoards.filter((board) => board.fullSyncEnabled);
+const selectableBoards = boardCatalog;
+
+async function renderAdminImportsPage() {
+  const { default: AdminImportsPage } = await import("../app/admin/imports/page");
+  render(await AdminImportsPage());
+}
 
 describe("admin imports page", () => {
   beforeEach(() => {
+    vi.resetModules();
+    vi.doUnmock("@/src/server/boardSync/boardRegistry");
     vi.clearAllMocks();
   });
 
@@ -39,14 +45,21 @@ describe("admin imports page", () => {
     cleanup();
   });
 
-  it("renders board full-sync actions without old import controls", async () => {
+  it("renders only boards enabled for manual full sync in the batch selection", async () => {
+    const { boardCatalog: runtimeBoardCatalog } = await import("@/src/server/boardSync/boardCatalog");
+    const board = runtimeBoardCatalog.find((item) => item.boardName === "JobInfo");
+    expect(board).toBeTruthy();
+    const previousValue = board?.fullSyncEnabled;
+    if (board) {
+      board.fullSyncEnabled = false;
+    }
     prismaMock.import.findMany.mockResolvedValue([]);
     prismaMock.importJob.findMany.mockResolvedValue([
       {
         id: "job-1",
-        jobType: "byr_board_full_sync",
+        jobType: "byr_board_full_sync_batch",
         sourceType: "byr_sync_api",
-        sourceLabel: "JobInfo",
+        sourceLabel: "multi-board full sync",
         status: "pending",
         cursorThreadKey: null,
         processedThreads: 0,
@@ -60,30 +73,49 @@ describe("admin imports page", () => {
     ]);
     vi.mocked(listRecentImportActivity).mockResolvedValue([]);
 
-    render(await AdminImportsPage());
+    try {
+      await renderAdminImportsPage();
 
-    const boardFullSyncButtons = screen.getAllByRole("button", {
-      name: /开始抓取 .* 全量内容/u,
-    });
+      const batchStartButton = screen.getByRole("button", { name: "开始全量抓取" });
 
-    expect(boardFullSyncButtons).toHaveLength(fullSyncBoards.length);
-    expect(boardFullSyncButtons.map((button) => button.textContent)).toEqual(
-      fullSyncBoards.map((board) => `开始抓取 ${board.boardName} 全量内容`),
-    );
-    expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
-    expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "停止" })).toBeTruthy();
-    expect(screen.getByText("waiting for slot")).toBeTruthy();
+      expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
+      const enabledBoard = screen.getByRole("checkbox", { name: "IWhisper" });
+      expect(enabledBoard).toBeTruthy();
+      expect(enabledBoard.getAttribute("name")).toBe("boardNames");
+      expect(enabledBoard.getAttribute("value")).toBe("IWhisper");
+      expect(screen.queryByRole("checkbox", { name: "JobInfo" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /旧库导入/u })).toBeNull();
+      expect(screen.queryByRole("button", { name: /开始抓取 .* 全量内容/u })).toBeNull();
+      expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "停止" })).toBeTruthy();
+      expect(screen.getByText("waiting for slot")).toBeTruthy();
+      expect(screen.getByText("当前将按首页目录顺序串行抓取：IWhisper")).toBeTruthy();
 
-    const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
-    expect(boardFullSyncForms.map((form) => form?.getAttribute("action"))).toEqual(
-      fullSyncBoards.map(() => "/admin/api/import-jobs/byr-board-full-sync"),
-    );
-    expect(
-      boardFullSyncForms.map((form) =>
-        form?.querySelector<HTMLInputElement>('input[name="boardName"]')?.value,
-      ),
-    ).toEqual(fullSyncBoards.map((board) => board.boardName));
+      const batchForm = batchStartButton.closest("form");
+      const syncForm = screen
+        .getByRole("button", { name: "同步北邮人数据" })
+        .closest("form");
+      expect(
+        (syncForm?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)?.value,
+      ).toBe("/admin/imports");
+      expect(batchForm?.getAttribute("action")).toBe(
+        "/admin/api/import-jobs/byr-board-full-sync-batch",
+      );
+      expect(
+        (batchForm?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)?.value,
+      ).toBe("/admin/imports");
+      expect(
+        Array.from(
+          batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
+            [],
+        ).map((input) => input.value),
+      ).toEqual(["IWhisper"]);
+      expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
+    } finally {
+      if (board && previousValue !== undefined) {
+        board.fullSyncEnabled = previousValue;
+      }
+    }
   });
 
   it("renders a stop action for pending board full-sync jobs", async () => {
@@ -91,9 +123,9 @@ describe("admin imports page", () => {
     prismaMock.importJob.findMany.mockResolvedValue([
       {
         id: "job-pending",
-        jobType: "byr_board_full_sync",
+        jobType: "byr_board_full_sync_batch",
         sourceType: "byr_sync_api",
-        sourceLabel: "IWhisper",
+        sourceLabel: "multi-board full sync",
         status: "pending",
         cursorThreadKey: null,
         processedThreads: 0,
@@ -107,12 +139,16 @@ describe("admin imports page", () => {
     ]);
     vi.mocked(listRecentImportActivity).mockResolvedValue([]);
 
-    render(await AdminImportsPage());
+    await renderAdminImportsPage();
 
     const stopButton = screen.getByRole("button", { name: "停止" });
-    expect(stopButton.closest("form")?.getAttribute("action")).toBe(
+    const stopForm = stopButton.closest("form");
+    expect(stopForm?.getAttribute("action")).toBe(
       "/admin/api/import-jobs/job-pending/stop",
     );
+    expect(
+      (stopForm?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)?.value,
+    ).toBe("/admin/imports");
     expect(screen.getByText("skipped by global throttle")).toBeTruthy();
   });
 
@@ -138,9 +174,9 @@ describe("admin imports page", () => {
     prismaMock.importJob.findMany.mockResolvedValue([
       {
         id: "job-1",
-        jobType: "byr_board_full_sync",
+        jobType: "byr_board_full_sync_batch",
         sourceType: "byr_sync_api",
-        sourceLabel: "JobInfo",
+        sourceLabel: "multi-board full sync",
         status: "running",
         cursorThreadKey: "2026-05-02T10:00:00.000Z|post-2",
         processedThreads: 3,
@@ -179,14 +215,18 @@ describe("admin imports page", () => {
       },
     ]);
 
-    render(await AdminImportsPage());
+    await renderAdminImportsPage();
 
     expect(screen.getByRole("heading", { name: "导入导出" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "同步北邮人数据" })).toBeTruthy();
-    for (const board of fullSyncBoards) {
-      expect(
-        screen.getByRole("button", { name: `开始抓取 ${board.boardName} 全量内容` }),
-      ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "开始全量抓取" })).toBeTruthy();
+    expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
+    for (const board of selectableBoards) {
+      if (board.fullSyncEnabled) {
+        expect(screen.getByRole("checkbox", { name: board.boardName })).toBeTruthy();
+      } else {
+        expect(screen.queryByRole("checkbox", { name: board.boardName })).toBeNull();
+      }
     }
     expect(screen.getByText("最近导入活动")).toBeTruthy();
     expect(screen.getByText("JobInfo · 任务")).toBeTruthy();
@@ -198,7 +238,7 @@ describe("admin imports page", () => {
     expect(screen.getByText("回复：10")).toBeTruthy();
     expect(screen.getByText("Sync API request failed: 401")).toBeTruthy();
     expect(screen.getByText("板块全量抓取任务")).toBeTruthy();
-    expect(screen.getByText("byr_board_full_sync")).toBeTruthy();
+    expect(screen.getByText("byr_board_full_sync_batch")).toBeTruthy();
     expect(screen.queryByText(/legacy_/u)).toBeNull();
     expect(screen.getByText("running")).toBeTruthy();
     expect(screen.getByText("2026-05-02T10:00:00.000Z|post-2")).toBeTruthy();
@@ -209,23 +249,26 @@ describe("admin imports page", () => {
     expect(screen.getAllByRole("button", { name: "停止" })).toHaveLength(1);
 
     expect(prismaMock.importJob.findMany).toHaveBeenCalledWith({
-      where: { jobType: "byr_board_full_sync" },
-      orderBy: { createdAt: "desc" },
+      where: { jobType: "byr_board_full_sync_batch" },
+      orderBy: { updatedAt: "desc" },
       take: 20,
     });
 
-    const boardFullSyncButtons = screen.getAllByRole("button", {
-      name: /开始抓取 .* 全量内容/u,
-    });
-    expect(boardFullSyncButtons).toHaveLength(fullSyncBoards.length);
-    const boardFullSyncForms = boardFullSyncButtons.map((button) => button.closest("form"));
-    expect(boardFullSyncForms.map((form) => form?.getAttribute("action"))).toEqual(
-      fullSyncBoards.map(() => "/admin/api/import-jobs/byr-board-full-sync"),
+    const batchForm = screen
+      .getByRole("button", { name: "开始全量抓取" })
+      .closest("form");
+    expect(batchForm?.getAttribute("action")).toBe(
+      "/admin/api/import-jobs/byr-board-full-sync-batch",
     );
     expect(
-      boardFullSyncForms.map((form) =>
-        form?.querySelector<HTMLInputElement>('input[name="boardName"]')?.value,
-      ),
-    ).toEqual(fullSyncBoards.map((board) => board.boardName));
+      (batchForm?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)?.value,
+    ).toBe("/admin/imports");
+    expect(
+      Array.from(
+        batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
+          [],
+      ).map((input) => input.value),
+    ).toEqual(selectableBoards.map((board) => board.boardName));
+    expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
   });
 });

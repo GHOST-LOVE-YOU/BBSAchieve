@@ -1,4 +1,7 @@
+import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
+
+import { createBatchJobMetadata } from "./boardBatchJobMetadata";
 
 export type ImportJobStore = Pick<PrismaClient, "importJob">;
 
@@ -6,6 +9,11 @@ export type BoardFullSyncJobInput = {
   boardName: string;
   fullSyncWindowMinutes: number;
   requestedBy?: string | null;
+};
+
+export type BoardBatchFullSyncJobInput = {
+  selectedBoardNames: string[];
+  orderedBoardNames: string[];
 };
 
 export type JobProgressUpdate = {
@@ -16,6 +24,7 @@ export type JobProgressUpdate = {
   skippedReplies?: number;
   progressNote?: string | null;
   lastProcessedAt?: Date | null;
+  metadataJson?: Prisma.InputJsonValue | null;
 };
 
 export function createBoardFullSyncJob(
@@ -43,6 +52,34 @@ export function createBoardFullSyncJob(
         fullSyncWindowMinutes: input.fullSyncWindowMinutes,
         requestedBy: input.requestedBy ?? null,
       },
+    },
+  });
+}
+
+export function createBoardBatchFullSyncJob(
+  prisma: ImportJobStore,
+  input: BoardBatchFullSyncJobInput,
+) {
+  return prisma.importJob.create({
+    data: {
+      jobType: "byr_board_full_sync_batch",
+      sourceType: "byr_sync_api",
+      sourceLabel: "multi-board full sync",
+      status: "pending",
+      cursorThreadKey: null,
+      lastProcessedAt: null,
+      startedAt: null,
+      finishedAt: null,
+      processedThreads: 0,
+      processedReplies: 0,
+      skippedThreads: 0,
+      skippedReplies: 0,
+      errorMessage: null,
+      progressNote: null,
+      metadataJson: createBatchJobMetadata({
+        selectedBoardNames: input.selectedBoardNames,
+        orderedBoardNames: input.orderedBoardNames,
+      }),
     },
   });
 }
@@ -104,31 +141,39 @@ export function updateJobProgress(
   jobId: string,
   progress: JobProgressUpdate,
 ) {
+  const data = {
+    ...(progress.cursorThreadKey === undefined
+      ? {}
+      : { cursorThreadKey: progress.cursorThreadKey }),
+    ...(progress.processedThreads === undefined
+      ? {}
+      : { processedThreads: progress.processedThreads }),
+    ...(progress.processedReplies === undefined
+      ? {}
+      : { processedReplies: progress.processedReplies }),
+    ...(progress.skippedThreads === undefined
+      ? {}
+      : { skippedThreads: progress.skippedThreads }),
+    ...(progress.skippedReplies === undefined
+      ? {}
+      : { skippedReplies: progress.skippedReplies }),
+    ...(progress.progressNote === undefined
+      ? {}
+      : { progressNote: progress.progressNote }),
+    ...(progress.lastProcessedAt === undefined
+      ? {}
+      : { lastProcessedAt: progress.lastProcessedAt }),
+    ...(progress.metadataJson === undefined
+      ? {}
+      : {
+          metadataJson:
+            progress.metadataJson === null ? Prisma.DbNull : progress.metadataJson,
+        }),
+  };
+
   return prisma.importJob.update({
     where: { id: jobId },
-    data: {
-      ...(progress.cursorThreadKey === undefined
-        ? {}
-        : { cursorThreadKey: progress.cursorThreadKey }),
-      ...(progress.processedThreads === undefined
-        ? {}
-        : { processedThreads: progress.processedThreads }),
-      ...(progress.processedReplies === undefined
-        ? {}
-        : { processedReplies: progress.processedReplies }),
-      ...(progress.skippedThreads === undefined
-        ? {}
-        : { skippedThreads: progress.skippedThreads }),
-      ...(progress.skippedReplies === undefined
-        ? {}
-        : { skippedReplies: progress.skippedReplies }),
-      ...(progress.progressNote === undefined
-        ? {}
-        : { progressNote: progress.progressNote }),
-      ...(progress.lastProcessedAt === undefined
-        ? {}
-        : { lastProcessedAt: progress.lastProcessedAt }),
-    },
+    data,
   });
 }
 
@@ -183,6 +228,24 @@ export function markJobFailed(
     where: {
       id: jobId,
       status: "running",
+    },
+    data: {
+      status: "failed",
+      finishedAt: new Date(),
+      errorMessage,
+    },
+  });
+}
+
+export function markJobFailedBeforeOrDuringRun(
+  prisma: ImportJobStore,
+  jobId: string,
+  errorMessage: string,
+) {
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: { in: ["pending", "running", "paused"] },
     },
     data: {
       status: "failed",

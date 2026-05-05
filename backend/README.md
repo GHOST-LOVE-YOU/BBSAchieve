@@ -22,7 +22,7 @@
 ## 常用命令
 
 ```bash
-cd /home/yinyra/code/bbsAchieve/backend
+cd backend
 uv run pytest -q
 uv run byr-bbs login
 uv run byr-bbs board --name IWhisper --page 1
@@ -34,7 +34,10 @@ uv run byr-sync-cache
 
 ## 同步 API
 
-当前仓库已经具备可直接运行的同步 API，入口为 `byr-sync-api`。
+当前仓库已经具备可直接运行的同步 API，入口为 `byr-sync-api`。它负责向 Web 提供两类能力：
+
+- 主拉取：`/api/sync/updates`
+- 指定帖子补拉：`/api/sync/backfill`
 
 1. 启动本地 Redis：
 
@@ -57,17 +60,21 @@ uv run byr-sync-cache
 
 4. 访问接口：
 
-  - `GET /healthz`
-  - `GET /api/sync/updates`
-  - `GET /api/sync/backfill`
+- `GET /healthz`
+- `GET /api/sync/updates`
+- `GET /api/sync/backfill`
 
 示例：
 
 - `GET /api/sync/updates?board_name=IWhisper&window_minutes=30`
 
-`/api/sync/updates` 既服务最近窗口同步，也服务 Web 端首次全量抓取。全量抓取不会新增独立接口，而是通过更大的 `window_minutes` 复用同一条同步链路。为避免影响主站，抓取循环会在多页请求之间执行固定等待。
+`/api/sync/updates` 既服务最近窗口同步，也服务 Web 端的批量全量抓取。全量抓取不会新增独立接口，而是通过更大的 `window_minutes` 复用同一条同步链路。为避免影响主站，抓取循环会在多页请求之间执行固定等待。
 
-`/api/sync/updates` 会从第 1 页开始按最近活动顺序翻页，并在遇到窗口外主题后停止继续翻页。版面列表中的 `HH:MM:SS` 按当天时间解析，`YYYY-MM-DD` 按当日 `23:59:59` 解析。
+当前分支里，Web 会先在代码中固化一份首页板块目录，再由前端多选创建一条批量全量抓取总任务；后端不需要为每个板块暴露独立全量接口，只需继续把 `/api/sync/updates` 作为统一入口。Web 最近同步通常会带较小的 `limit`，而批量全量抓取会复用同一接口、传入更大的 `window_minutes`，并且不附带 `limit` 参数，让服务按时间窗口持续翻页。
+
+`/api/sync/updates` 会从第 1 页开始按最近活动顺序翻页，并在遇到窗口外主题后停止继续翻页；如果请求带了 `limit`，则会在达到条数后提前停止。版面列表中的 `HH:MM:SS` 按当天时间解析，`YYYY-MM-DD` 按当日 `23:59:59` 解析。
+
+`/api/sync/backfill` 继续用于指定帖子补拉，供 Web 在已知帖子或回复需要追补时单独请求，不参与批量全量抓取的主流程。
 
 同步接口会复用本地北邮人账号登录态，因此 `BBS_USERNAME` 和 `BBS_PASSWORD` 仍然需要在 `backend/.env` 中配置。`BYR_SYNC_API_TOKEN` 用于保护同步接口，`BYR_SYNC_REDIS_URL` 需要指向可用的 Redis 连接地址。
 

@@ -5,50 +5,38 @@ import {
   getBoardFullSyncDefinition,
   getScheduledBoardTasks,
 } from "@/src/server/boardSync/boardRegistry";
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 
 describe("boardRegistry", () => {
-  it("exposes the JobInfo board with concrete full-sync and scheduled settings", () => {
-    expect(boardSyncBoards).toContainEqual({
-      boardName: "JobInfo",
-      boardSlug: "job-info",
-      title: "JobInfo 全量与定时同步",
-      description: "管理员手动全量抓取 JobInfo，并按固定间隔同步最近内容。",
-      fullSyncEnabled: true,
-      fullSyncWindowMinutes: 60 * 24 * 365 * 10,
-      scheduledSyncEnabled: true,
-      scheduledIntervalMinutes: 120,
-      scheduledWindowMinutes: 180,
-    });
+  it("returns a full-sync definition by board name from the catalog-derived registry", () => {
+    const jobInfo = boardCatalog.find((board) => board.boardName === "JobInfo");
+
+    expect(jobInfo).toBeTruthy();
+    expect(getBoardFullSyncDefinition("JobInfo")).toEqual(jobInfo);
   });
 
-  it("returns a full-sync definition by board name", () => {
-    expect(getBoardFullSyncDefinition("JobInfo")).toEqual({
-      boardName: "JobInfo",
-      boardSlug: "job-info",
-      title: "JobInfo 全量与定时同步",
-      description: "管理员手动全量抓取 JobInfo，并按固定间隔同步最近内容。",
-      fullSyncEnabled: true,
-      fullSyncWindowMinutes: 60 * 24 * 365 * 10,
-      scheduledSyncEnabled: true,
-      scheduledIntervalMinutes: 120,
-      scheduledWindowMinutes: 180,
-    });
+  it("returns null when a board is missing from the catalog-derived registry", () => {
+    expect(getBoardFullSyncDefinition("MissingBoard")).toBeNull();
   });
 
-  it("builds the expected scheduled task for JobInfo only", () => {
-    expect(getScheduledBoardTasks()).toEqual([
-      {
-        taskKey: "job-info_recent_sync",
-        title: "JobInfo 最近内容同步",
-        description: "每 120 分钟同步一次 JobInfo 最近 180 分钟内容",
-        sourceType: "byr_sync_api",
-        sourceLabel: "JobInfo recent sync",
-        boardName: "JobInfo",
-        intervalMinutes: 120,
-        windowMinutes: 180,
-        enabled: true,
-        runnerType: "byr_sync_recent_window",
-      },
-    ]);
+  it("keeps scheduled task derivation aligned with the catalog order", () => {
+    expect(getScheduledBoardTasks().map((task) => task.boardName)).toEqual(
+      boardSyncBoards.filter((board) => board.scheduledSyncEnabled).map((board) => board.boardName),
+    );
+  });
+
+  it("derives concrete scheduled task fields for JobInfo", () => {
+    expect(getScheduledBoardTasks().find((task) => task.boardName === "JobInfo")).toEqual({
+      taskKey: "job-info_recent_sync",
+      title: "JobInfo 最近内容同步",
+      description: "每 120 分钟同步一次 JobInfo 最近 180 分钟内容",
+      sourceType: "byr_sync_api",
+      sourceLabel: "JobInfo recent sync",
+      boardName: "JobInfo",
+      intervalMinutes: 120,
+      windowMinutes: 180,
+      enabled: true,
+      runnerType: "byr_sync_recent_window",
+    });
   });
 });

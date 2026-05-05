@@ -1,14 +1,6 @@
-export type BoardSyncDefinition = {
-  boardName: string;
-  boardSlug: string;
-  title: string;
-  description: string;
-  fullSyncEnabled: boolean;
-  fullSyncWindowMinutes: number;
-  scheduledSyncEnabled: boolean;
-  scheduledIntervalMinutes: number;
-  scheduledWindowMinutes: number;
-};
+import { boardCatalog, type BoardCatalogEntry } from "./boardCatalog";
+
+export type BoardSyncDefinition = BoardCatalogEntry;
 
 export type DerivedScheduledBoardTask = {
   taskKey: string;
@@ -23,19 +15,7 @@ export type DerivedScheduledBoardTask = {
   runnerType: "byr_sync_recent_window";
 };
 
-export const boardSyncBoards: readonly BoardSyncDefinition[] = [
-  {
-    boardName: "JobInfo",
-    boardSlug: "job-info",
-    title: "JobInfo 全量与定时同步",
-    description: "管理员手动全量抓取 JobInfo，并按固定间隔同步最近内容。",
-    fullSyncEnabled: true,
-    fullSyncWindowMinutes: 60 * 24 * 365 * 10,
-    scheduledSyncEnabled: true,
-    scheduledIntervalMinutes: 120,
-    scheduledWindowMinutes: 180,
-  },
-];
+export const boardSyncBoards: readonly BoardSyncDefinition[] = boardCatalog;
 
 export function getBoardFullSyncDefinition(boardName: string) {
   return boardSyncBoards.find((board) => board.boardName === boardName) ?? null;

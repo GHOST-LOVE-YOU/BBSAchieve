@@ -195,12 +195,23 @@ class SyncService:
 
         page = max(1, ((start_floor - 1) // 10) + 1)
         self._sleep_between_requests()
-        thread_page = self.thread_service.fetch_page(
+        first_page = self.thread_service.fetch_page(
             board_name=board_name,
             article_id=article_id,
             page=page,
         )
-        observed_max_floor = self._observed_max_floor(thread_page.posts)
+        posts = list(first_page.posts)
+        total_pages = max(page, getattr(first_page, "total_pages", page))
+        for next_page in range(page + 1, total_pages + 1):
+            self._sleep_between_requests()
+            page_result = self.thread_service.fetch_page(
+                board_name=board_name,
+                article_id=article_id,
+                page=next_page,
+            )
+            posts.extend(page_result.posts)
+
+        observed_max_floor = self._observed_max_floor(posts)
         known_upper_floor = observed_max_floor
         if cached is not None:
             cached_reply_count = cached.reply_count
@@ -214,12 +225,11 @@ class SyncService:
             and known_upper_floor - start_floor > max_backfill_window
         ):
             raise ValueError("Requested rewind exceeds max backfill window")
-        posts = self._build_backfill_posts(thread_page.posts, start_floor=start_floor)
         return BackfillResult(
             board_name=board_name,
             article_id=article_id,
             start_floor=start_floor,
-            posts=posts,
+            posts=self._build_backfill_posts(posts, start_floor=start_floor),
         )
 
     def fetch_original_post(
@@ -321,19 +331,18 @@ class SyncService:
         cutoff = now - timedelta(minutes=window_minutes)
         collected: list[BoardThreadLike] = []
         page = 1
-        reached_out_of_window = False
 
         while limit is None or len(collected) < limit:
             board_page = self.board_service.fetch_page(board_name=board_name, page=page)
+            page_has_in_window_thread = False
             for thread in board_page.threads:
                 observed_time = self._resolve_thread_observed_time(thread, now=now)
                 if observed_time >= cutoff:
+                    page_has_in_window_thread = True
                     collected.append(thread)
                     if limit is not None and len(collected) >= limit:
                         return collected, page
-                else:
-                    reached_out_of_window = True
-            if reached_out_of_window or not board_page.has_next_page:
+            if not page_has_in_window_thread or not board_page.has_next_page:
                 break
             self._sleep_between_requests()
             page += 1
@@ -424,7 +433,10 @@ class SyncService:
         normalized = raw_time.strip()
         if re.fullmatch(r"\d{2}:\d{2}:\d{2}", normalized):
             clock_time = datetime.strptime(normalized, "%H:%M:%S").time()
-            return datetime.combine(now.date(), clock_time)
+            parsed = datetime.combine(now.date(), clock_time)
+            if parsed - now > timedelta(hours=12):
+                return parsed - timedelta(days=1)
+            return parsed
         if re.fullmatch(r"\d{4}-\d{2}-\d{2}", normalized):
             parsed_date = datetime.strptime(normalized, "%Y-%m-%d").date()
             return datetime.combine(parsed_date, time(23, 59, 59))

@@ -1,20 +1,20 @@
 import Link from "next/link";
 
-import { boardSyncBoards } from "@/src/server/boardSync/boardRegistry";
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 import { prisma } from "@/src/server/db/client";
 import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminImportsPage() {
-  const fullSyncBoards = boardSyncBoards.filter((board) => board.fullSyncEnabled);
+  const selectableBoards = boardCatalog.filter((board) => board.fullSyncEnabled);
   const imports = await prisma.import.findMany({
     orderBy: { startedAt: "desc" },
     take: 20,
   });
   const importJobs = await prisma.importJob.findMany({
-    where: { jobType: "byr_board_full_sync" },
-    orderBy: { createdAt: "desc" },
+    where: { jobType: "byr_board_full_sync_batch" },
+    orderBy: { updatedAt: "desc" },
     take: 20,
   });
   const recentActivity = await listRecentImportActivity(prisma);
@@ -28,6 +28,7 @@ export default async function AdminImportsPage() {
         <h1 className="text-3xl font-semibold">导入导出</h1>
         <div className="grid gap-3">
           <form action="/admin/api/imports/byr-sync" method="post">
+            <input type="hidden" name="redirectTo" value="/admin/imports" />
             <button
               className="rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white"
               type="submit"
@@ -35,21 +36,55 @@ export default async function AdminImportsPage() {
               同步北邮人数据
             </button>
           </form>
-          {fullSyncBoards.map((board) => (
-            <form
-              key={board.boardName}
-              action="/admin/api/import-jobs/byr-board-full-sync"
-              method="post"
+          <form
+            action="/admin/api/import-jobs/byr-board-full-sync-batch"
+            method="post"
+            className="rounded-xl border border-zinc-200 p-4"
+          >
+            <input type="hidden" name="redirectTo" value="/admin/imports" />
+            <fieldset className="grid gap-3">
+              <legend className="text-sm font-medium text-zinc-900">选择要全量抓取的板块</legend>
+              {selectableBoards.map((board) => (
+                <div
+                  key={board.boardName}
+                  className="flex items-start gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                >
+                  <input
+                    id={`board-${board.boardSlug}`}
+                    type="checkbox"
+                    name="boardNames"
+                    value={board.boardName}
+                    defaultChecked
+                    className="mt-0.5"
+                    aria-describedby={`board-${board.boardSlug}-description`}
+                  />
+                  <span className="grid gap-1">
+                    <label
+                      htmlFor={`board-${board.boardSlug}`}
+                      className="font-medium text-zinc-900"
+                    >
+                      {board.boardName}
+                    </label>
+                    <span
+                      id={`board-${board.boardSlug}-description`}
+                      className="text-zinc-500"
+                    >
+                      {board.description}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </fieldset>
+            <button
+              className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
+              type="submit"
             >
-              <input type="hidden" name="boardName" value={board.boardName} />
-              <button
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
-                type="submit"
-              >
-                {`开始抓取 ${board.boardName} 全量内容`}
-              </button>
-            </form>
-          ))}
+              开始全量抓取
+            </button>
+            <p className="mt-3 text-sm text-zinc-500">
+              当前将按首页目录顺序串行抓取：{selectableBoards.map((board) => board.boardName).join("、")}
+            </p>
+          </form>
         </div>
       </div>
 
@@ -127,6 +162,7 @@ export default async function AdminImportsPage() {
                       <div className="flex flex-wrap gap-2">
                         {(job.status === "paused" || job.status === "failed") ? (
                           <form action={`/admin/api/import-jobs/${job.id}/resume`} method="post">
+                            <input type="hidden" name="redirectTo" value="/admin/imports" />
                             <button
                               className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs"
                               type="submit"
@@ -137,6 +173,7 @@ export default async function AdminImportsPage() {
                         ) : null}
                         {(job.status === "pending" || job.status === "running" || job.status === "paused" || job.status === "failed") ? (
                           <form action={`/admin/api/import-jobs/${job.id}/stop`} method="post">
+                            <input type="hidden" name="redirectTo" value="/admin/imports" />
                             <button
                               className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs"
                               type="submit"
