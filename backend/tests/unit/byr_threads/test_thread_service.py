@@ -124,3 +124,15 @@ def test_decode_text_respects_response_encoding() -> None:
     response.encoding = "gbk"
 
     assert ThreadService._decode_text(response) == "悄悄话"
+
+
+def test_decode_text_falls_back_when_response_encoding_is_wrong() -> None:
+    request = httpx.Request("GET", "https://bbs.byr.cn/article/IWhisper/123")
+    response = httpx.Response(
+        200,
+        content="悄悄话".encode("utf-8"),
+        request=request,
+    )
+    response.encoding = "gbk"
+
+    assert ThreadService._decode_text(response) == "悄悄话"

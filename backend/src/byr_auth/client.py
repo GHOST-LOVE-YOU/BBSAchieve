@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 from dotenv import dotenv_values
 
+from .encoding import decode_response_text
 from .models import AuthContext, AuthError, LoginResult, SessionInfo
 from .store import CookieStore
 
@@ -144,13 +145,4 @@ class ByrAuthClient:
 
     @staticmethod
     def _decode_text(response: httpx.Response) -> str:
-        attempted_encodings: list[str] = []
-        for encoding in [response.encoding, "utf-8", "gbk", "gb18030"]:
-            if not encoding or encoding in attempted_encodings:
-                continue
-            attempted_encodings.append(encoding)
-            try:
-                return response.content.decode(encoding)
-            except (LookupError, UnicodeDecodeError):
-                continue
-        return response.content.decode("utf-8", errors="replace")
+        return decode_response_text(response)

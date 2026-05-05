@@ -48,6 +48,18 @@ def test_decode_text_respects_response_encoding() -> None:
     assert BoardService._decode_text(response) == "悄悄话"
 
 
+def test_decode_text_falls_back_when_response_encoding_is_wrong() -> None:
+    request = httpx.Request("GET", "https://bbs.byr.cn/board/IWhisper")
+    response = httpx.Response(
+        200,
+        content="悄悄话".encode("utf-8"),
+        request=request,
+    )
+    response.encoding = "gbk"
+
+    assert BoardService._decode_text(response) == "悄悄话"
+
+
 def test_fetch_page_passes_sticky_filter_option() -> None:
     service = BoardService(FakeAuthClient())
     request = httpx.Request("GET", "https://bbs.byr.cn/board/IWhisper?p=1&_uid=42")
