@@ -43,6 +43,7 @@ function makeDeps(options?: {
   markJobPaused?: ReturnType<typeof vi.fn>;
   findJobById?: ReturnType<typeof vi.fn>;
   getBoardFullSyncWindowMinutes?: ReturnType<typeof vi.fn>;
+  sleepBetweenBoards?: ReturnType<typeof vi.fn>;
   status?: string;
 }) {
   const metadata =
@@ -82,6 +83,7 @@ function makeDeps(options?: {
     getBoardFullSyncWindowMinutes:
       options?.getBoardFullSyncWindowMinutes ??
       vi.fn((boardName: string) => (boardName === "IWhisper" ? 30 : 180)),
+    sleepBetweenBoards: options?.sleepBetweenBoards,
     prisma: {},
   };
 }
@@ -417,6 +419,31 @@ describe("runBoardBatchFullSyncJob", () => {
       expect.objectContaining({
         boardName: secondBoardName,
         windowMinutes: secondBoardName === "IWhisper" ? 45 : 90,
+      }),
+    );
+    expect(result.status).toBe("succeeded");
+  });
+
+  it("waits between completed boards before starting the next board", async () => {
+    const sleepBetweenBoards = vi.fn(async () => undefined);
+    const deps = makeDeps({
+      sleepBetweenBoards,
+    });
+
+    const result = await runBoardBatchFullSyncJob(deps as never, {
+      jobId: "batch-1",
+      ...makeThrottle(),
+    });
+
+    expect(sleepBetweenBoards).toHaveBeenCalledTimes(1);
+    expect(sleepBetweenBoards).toHaveBeenCalledWith({
+      completedBoardName: firstBoardName,
+      nextBoardName: secondBoardName,
+    });
+    expect(deps.runByrSyncImport).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        boardName: secondBoardName,
       }),
     );
     expect(result.status).toBe("succeeded");

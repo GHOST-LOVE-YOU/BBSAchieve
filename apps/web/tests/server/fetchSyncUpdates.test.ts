@@ -30,7 +30,30 @@ describe("fetchSyncUpdates", () => {
     await expect(
       fetchSyncUpdates({ boardName: "IWhisper", windowMinutes: 30 }),
     ).rejects.toThrow(
-      "Sync API request failed: 401",
+      "Sync API request failed for board IWhisper: 401; detail: bad token",
+    );
+  });
+
+  it("includes response body detail for non-2xx responses", async () => {
+    vi.stubEnv("BYR_SYNC_API_BASE_URL", "https://sync.example.test");
+    vi.stubEnv("BYR_SYNC_API_TOKEN", "secret-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            detail:
+              "Upstream BYR authentication failed: Expected JSON response from https://bbs.byr.cn/user/ajax_session.json",
+          },
+          { status: 502 },
+        ),
+      ),
+    );
+
+    await expect(
+      fetchSyncUpdates({ boardName: "Xyq", windowMinutes: 15768000 }),
+    ).rejects.toThrow(
+      "Sync API request failed for board Xyq: 502; detail: Upstream BYR authentication failed: Expected JSON response from https://bbs.byr.cn/user/ajax_session.json",
     );
   });
 

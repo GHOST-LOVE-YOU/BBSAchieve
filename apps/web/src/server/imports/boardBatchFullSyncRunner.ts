@@ -22,6 +22,10 @@ type BatchRunnerDeps = {
   prisma: unknown;
   runByrSyncImport?: typeof runByrSyncImport;
   getBoardFullSyncWindowMinutes?: (boardName: string) => number;
+  sleepBetweenBoards?: (input: {
+    completedBoardName: string;
+    nextBoardName: string;
+  }) => Promise<void>;
 };
 
 type BatchRunnerInput = {
@@ -140,6 +144,12 @@ export async function runBoardBatchFullSyncJob(
               : "全部板块已完成",
           });
           current = nextMetadata;
+          if (nextMetadata.currentBoardName) {
+            await deps.sleepBetweenBoards?.({
+              completedBoardName: boardName,
+              nextBoardName: nextMetadata.currentBoardName,
+            });
+          }
         } catch (error) {
           const failedMetadata = nextMetadata.currentBoardName
             ? markBoardFailed(nextMetadata, nextMetadata.currentBoardName)

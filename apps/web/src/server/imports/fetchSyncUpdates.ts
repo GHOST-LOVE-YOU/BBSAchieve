@@ -19,6 +19,31 @@ function describeFetchCause(error: unknown): string | null {
   return null;
 }
 
+async function readErrorDetail(response: Response): Promise<string | null> {
+  const text = await response.text();
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(trimmed) as unknown;
+    if (
+      payload &&
+      typeof payload === "object" &&
+      "detail" in payload &&
+      typeof payload.detail === "string" &&
+      payload.detail.trim().length > 0
+    ) {
+      return payload.detail.trim();
+    }
+  } catch {
+    // Fall through to returning a text preview below.
+  }
+
+  return trimmed.slice(0, 240);
+}
+
 export async function fetchSyncUpdates(input: {
   boardName: string;
   windowMinutes: number;
@@ -61,7 +86,12 @@ export async function fetchSyncUpdates(input: {
   }
 
   if (!response.ok) {
-    throw new Error(`Sync API request failed: ${response.status}`);
+    const detail = await readErrorDetail(response);
+    throw new Error(
+      `Sync API request failed for board ${input.boardName}: ${response.status}${
+        detail ? `; detail: ${detail}` : ""
+      }`,
+    );
   }
 
   return (await response.json()) as ByrSyncUpdatesPayload;

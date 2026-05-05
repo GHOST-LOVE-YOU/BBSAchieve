@@ -5,13 +5,14 @@ from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import time
 from typing import Any
 
 import httpx
 from dotenv import dotenv_values
 
 from .encoding import decode_response_text
-from .models import AuthContext, AuthError, LoginResult, SessionInfo
+from .models import AuthContext, AuthError, AuthRateLimitError, LoginResult, SessionInfo
 from .store import CookieStore
 
 BASE_URL = "https://bbs.byr.cn"
@@ -22,6 +23,9 @@ DEFAULT_HEADERS = {
     "Referer": "https://bbs.byr.cn/#!login",
     "X-Requested-With": "XMLHttpRequest",
 }
+DEFAULT_SESSION_CHECK_COOLDOWN_SECONDS = 120.0
+DEFAULT_AUTH_RATE_LIMIT_RETRY_SECONDS = 300.0
+DEFAULT_AUTH_RATE_LIMIT_MAX_RETRIES = 100
 
 
 class ByrAuthClient:
@@ -31,12 +35,34 @@ class ByrAuthClient:
         root_dir: Path | None = None,
         env_path: Path | None = None,
         cookie_path: Path | None = None,
+        sleep: Any | None = None,
+        session_check_cooldown_seconds: float | None = None,
+        auth_rate_limit_retry_seconds: float | None = None,
+        auth_rate_limit_max_retries: int | None = None,
     ) -> None:
         self.root_dir = root_dir or Path(__file__).resolve().parents[2]
         self.env_path = env_path or self.root_dir / ".env"
         self.cookie_path = cookie_path or self.root_dir / ".state" / "byr_cookies.json"
         self.env = dotenv_values(self.env_path)
         self.cookie_store = CookieStore(self.cookie_path)
+        self.sleep = sleep or time.sleep
+        self.session_check_cooldown_seconds = (
+            DEFAULT_SESSION_CHECK_COOLDOWN_SECONDS
+            if session_check_cooldown_seconds is None
+            else session_check_cooldown_seconds
+        )
+        self.auth_rate_limit_retry_seconds = (
+            DEFAULT_AUTH_RATE_LIMIT_RETRY_SECONDS
+            if auth_rate_limit_retry_seconds is None
+            else auth_rate_limit_retry_seconds
+        )
+        self.auth_rate_limit_max_retries = (
+            DEFAULT_AUTH_RATE_LIMIT_MAX_RETRIES
+            if auth_rate_limit_max_retries is None
+            else auth_rate_limit_max_retries
+        )
+        self._cached_session: SessionInfo | None = None
+        self._cached_session_checked_at: float | None = None
 
     def check_status(self) -> LoginResult:
         with self._open_client() as client:
@@ -104,7 +130,12 @@ class ByrAuthClient:
         *,
         force_relogin: bool = False,
     ) -> tuple[SessionInfo, bool]:
-        session = self._fetch_session_info(client)
+        cached_session = self._get_recent_cached_session(force_relogin=force_relogin)
+        if cached_session is not None:
+            return cached_session, True
+
+        session = self._fetch_session_info_with_retry(client)
+        self._remember_session(session)
         if session.is_login and not force_relogin:
             return session, True
 
@@ -121,7 +152,35 @@ class ByrAuthClient:
         login_session = SessionInfo(payload)
         if not login_session.is_login or int(payload.get("ajax_st", 0)) != 1:
             raise AuthError(payload.get("ajax_msg", "Login failed"))
+        self._remember_session(login_session)
         return login_session, False
+
+    def _fetch_session_info_with_retry(self, client: httpx.Client) -> SessionInfo:
+        for attempt in range(self.auth_rate_limit_max_retries + 1):
+            try:
+                return self._fetch_session_info(client)
+            except AuthRateLimitError:
+                if attempt >= self.auth_rate_limit_max_retries:
+                    raise
+                self.sleep(self.auth_rate_limit_retry_seconds)
+        raise AuthError("Unable to fetch session info")
+
+    def _get_recent_cached_session(self, *, force_relogin: bool) -> SessionInfo | None:
+        if force_relogin or self._cached_session is None or not self._cached_session.is_login:
+            return None
+        if self.session_check_cooldown_seconds <= 0:
+            return None
+        checked_at = self._cached_session_checked_at
+        if checked_at is None:
+            return None
+        if time.monotonic() - checked_at > self.session_check_cooldown_seconds:
+            return None
+        return self._cached_session
+
+    def _remember_session(self, session: SessionInfo) -> None:
+        if session.is_login:
+            self._cached_session = session
+            self._cached_session_checked_at = time.monotonic()
 
     def _require_env(self, key: str) -> str:
         value = os.getenv(key) or self.env.get(key)
@@ -137,6 +196,10 @@ class ByrAuthClient:
         except json.JSONDecodeError as exc:
             content_type = response.headers.get("content-type", "unknown")
             preview = text.strip().replace("\n", " ")[:120] or "<empty>"
+            if "请勿频繁登录" in preview:
+                raise AuthRateLimitError(
+                    "BYR authentication is rate limited: 请勿频繁登录"
+                ) from exc
             raise AuthError(
                 "Expected JSON response from "
                 f"{response.request.url} "
