@@ -17,7 +17,9 @@ export function resolveBoardIdentity(boardName: string): ResolvedBoardIdentity {
     };
   }
 
-  const matchedBoard = boardCatalog.find((board) => board.boardName === trimmed);
+  const matchedBoard =
+    boardCatalog.find((board) => board.boardName === trimmed) ??
+    boardCatalog.find((board) => board.boardSlug === trimmed);
   if (matchedBoard) {
     return {
       slug: matchedBoard.boardSlug,

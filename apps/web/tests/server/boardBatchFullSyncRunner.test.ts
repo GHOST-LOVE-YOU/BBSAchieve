@@ -8,7 +8,16 @@ import {
   createBatchJobMetadata,
   markBoardCompleted,
 } from "@/src/server/imports/boardBatchJobMetadata";
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 import { runBoardBatchFullSyncJob } from "@/src/server/imports/boardBatchFullSyncRunner";
+
+const orderedBoardNames = boardCatalog.map((board) => board.boardName);
+const defaultSelectedBoardNames = ["JobInfo", "IWhisper"];
+const defaultOrderedBoardNames = orderedBoardNames.filter((boardName) =>
+  defaultSelectedBoardNames.includes(boardName),
+);
+const firstBoardName = defaultOrderedBoardNames[0]!;
+const secondBoardName = defaultOrderedBoardNames[1]!;
 
 function makeThrottle() {
   return {
@@ -39,8 +48,8 @@ function makeDeps(options?: {
   const metadata =
     options?.metadata ??
     createBatchJobMetadata({
-      selectedBoardNames: ["JobInfo", "IWhisper"],
-      orderedBoardNames: ["IWhisper", "JobInfo"],
+      selectedBoardNames: defaultSelectedBoardNames,
+      orderedBoardNames: defaultOrderedBoardNames,
     });
 
   return {
@@ -98,13 +107,13 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(deps.runByrSyncImport).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        boardName: "IWhisper",
+        boardName: firstBoardName,
       }),
     );
     expect(deps.runByrSyncImport).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        boardName: "JobInfo",
+        boardName: secondBoardName,
       }),
     );
     expect(updateJobProgress).toHaveBeenLastCalledWith(
@@ -147,17 +156,17 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(runByrSyncImport).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        boardName: "JobInfo",
+        boardName: secondBoardName,
       }),
     );
     expect(updateJobProgress).toHaveBeenLastCalledWith(
       "batch-1",
       expect.objectContaining({
-        progressNote: "板块 JobInfo 失败",
+        progressNote: `板块 ${secondBoardName} 失败`,
         metadataJson: expect.objectContaining({
-          currentBoardName: "JobInfo",
-          failedBoardName: "JobInfo",
-          completedBoardNames: ["IWhisper"],
+          currentBoardName: secondBoardName,
+          failedBoardName: secondBoardName,
+          completedBoardNames: [firstBoardName],
         }),
       }),
     );
@@ -187,7 +196,7 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(deps.runByrSyncImport).toHaveBeenCalledTimes(1);
     expect(deps.runByrSyncImport).toHaveBeenCalledWith(
       expect.objectContaining({
-        boardName: "IWhisper",
+        boardName: firstBoardName,
       }),
     );
     expect(updateJobProgress).toHaveBeenNthCalledWith(
@@ -195,9 +204,9 @@ describe("runBoardBatchFullSyncJob", () => {
       "batch-1",
       expect.objectContaining({
         metadataJson: expect.objectContaining({
-          currentBoardName: "JobInfo",
+          currentBoardName: secondBoardName,
           failedBoardName: null,
-          completedBoardNames: ["IWhisper"],
+          completedBoardNames: [firstBoardName],
         }),
       }),
     );
@@ -206,11 +215,11 @@ describe("runBoardBatchFullSyncJob", () => {
       "batch-1",
       expect.objectContaining({
         metadataJson: expect.objectContaining({
-          currentBoardName: "JobInfo",
-          failedBoardName: "JobInfo",
-          completedBoardNames: ["IWhisper"],
+          currentBoardName: secondBoardName,
+          failedBoardName: secondBoardName,
+          completedBoardNames: [firstBoardName],
         }),
-        progressNote: "板块 JobInfo 失败",
+        progressNote: `板块 ${secondBoardName} 失败`,
       }),
     );
     expect(markJobFailed).toHaveBeenCalledWith("batch-1", "progress write exploded");
@@ -221,11 +230,11 @@ describe("runBoardBatchFullSyncJob", () => {
   it("resumes from the failed current board and skips boards already completed", async () => {
     const metadata = markBoardCompleted(
       createBatchJobMetadata({
-        selectedBoardNames: ["JobInfo", "IWhisper"],
-        orderedBoardNames: ["IWhisper", "JobInfo"],
+        selectedBoardNames: defaultSelectedBoardNames,
+        orderedBoardNames: defaultOrderedBoardNames,
       }),
       {
-        boardName: "IWhisper",
+        boardName: firstBoardName,
         processedThreads: 2,
         processedReplies: 5,
       },
@@ -239,7 +248,7 @@ describe("runBoardBatchFullSyncJob", () => {
     const deps = makeDeps({
       metadata: {
         ...metadata,
-        failedBoardName: "JobInfo",
+        failedBoardName: secondBoardName,
       },
       runByrSyncImport,
       updateJobProgress,
@@ -253,7 +262,7 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(runByrSyncImport).toHaveBeenCalledTimes(1);
     expect(runByrSyncImport).toHaveBeenCalledWith(
       expect.objectContaining({
-        boardName: "JobInfo",
+        boardName: secondBoardName,
       }),
     );
     expect(updateJobProgress).toHaveBeenCalledWith(
@@ -262,7 +271,7 @@ describe("runBoardBatchFullSyncJob", () => {
         processedThreads: 5,
         processedReplies: 12,
         metadataJson: expect.objectContaining({
-          completedBoardNames: ["IWhisper", "JobInfo"],
+          completedBoardNames: [firstBoardName, secondBoardName],
           failedBoardName: null,
           currentBoardName: null,
         }),
@@ -294,7 +303,7 @@ describe("runBoardBatchFullSyncJob", () => {
 
     expect(markJobPaused).toHaveBeenCalledWith(
       "batch-1",
-      "等待全局抓取窗口，当前板块 IWhisper",
+      `等待全局抓取窗口，当前板块 ${firstBoardName}`,
     );
     expect(deps.markJobRunning).not.toHaveBeenCalled();
     expect(deps.runByrSyncImport).not.toHaveBeenCalled();
@@ -324,7 +333,7 @@ describe("runBoardBatchFullSyncJob", () => {
 
     expect(markJobPaused).toHaveBeenCalledWith(
       "batch-1",
-      "等待全局抓取窗口，当前板块 IWhisper",
+      `等待全局抓取窗口，当前板块 ${firstBoardName}`,
     );
     expect(updateJobProgress).not.toHaveBeenCalled();
     expect(deps.markJobRunning).not.toHaveBeenCalled();
@@ -333,8 +342,8 @@ describe("runBoardBatchFullSyncJob", () => {
 
   it("re-checks cancellation between boards so later boards do not start", async () => {
     const metadata = createBatchJobMetadata({
-      selectedBoardNames: ["JobInfo", "IWhisper"],
-      orderedBoardNames: ["IWhisper", "JobInfo"],
+      selectedBoardNames: defaultSelectedBoardNames,
+      orderedBoardNames: defaultOrderedBoardNames,
     });
     const findJobById = vi
       .fn()
@@ -352,7 +361,7 @@ describe("runBoardBatchFullSyncJob", () => {
         id: "batch-1",
         status: "cancelled",
         metadataJson: markBoardCompleted(metadata, {
-          boardName: "IWhisper",
+          boardName: firstBoardName,
           processedThreads: 2,
           processedReplies: 5,
         }),
@@ -376,7 +385,7 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(runByrSyncImport).toHaveBeenCalledTimes(1);
     expect(runByrSyncImport).toHaveBeenCalledWith(
       expect.objectContaining({
-        boardName: "IWhisper",
+        boardName: firstBoardName,
       }),
     );
     expect(deps.markJobSucceeded).not.toHaveBeenCalled();
@@ -399,15 +408,15 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(deps.runByrSyncImport).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        boardName: "IWhisper",
-        windowMinutes: 45,
+        boardName: firstBoardName,
+        windowMinutes: firstBoardName === "IWhisper" ? 45 : 90,
       }),
     );
     expect(deps.runByrSyncImport).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        boardName: "JobInfo",
-        windowMinutes: 90,
+        boardName: secondBoardName,
+        windowMinutes: secondBoardName === "IWhisper" ? 45 : 90,
       }),
     );
     expect(result.status).toBe("succeeded");

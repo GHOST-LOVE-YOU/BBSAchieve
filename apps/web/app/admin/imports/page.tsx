@@ -1,13 +1,17 @@
 import Link from "next/link";
 
-import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
+import {
+  boardCatalog,
+  boardCatalogSections,
+} from "@/src/server/boardSync/boardCatalog";
 import { prisma } from "@/src/server/db/client";
 import { listRecentImportActivity } from "@/src/server/admin/listRecentImportActivity";
+
+import { BoardSectionSelector } from "./BoardSectionSelector";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminImportsPage() {
-  const selectableBoards = boardCatalog.filter((board) => board.fullSyncEnabled);
   const imports = await prisma.import.findMany({
     orderBy: { startedAt: "desc" },
     take: 20,
@@ -44,36 +48,10 @@ export default async function AdminImportsPage() {
             <input type="hidden" name="redirectTo" value="/admin/imports" />
             <fieldset className="grid gap-3">
               <legend className="text-sm font-medium text-zinc-900">选择要全量抓取的板块</legend>
-              {selectableBoards.map((board) => (
-                <div
-                  key={board.boardName}
-                  className="flex items-start gap-3 rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                >
-                  <input
-                    id={`board-${board.boardSlug}`}
-                    type="checkbox"
-                    name="boardNames"
-                    value={board.boardName}
-                    defaultChecked
-                    className="mt-0.5"
-                    aria-describedby={`board-${board.boardSlug}-description`}
-                  />
-                  <span className="grid gap-1">
-                    <label
-                      htmlFor={`board-${board.boardSlug}`}
-                      className="font-medium text-zinc-900"
-                    >
-                      {board.boardName}
-                    </label>
-                    <span
-                      id={`board-${board.boardSlug}-description`}
-                      className="text-zinc-500"
-                    >
-                      {board.description}
-                    </span>
-                  </span>
-                </div>
-              ))}
+              <BoardSectionSelector
+                sections={boardCatalogSections}
+                orderedBoards={boardCatalog.filter((board) => board.fullSyncEnabled)}
+              />
             </fieldset>
             <button
               className="mt-4 rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-900"
@@ -81,9 +59,6 @@ export default async function AdminImportsPage() {
             >
               开始全量抓取
             </button>
-            <p className="mt-3 text-sm text-zinc-500">
-              当前将按首页目录顺序串行抓取：{selectableBoards.map((board) => board.boardName).join("、")}
-            </p>
           </form>
         </div>
       </div>
