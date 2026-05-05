@@ -9,8 +9,14 @@ const publicReadingMock = vi.hoisted(() => ({
   getThreadRepliesFeed: vi.fn(),
 }));
 
+const listBoardThreadsMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/src/server/reading/publicReadingService", () => ({
   createPublicReadingService: () => publicReadingMock,
+}));
+
+vi.mock("@/src/server/reading/listBoardThreads", () => ({
+  listBoardThreads: listBoardThreadsMock,
 }));
 
 vi.mock("next/link", () => ({
@@ -84,34 +90,29 @@ describe("web public routes", () => {
       name: "Jobs and Offers",
       description: "Signals for roles, openings, and practical next steps.",
     });
-    publicReadingMock.getBoardThreadsFeed.mockResolvedValue({
-      items: [
+    listBoardThreadsMock.mockResolvedValue({
+      threads: [
         {
           id: "thread:newest",
           title: "Newest active thread",
-          authorName: "Robot 1",
-          publishedAt: "2026-05-01T09:00:00.000Z",
-          replyCount: 2,
           lastReplyAt: "2026-05-01T09:05:00.000Z",
         },
         {
           id: "thread:older",
           title: "Older active thread",
-          authorName: "Robot 2",
-          publishedAt: "2026-05-01T08:00:00.000Z",
-          replyCount: 0,
           lastReplyAt: null,
         },
       ],
-      page: {
-        limit: 20,
-        nextCursor: "cursor-2",
-        hasMore: true,
-      },
+      page: 1,
+      totalPages: 1,
+      totalCount: 2,
+      hasPreviousPage: false,
+      hasNextPage: false,
     });
 
     const ui = await BoardPage({
       params: Promise.resolve({ boardId: "job" }),
+      searchParams: Promise.resolve({}),
     });
     const { container } = render(ui);
     const threadLinks = within(container)
@@ -120,14 +121,60 @@ describe("web public routes", () => {
 
     expect(threadLinks).toEqual(["Newest active thread", "Older active thread"]);
     expect(publicReadingMock.getBoard).toHaveBeenCalledWith("job");
-    expect(publicReadingMock.getBoardThreadsFeed).toHaveBeenCalledWith({
-      boardIdOrSlug: "job",
+    expect(listBoardThreadsMock).toHaveBeenCalledWith({
+      boardId: "board:job",
+      boardSlug: "job",
       limit: 20,
+      page: 1,
     });
     expect(
       within(container).getByText("Signals for roles, openings, and practical next steps."),
     ).toBeTruthy();
     expect(screen.queryByText(/第 \d+ 页/)).toBeNull();
+  });
+
+  it("renders page-based board pagination links", async () => {
+    publicReadingMock.getBoard.mockResolvedValue({
+      id: "board:iwhisper",
+      slug: "iwhisper",
+      name: "IWhisper",
+      description: "悄悄话",
+    });
+    listBoardThreadsMock.mockResolvedValue({
+      threads: [
+        {
+          id: "thread:middle",
+          title: "Middle page thread",
+          lastReplyAt: "2026-05-01T09:05:00.000Z",
+        },
+      ],
+      page: 2,
+      totalPages: 5,
+      totalCount: 81,
+      hasPreviousPage: true,
+      hasNextPage: true,
+    });
+
+    render(
+      await BoardPage({
+        params: Promise.resolve({ boardId: "iwhisper" }),
+        searchParams: Promise.resolve({ page: "2" }),
+      }),
+    );
+
+    expect(screen.getByText("第 2 / 5 页")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "上一页" }).getAttribute("href")).toBe(
+      "/boards/iwhisper?page=1",
+    );
+    expect(screen.getByRole("link", { name: "下一页" }).getAttribute("href")).toBe(
+      "/boards/iwhisper?page=3",
+    );
+    expect(listBoardThreadsMock).toHaveBeenCalledWith({
+      boardId: "board:iwhisper",
+      boardSlug: "iwhisper",
+      limit: 20,
+      page: 2,
+    });
   });
 
   it("renders thread detail from the public reading service", async () => {
@@ -226,6 +273,7 @@ describe("web public routes", () => {
     await expect(
       BoardPage({
         params: Promise.resolve({ boardId: "missing-board" }),
+        searchParams: Promise.resolve({}),
       }),
     ).rejects.toThrow(nextNavigation.error);
 
@@ -238,31 +286,13 @@ describe("web public routes", () => {
     expect(nextNavigation.notFound).toHaveBeenCalledTimes(2);
   });
 
-  it("calls notFound when the board thread feed is missing", async () => {
-    nextNavigation.notFound.mockClear();
-    publicReadingMock.getBoard.mockResolvedValue({
-      id: "board:job",
-      slug: "job",
-      name: "Jobs and Offers",
-      description: "Signals for roles, openings, and practical next steps.",
-    });
-    publicReadingMock.getBoardThreadsFeed.mockResolvedValue(null);
-
-    await expect(
-      BoardPage({
-        params: Promise.resolve({ boardId: "job" }),
-      }),
-    ).rejects.toThrow(nextNavigation.error);
-
-    expect(nextNavigation.notFound).toHaveBeenCalledTimes(1);
-  });
-
   it("renders board fallback UI when service calls fail", async () => {
     publicReadingMock.getBoard.mockRejectedValueOnce(new Error("board failed"));
 
     const firstRender = render(
       await BoardPage({
         params: Promise.resolve({ boardId: "job" }),
+        searchParams: Promise.resolve({}),
       }),
     );
 
@@ -279,13 +309,12 @@ describe("web public routes", () => {
       name: "Jobs and Offers",
       description: "Signals for roles, openings, and practical next steps.",
     });
-    publicReadingMock.getBoardThreadsFeed.mockRejectedValueOnce(
-      new Error("board threads failed"),
-    );
+    listBoardThreadsMock.mockRejectedValueOnce(new Error("board threads failed"));
 
     const secondRender = render(
       await BoardPage({
         params: Promise.resolve({ boardId: "job" }),
+        searchParams: Promise.resolve({}),
       }),
     );
 
