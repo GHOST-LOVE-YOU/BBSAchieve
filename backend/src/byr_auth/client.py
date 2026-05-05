@@ -130,7 +130,17 @@ class ByrAuthClient:
 
     @staticmethod
     def _parse_json(response: httpx.Response) -> dict[str, Any]:
-        return json.loads(ByrAuthClient._decode_text(response))
+        text = ByrAuthClient._decode_text(response)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            content_type = response.headers.get("content-type", "unknown")
+            preview = text.strip().replace("\n", " ")[:120] or "<empty>"
+            raise AuthError(
+                "Expected JSON response from "
+                f"{response.request.url} "
+                f"(status={response.status_code}, content_type={content_type}, body={preview!r})"
+            ) from exc
 
     @staticmethod
     def _decode_text(response: httpx.Response) -> str:

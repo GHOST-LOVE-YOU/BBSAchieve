@@ -52,6 +52,16 @@ def test_parse_json_falls_back_when_response_encoding_is_invalid() -> None:
     assert payload["ajax_msg"] == "登录成功"
 
 
+def test_parse_json_raises_auth_error_for_non_json_response() -> None:
+    response = make_response(
+        content=b"<html><title>blocked</title></html>",
+        url="https://bbs.byr.cn/user/ajax_session.json",
+    )
+
+    with pytest.raises(AuthError, match="Expected JSON response"):
+        ByrAuthClient._parse_json(response)
+
+
 def test_require_env_reads_from_loaded_env(tmp_path) -> None:
     env_path = tmp_path / ".env"
     env_path.write_text("BBS_USERNAME=test-user\n", encoding="utf-8")
