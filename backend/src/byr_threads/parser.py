@@ -4,7 +4,7 @@ import re
 from typing import Iterable
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag
+from bs4.element import NavigableString, Tag
 
 from .models import ThreadPageResult, ThreadPost
 
@@ -116,7 +116,7 @@ def _extract_post_id(article_node: Tag) -> str:
 
 
 def _extract_content_lines(content_node: Tag) -> list[str]:
-    text = content_node.get_text("\n", strip=False)
+    text = _serialize_content_text(content_node)
     lines = [_normalize_line(line) for line in text.splitlines()]
 
     while lines and not lines[0]:
@@ -124,6 +124,26 @@ def _extract_content_lines(content_node: Tag) -> list[str]:
     while lines and not lines[-1]:
         lines.pop()
     return lines
+
+
+def _serialize_content_text(content_node: Tag) -> str:
+    chunks: list[str] = []
+    for node in content_node.descendants:
+        if isinstance(node, NavigableString):
+            chunks.append(str(node))
+        elif isinstance(node, Tag) and node.name == "br":
+            chunks.append("\n")
+        elif isinstance(node, Tag) and node.name == "img":
+            if token := _extract_inline_image_token(node):
+                chunks.append(token)
+    return "".join(chunks)
+
+
+def _extract_inline_image_token(image_node: Tag) -> str:
+    alt = str(image_node.get("alt", "")).strip()
+    if re.fullmatch(r"(?:em|ema)\d+", alt):
+        return f"[{alt}]"
+    return ""
 
 
 def _extract_body(lines: list[str]) -> str:

@@ -125,6 +125,25 @@ def test_parse_thread_page_extracts_named_single_page_snapshot() -> None:
     assert post.body.startswith("相关提醒公告合集整理")
 
 
+def test_parse_thread_page_preserves_image_only_ubb_emoji_replies() -> None:
+    html = load_fixture("iwhisper_article_8846213_page_1.html")
+
+    result = parse_thread_page(
+        html=html,
+        board_name="IWhisper",
+        article_id="8846213",
+        page=1,
+        user_id="fixture-user",
+        reused_cookies=True,
+        requested_url="https://bbs.byr.cn/article/IWhisper/8846213?p=1&_uid=fixture-user",
+    )
+
+    posts_by_id = {post.post_id: post for post in result.posts}
+
+    assert posts_by_id["8846246"].body == "[em7]"
+    assert posts_by_id["8846269"].body == "[em7][em7][em7]"
+
+
 def test_parse_thread_page_handles_missing_optional_sections() -> None:
     html = """
     <html>
