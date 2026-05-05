@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireRouteUser } from "@/src/server/auth/routeGuards";
 import { createPublicReadingService } from "@/src/server/reading/publicReadingService";
 
 function parseLimit(url: URL) {
@@ -17,6 +18,11 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ threadId: string }> },
 ) {
+  const auth = await requireRouteUser(request);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const { threadId } = await context.params;
     const url = new URL(request.url);

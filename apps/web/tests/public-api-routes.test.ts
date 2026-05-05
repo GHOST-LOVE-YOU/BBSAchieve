@@ -8,8 +8,16 @@ const publicReadingServiceMock = vi.hoisted(() => ({
   getThreadRepliesFeed: vi.fn(),
 }));
 
+const authGuardMock = vi.hoisted(() => ({
+  requireRouteUser: vi.fn(),
+}));
+
 vi.mock("@/src/server/reading/publicReadingService", () => ({
   createPublicReadingService: () => publicReadingServiceMock,
+}));
+
+vi.mock("@/src/server/auth/routeGuards", () => ({
+  requireRouteUser: authGuardMock.requireRouteUser,
 }));
 
 import { GET as getBoards } from "../app/api/public/boards/route";
@@ -21,6 +29,14 @@ import { GET as getThreadRepliesFeed } from "../app/api/public/threads/[threadId
 describe("public api routes", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    authGuardMock.requireRouteUser.mockResolvedValue({
+      ok: true,
+      identity: {
+        provider: "kinde",
+        subject: "kp_route_user",
+        orgCodes: [],
+      },
+    });
   });
 
   it("returns boards as anonymous json", async () => {
@@ -52,6 +68,7 @@ describe("public api routes", () => {
         },
       ],
     });
+    expect(authGuardMock.requireRouteUser).not.toHaveBeenCalled();
   });
 
   it("returns 500 when board list loading fails unexpectedly", async () => {
@@ -210,6 +227,25 @@ describe("public api routes", () => {
         replyCount: 2,
       },
     });
+    expect(authGuardMock.requireRouteUser).toHaveBeenCalledWith(
+      expect.any(Request),
+    );
+  });
+
+  it("returns 401 for anonymous thread detail API access", async () => {
+    authGuardMock.requireRouteUser.mockResolvedValueOnce({
+      ok: false,
+      response: Response.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const response = await getThread(
+      new Request("http://localhost/api/public/threads/first-offer"),
+      { params: Promise.resolve({ threadId: "first-offer" }) },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
+    expect(publicReadingServiceMock.getThread).not.toHaveBeenCalled();
   });
 
   it("returns thread replies feed json", async () => {
@@ -254,6 +290,27 @@ describe("public api routes", () => {
         hasMore: false,
       },
     });
+    expect(authGuardMock.requireRouteUser).toHaveBeenCalledWith(
+      expect.any(Request),
+    );
+  });
+
+  it("returns 401 for anonymous thread replies API access", async () => {
+    authGuardMock.requireRouteUser.mockResolvedValueOnce({
+      ok: false,
+      response: Response.json({ error: "Unauthorized" }, { status: 401 }),
+    });
+
+    const response = await getThreadRepliesFeed(
+      new Request(
+        "http://localhost/api/public/threads/first-offer/replies?limit=20",
+      ),
+      { params: Promise.resolve({ threadId: "first-offer" }) },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
+    expect(publicReadingServiceMock.getThreadRepliesFeed).not.toHaveBeenCalled();
   });
 
   it("returns 400 when thread replies feed limit is not an integer", async () => {
