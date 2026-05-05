@@ -20,6 +20,6 @@ describe("boardCatalog sections", () => {
       boardCatalog
         .filter((board) => board.scheduledSyncEnabled)
         .map((board) => board.boardName),
-    ).toEqual(["IWhisper", "JobInfo"]);
+    ).toEqual(["JobInfo", "IWhisper"]);
   });
 });

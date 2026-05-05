@@ -104,7 +104,7 @@ export function BoardSectionSelector({
                           htmlFor={`board-${board.boardSlug}`}
                           className="font-medium text-zinc-900"
                         >
-                          {board.boardName}
+                          {board.title}
                         </label>
                         <span
                           id={`board-${board.boardSlug}-description`}
@@ -126,7 +126,7 @@ export function BoardSectionSelector({
       <p className="mt-1 text-sm text-zinc-500">当前已选择 {selectedBoardNames.length} 个板块</p>
       <p className="mt-1 text-sm text-zinc-500">
         当前将按首页目录顺序串行抓取：
-        {orderedBoards.map((board) => board.boardName).join("、")}
+        {orderedBoards.map((board) => board.title).join("、")}
       </p>
     </>
   );

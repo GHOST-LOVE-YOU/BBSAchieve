@@ -33,18 +33,6 @@ describe("boardCatalog", () => {
   it("derives the expected scheduled task details for the fixed homepage boards", () => {
     expect(getScheduledBoardTasks()).toEqual([
       {
-        taskKey: "iwhisper_recent_sync",
-        title: "IWhisper 最近内容同步",
-        description: "每 20 分钟同步一次 IWhisper 最近 30 分钟内容",
-        sourceType: "byr_sync_api",
-        sourceLabel: "IWhisper recent sync",
-        boardName: "IWhisper",
-        intervalMinutes: 20,
-        windowMinutes: 30,
-        enabled: true,
-        runnerType: "byr_sync_recent_window",
-      },
-      {
         taskKey: "job-info_recent_sync",
         title: "JobInfo 最近内容同步",
         description: "每 120 分钟同步一次 JobInfo 最近 180 分钟内容",
@@ -53,6 +41,18 @@ describe("boardCatalog", () => {
         boardName: "JobInfo",
         intervalMinutes: 120,
         windowMinutes: 180,
+        enabled: true,
+        runnerType: "byr_sync_recent_window",
+      },
+      {
+        taskKey: "iwhisper_recent_sync",
+        title: "IWhisper 最近内容同步",
+        description: "每 20 分钟同步一次 IWhisper 最近 30 分钟内容",
+        sourceType: "byr_sync_api",
+        sourceLabel: "IWhisper recent sync",
+        boardName: "IWhisper",
+        intervalMinutes: 20,
+        windowMinutes: 30,
         enabled: true,
         runnerType: "byr_sync_recent_window",
       },

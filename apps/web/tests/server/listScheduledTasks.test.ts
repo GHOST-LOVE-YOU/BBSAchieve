@@ -129,7 +129,7 @@ describe("listScheduledTasks", () => {
       },
       orderBy: { startedAt: "desc" },
     });
-    expect(result[0]).toMatchObject({
+    expect(result.find((task) => task.taskKey === "iwhisper_recent_sync")).toMatchObject({
       taskKey: "iwhisper_recent_sync",
       latestRun: {
         id: "run-2",

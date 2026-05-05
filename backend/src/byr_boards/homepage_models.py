@@ -6,6 +6,7 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class HomepageBoardEntry:
     board_name: str
+    board_title: str
     board_path: str
 
 

@@ -11,19 +11,21 @@ def parse_homepage_board_catalog(*, html: str) -> HomepageBoardCatalog:
     soup = BeautifulSoup(html, "html.parser")
     sections: list[HomepageBoardSection] = []
 
-    for section_node in soup.select(".forum-section, .fav-section, .board-section"):
-        title_node = section_node.find(["h2", "h3", "legend", "strong"])
+    for section_node in soup.select("li.widget"):
+        title_node = section_node.select_one(".widget-title")
         section_name = title_node.get_text(" ", strip=True) if title_node else ""
         boards: list[HomepageBoardEntry] = []
 
-        for anchor in section_node.select("a[href]"):
+        for anchor in section_node.select(".w-tab-content .w-list-float a[href]"):
             href = anchor.get("href", "").strip()
             if not href.startswith("/board/"):
                 continue
-            board_name = anchor.get_text(" ", strip=True)
+            board_title = anchor.get_text(" ", strip=True)
             board_path = urlparse(href).path
+            board_name = board_path.rsplit("/", 1)[-1]
             if (
-                board_name == ""
+                board_title == ""
+                or board_name == ""
                 or board_path == ""
                 or board_path == "/board/"
                 or board_path.count("/") < 2
@@ -32,6 +34,7 @@ def parse_homepage_board_catalog(*, html: str) -> HomepageBoardCatalog:
             boards.append(
                 HomepageBoardEntry(
                     board_name=board_name,
+                    board_title=board_title,
                     board_path=board_path,
                 )
             )

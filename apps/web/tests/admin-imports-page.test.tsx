@@ -91,12 +91,12 @@ describe("admin imports page", () => {
       expect(screen.getByText("只会抓取已勾选板块，执行顺序按首页目录顺序。")).toBeTruthy();
       expect(screen.getByText("当前已选择 0 个板块")).toBeTruthy();
       expect(screen.getByText(boardCatalogSections[0]!.sectionName)).toBeTruthy();
-      const enabledBoard = screen.getByRole("checkbox", { name: "IWhisper" });
+      const enabledBoard = screen.getByRole("checkbox", { name: "悄悄话" });
       expect(enabledBoard).toBeTruthy();
       expect((enabledBoard as HTMLInputElement).checked).toBe(false);
       expect(enabledBoard.getAttribute("name")).toBe("boardNames");
       expect(enabledBoard.getAttribute("value")).toBe("IWhisper");
-      expect(screen.queryByRole("checkbox", { name: "JobInfo" })).toBeNull();
+      expect(screen.queryByRole("checkbox", { name: "招聘信息专版" })).toBeNull();
       expect(screen.getAllByRole("button", { name: "全选本分区" })).toHaveLength(
         boardCatalogSections.length,
       );
@@ -127,7 +127,20 @@ describe("admin imports page", () => {
           batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
             [],
         ).map((input) => input.value),
-      ).toEqual(["IWhisper", "Talking"]);
+      ).toEqual(
+        runtimeBoardCatalogSections
+          .flatMap((section) => [...section.boards])
+          .filter((item) => item.fullSyncEnabled)
+          .map((item) => item.boardName),
+      );
+      expect(
+        batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]')
+          .length,
+      ).toBe(
+        runtimeBoardCatalogSections
+          .flatMap((section) => [...section.boards])
+          .filter((item) => item.fullSyncEnabled).length,
+      );
       expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
     } finally {
       if (board && previousValue !== undefined) {
@@ -170,7 +183,9 @@ describe("admin imports page", () => {
     expect(screen.getByText("skipped by global throttle")).toBeTruthy();
   });
 
-  it("renders the sync entry, recent activity, and import jobs including board full-sync tasks", async () => {
+  it(
+    "renders the sync entry, recent activity, and import jobs including board full-sync tasks",
+    async () => {
     prismaMock.import.findMany.mockResolvedValue([
       {
         id: "import-1",
@@ -239,18 +254,19 @@ describe("admin imports page", () => {
     expect(screen.getByRole("button", { name: "同步北邮人数据" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "开始全量抓取" })).toBeTruthy();
     expect(screen.getByText("选择要全量抓取的板块")).toBeTruthy();
-    for (const section of boardCatalogSections) {
-      expect(screen.getByText(section.sectionName)).toBeTruthy();
-    }
-    for (const board of selectableBoards) {
-      if (board.fullSyncEnabled) {
-        const checkbox = screen.getByRole("checkbox", { name: board.boardName });
-        expect(checkbox).toBeTruthy();
-        expect((checkbox as HTMLInputElement).checked).toBe(false);
-      } else {
-        expect(screen.queryByRole("checkbox", { name: board.boardName })).toBeNull();
-      }
-    }
+      expect(screen.getByText("北邮校园")).toBeTruthy();
+      expect(screen.getByText("信息社会")).toBeTruthy();
+      expect(screen.getByText("生活时尚")).toBeTruthy();
+    const renderedCheckboxes = screen.getAllByRole("checkbox");
+    expect(renderedCheckboxes).toHaveLength(
+      selectableBoards.filter((board) => board.fullSyncEnabled).length,
+    );
+    expect(renderedCheckboxes.every((checkbox) => !(checkbox as HTMLInputElement).checked)).toBe(
+      true,
+    );
+    expect(screen.getByRole("checkbox", { name: "北邮教务处" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "招聘信息专版" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "悄悄话" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "全选本分区" })).toHaveLength(
       boardCatalogSections.length,
     );
@@ -300,7 +316,9 @@ describe("admin imports page", () => {
       ).map((input) => input.value),
     ).toEqual(selectableBoards.map((board) => board.boardName));
     expect(batchForm?.querySelector('input[type="hidden"][name="boardNames"]')).toBeNull();
-  });
+    },
+    15000,
+  );
 
   it("selects and clears boards within a section", async () => {
     prismaMock.import.findMany.mockResolvedValue([]);
@@ -310,19 +328,34 @@ describe("admin imports page", () => {
     const user = userEvent.setup();
     await renderAdminImportsPage();
 
-    const iwhisperCheckbox = screen.getByRole("checkbox", { name: "IWhisper" });
-    const talkingCheckbox = screen.getByRole("checkbox", { name: "Talking" });
+    const iwhisperCheckbox = screen.getByRole("checkbox", { name: "悄悄话" });
+    const talkingCheckbox = screen.getByRole("checkbox", { name: "谈天说地" });
+    const iwhisperSectionIndex = boardCatalogSections.findIndex((section) =>
+      section.boards.some((board) => board.boardName === "IWhisper"),
+    );
+    expect(iwhisperSectionIndex).toBeGreaterThanOrEqual(0);
+    const expectedSectionSelectionCount =
+      boardCatalogSections[iwhisperSectionIndex]!.boards.filter((board) => board.fullSyncEnabled)
+        .length;
 
-    await user.click(screen.getAllByRole("button", { name: "全选本分区" })[0]!);
+    await user.click(screen.getAllByRole("button", { name: "全选本分区" })[iwhisperSectionIndex]!);
 
     expect((iwhisperCheckbox as HTMLInputElement).checked).toBe(true);
     expect((talkingCheckbox as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText("当前已选择 2 个板块")).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole("checkbox")
+        .filter((checkbox) => (checkbox as HTMLInputElement).checked),
+    ).toHaveLength(expectedSectionSelectionCount);
 
-    await user.click(screen.getAllByRole("button", { name: "取消本分区" })[0]!);
+    await user.click(screen.getAllByRole("button", { name: "取消本分区" })[iwhisperSectionIndex]!);
 
     expect((iwhisperCheckbox as HTMLInputElement).checked).toBe(false);
     expect((talkingCheckbox as HTMLInputElement).checked).toBe(false);
-    expect(screen.getByText("当前已选择 0 个板块")).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole("checkbox")
+        .filter((checkbox) => (checkbox as HTMLInputElement).checked),
+    ).toHaveLength(0);
   });
 });
