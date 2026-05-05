@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireAdminRouteUser } from "@/src/server/auth/routeGuards";
 import { prisma } from "@/src/server/db/client";
 import { runScheduledTask } from "@/src/server/scheduler/runScheduledTask";
 import { getScheduledTask } from "@/src/server/scheduler/taskRegistry";
@@ -45,6 +46,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ taskKey: string }> },
 ) {
+  const auth = await requireAdminRouteUser(request);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   try {
     const { taskKey } = await params;
     const task = getScheduledTask(taskKey);

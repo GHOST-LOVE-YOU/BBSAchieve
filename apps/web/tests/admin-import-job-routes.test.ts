@@ -14,8 +14,16 @@ const routeMocks = vi.hoisted(() => ({
   prisma: {},
 }));
 
+const adminAuthGuardMock = vi.hoisted(() => ({
+  requireAdminRouteUser: vi.fn(),
+}));
+
 vi.mock("@/src/server/db/client", () => ({
   prisma: routeMocks.prisma,
+}));
+
+vi.mock("@/src/server/auth/routeGuards", () => ({
+  requireAdminRouteUser: adminAuthGuardMock.requireAdminRouteUser,
 }));
 
 vi.mock("@/src/server/imports/importJobStore", () => ({
@@ -45,6 +53,67 @@ describe("admin import job routes", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValue({
+      ok: true,
+      identity: {
+        provider: "kinde",
+        subject: "kp_admin_user",
+        orgCodes: ["org_ed7de8344b99"],
+      },
+    });
+  });
+
+  it("returns 403 before starting batch jobs when admin auth fails", async () => {
+    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValueOnce({
+      ok: false,
+      response: Response.json({ error: "Forbidden" }, { status: 403 }),
+    });
+    routeMocks.createBoardBatchFullSyncJob.mockResolvedValue({ id: "job-batch-1" });
+    const formData = new FormData();
+    formData.append("boardNames", "JobInfo");
+    const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync-batch", {
+      method: "POST",
+      body: formData,
+    });
+
+    const response = await startPOST(request);
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
+    expect(routeMocks.createBoardBatchFullSyncJob).not.toHaveBeenCalled();
+    expect(routeMocks.scheduleBoardBatchFullSync).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 before resuming batch jobs when admin auth fails", async () => {
+    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValueOnce({
+      ok: false,
+      response: Response.json({ error: "Forbidden" }, { status: 403 }),
+    });
+
+    const response = await resumePOST(request, {
+      params: Promise.resolve({ jobId: "job-batch-1" }),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
+    expect(routeMocks.findJobById).not.toHaveBeenCalled();
+    expect(routeMocks.markJobRunning).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 before stopping batch jobs when admin auth fails", async () => {
+    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValueOnce({
+      ok: false,
+      response: Response.json({ error: "Forbidden" }, { status: 403 }),
+    });
+
+    const response = await stopPOST(request, {
+      params: Promise.resolve({ jobId: "job-batch-1" }),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
+    expect(routeMocks.findJobById).not.toHaveBeenCalled();
+    expect(routeMocks.markJobCancelled).not.toHaveBeenCalled();
   });
 
   it("creates one batch job from multiple selected boards and reorders them by catalog order", async () => {

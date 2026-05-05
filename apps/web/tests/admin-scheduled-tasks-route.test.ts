@@ -5,8 +5,16 @@ const routeMocks = vi.hoisted(() => ({
   runScheduledTask: vi.fn(),
 }));
 
+const adminAuthGuardMock = vi.hoisted(() => ({
+  requireAdminRouteUser: vi.fn(),
+}));
+
 vi.mock("@/src/server/db/client", () => ({
   prisma: routeMocks.prisma,
+}));
+
+vi.mock("@/src/server/auth/routeGuards", () => ({
+  requireAdminRouteUser: adminAuthGuardMock.requireAdminRouteUser,
 }));
 
 vi.mock("@/src/server/scheduler/runScheduledTask", () => ({
@@ -18,6 +26,30 @@ import { POST } from "../app/admin/api/scheduled-tasks/[taskKey]/run/route";
 describe("admin scheduled tasks run route", () => {
   beforeEach(() => {
     routeMocks.runScheduledTask.mockReset();
+    adminAuthGuardMock.requireAdminRouteUser.mockReset();
+    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValue({
+      ok: true,
+      identity: {
+        provider: "kinde",
+        subject: "kp_admin_user",
+        orgCodes: ["org_ed7de8344b99"],
+      },
+    });
+  });
+
+  it("returns 403 before running a scheduled task when admin auth fails", async () => {
+    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValueOnce({
+      ok: false,
+      response: Response.json({ error: "Forbidden" }, { status: 403 }),
+    });
+
+    const response = await POST(new Request("http://localhost"), {
+      params: Promise.resolve({ taskKey: "iwhisper_recent_sync" }),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
+    expect(routeMocks.runScheduledTask).not.toHaveBeenCalled();
   });
 
   it("runs a scheduled task immediately by task key", async () => {

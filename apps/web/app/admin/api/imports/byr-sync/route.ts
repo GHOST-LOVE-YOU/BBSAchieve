@@ -5,6 +5,7 @@ import {
   buildAdminImportsRedirectUrl,
   readRedirectTo,
 } from "@/src/server/admin/adminImportsRedirect";
+import { requireAdminRouteUser } from "@/src/server/auth/routeGuards";
 import { prisma } from "@/src/server/db/client";
 import { resolveBoardIdentity } from "@/src/server/boardSync/resolveBoardIdentity";
 import { fetchSyncOriginalPost } from "@/src/server/imports/fetchSyncOriginalPost";
@@ -140,6 +141,11 @@ export async function runByrSyncImport(input: {
 }
 
 export async function POST(request?: Request) {
+  const auth = await requireAdminRouteUser(request);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const redirectTo = request ? await readRedirectTo(request) : null;
 
   try {

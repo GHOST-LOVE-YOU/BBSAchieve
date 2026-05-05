@@ -13,8 +13,16 @@ const routeMocks = vi.hoisted(() => ({
   },
 }));
 
+const adminAuthGuardMock = vi.hoisted(() => ({
+  requireAdminRouteUser: vi.fn(),
+}));
+
 vi.mock("@/src/server/db/client", () => ({
   prisma: routeMocks.prisma,
+}));
+
+vi.mock("@/src/server/auth/routeGuards", () => ({
+  requireAdminRouteUser: adminAuthGuardMock.requireAdminRouteUser,
 }));
 
 vi.mock("@/src/server/imports/fetchSyncUpdates", () => ({
@@ -58,6 +66,33 @@ describe("admin byr sync route", () => {
     routeMocks.mapSyncPayload.mockReset();
     routeMocks.importSyncBatch.mockReset();
     routeMocks.prisma.thread.findUnique.mockReset();
+    adminAuthGuardMock.requireAdminRouteUser.mockReset();
+    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValue({
+      ok: true,
+      identity: {
+        provider: "kinde",
+        subject: "kp_admin_user",
+        orgCodes: ["org_ed7de8344b99"],
+      },
+    });
+  });
+
+  it("returns 403 before running a manual sync when admin auth fails", async () => {
+    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValueOnce({
+      ok: false,
+      response: Response.json({ error: "Forbidden" }, { status: 403 }),
+    });
+
+    const response = await POST(
+      new Request("http://localhost/admin/api/imports/byr-sync", {
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
+    expect(routeMocks.fetchSyncUpdates).not.toHaveBeenCalled();
+    expect(routeMocks.importSyncBatch).not.toHaveBeenCalled();
   });
 
   it("imports updates and returns json", async () => {

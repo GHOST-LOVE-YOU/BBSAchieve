@@ -4,6 +4,7 @@ import {
   buildAdminImportsRedirectUrl,
   readRedirectTo,
 } from "@/src/server/admin/adminImportsRedirect";
+import { requireAdminRouteUser } from "@/src/server/auth/routeGuards";
 import { prisma } from "@/src/server/db/client";
 import {
   findJobById,
@@ -14,6 +15,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ jobId: string }> },
 ) {
+  const auth = await requireAdminRouteUser(request);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const redirectTo = await readRedirectTo(request);
 
   try {

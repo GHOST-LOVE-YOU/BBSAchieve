@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 
 import { buildAdminImportsRedirectUrl } from "@/src/server/admin/adminImportsRedirect";
+import { requireAdminRouteUser } from "@/src/server/auth/routeGuards";
 import { boardSyncBoards } from "@/src/server/boardSync/boardRegistry";
 import { prisma } from "@/src/server/db/client";
 import { createBoardBatchFullSyncJob } from "@/src/server/imports/importJobStore";
 import { scheduleBoardBatchFullSync } from "@/src/server/imports/scheduleBoardBatchFullSync";
 
 export async function POST(request: Request) {
+  const auth = await requireAdminRouteUser(request);
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const formData = await request.formData();
   const redirectToValue = formData.get("redirectTo");
   const redirectTo =
