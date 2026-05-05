@@ -5,6 +5,20 @@ function getRequiredEnv(name: string): string | null {
   return value && value.trim().length > 0 ? value : null;
 }
 
+function describeFetchCause(error: unknown): string | null {
+  if (!(error instanceof Error) || !("cause" in error)) {
+    return null;
+  }
+  const cause = error.cause;
+  if (cause instanceof Error) {
+    return cause.message;
+  }
+  if (typeof cause === "string" && cause.trim().length > 0) {
+    return cause;
+  }
+  return null;
+}
+
 export async function fetchSyncUpdates(input: {
   boardName: string;
   windowMinutes: number;
@@ -25,16 +39,26 @@ export async function fetchSyncUpdates(input: {
     params.set("limit", String(input.limit));
   }
 
-  const response = await fetch(
-    `${baseUrl.replace(/\/$/, "")}/api/sync/updates?${params.toString()}`,
-    {
+  const url = `${baseUrl.replace(/\/$/, "")}/api/sync/updates?${params.toString()}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
       method: "GET",
       headers: {
         "X-Sync-Token": token,
       },
       cache: "no-store",
-    },
-  );
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown fetch error";
+    const cause = describeFetchCause(error);
+    throw new Error(
+      `Sync API fetch failed for board ${input.boardName} at ${url}: ${message}${
+        cause ? `; cause: ${cause}` : ""
+      }`,
+      { cause: error },
+    );
+  }
 
   if (!response.ok) {
     throw new Error(`Sync API request failed: ${response.status}`);
