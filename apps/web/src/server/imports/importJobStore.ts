@@ -236,3 +236,21 @@ export function markJobFailed(
     },
   });
 }
+
+export function markJobFailedBeforeOrDuringRun(
+  prisma: ImportJobStore,
+  jobId: string,
+  errorMessage: string,
+) {
+  return prisma.importJob.updateMany({
+    where: {
+      id: jobId,
+      status: { in: ["pending", "running", "paused"] },
+    },
+    data: {
+      status: "failed",
+      finishedAt: new Date(),
+      errorMessage,
+    },
+  });
+}

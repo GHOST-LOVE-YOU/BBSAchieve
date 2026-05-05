@@ -28,6 +28,7 @@ export default async function AdminImportsPage() {
         <h1 className="text-3xl font-semibold">导入导出</h1>
         <div className="grid gap-3">
           <form action="/admin/api/imports/byr-sync" method="post">
+            <input type="hidden" name="redirectTo" value="/admin/imports" />
             <button
               className="rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white"
               type="submit"
@@ -40,6 +41,7 @@ export default async function AdminImportsPage() {
             method="post"
             className="rounded-xl border border-zinc-200 p-4"
           >
+            <input type="hidden" name="redirectTo" value="/admin/imports" />
             <fieldset className="grid gap-3">
               <legend className="text-sm font-medium text-zinc-900">选择要全量抓取的板块</legend>
               {selectableBoards.map((board) => (
@@ -160,6 +162,7 @@ export default async function AdminImportsPage() {
                       <div className="flex flex-wrap gap-2">
                         {(job.status === "paused" || job.status === "failed") ? (
                           <form action={`/admin/api/import-jobs/${job.id}/resume`} method="post">
+                            <input type="hidden" name="redirectTo" value="/admin/imports" />
                             <button
                               className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs"
                               type="submit"
@@ -170,6 +173,7 @@ export default async function AdminImportsPage() {
                         ) : null}
                         {(job.status === "pending" || job.status === "running" || job.status === "paused" || job.status === "failed") ? (
                           <form action={`/admin/api/import-jobs/${job.id}/stop`} method="post">
+                            <input type="hidden" name="redirectTo" value="/admin/imports" />
                             <button
                               className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs"
                               type="submit"

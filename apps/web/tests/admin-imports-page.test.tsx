@@ -92,9 +92,18 @@ describe("admin imports page", () => {
       expect(screen.getByText("当前将按首页目录顺序串行抓取：IWhisper")).toBeTruthy();
 
       const batchForm = batchStartButton.closest("form");
+      const syncForm = screen
+        .getByRole("button", { name: "同步北邮人数据" })
+        .closest("form");
+      expect(
+        (syncForm?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)?.value,
+      ).toBe("/admin/imports");
       expect(batchForm?.getAttribute("action")).toBe(
         "/admin/api/import-jobs/byr-board-full-sync-batch",
       );
+      expect(
+        (batchForm?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)?.value,
+      ).toBe("/admin/imports");
       expect(
         Array.from(
           batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??
@@ -133,9 +142,13 @@ describe("admin imports page", () => {
     await renderAdminImportsPage();
 
     const stopButton = screen.getByRole("button", { name: "停止" });
-    expect(stopButton.closest("form")?.getAttribute("action")).toBe(
+    const stopForm = stopButton.closest("form");
+    expect(stopForm?.getAttribute("action")).toBe(
       "/admin/api/import-jobs/job-pending/stop",
     );
+    expect(
+      (stopForm?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)?.value,
+    ).toBe("/admin/imports");
     expect(screen.getByText("skipped by global throttle")).toBeTruthy();
   });
 
@@ -247,6 +260,9 @@ describe("admin imports page", () => {
     expect(batchForm?.getAttribute("action")).toBe(
       "/admin/api/import-jobs/byr-board-full-sync-batch",
     );
+    expect(
+      (batchForm?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)?.value,
+    ).toBe("/admin/imports");
     expect(
       Array.from(
         batchForm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"][name="boardNames"]') ??

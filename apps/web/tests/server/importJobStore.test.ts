@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createBoardFullSyncJob,
   markJobFailed,
+  markJobFailedBeforeOrDuringRun,
   markJobCancelled,
   markJobPaused,
   markJobRunning,
@@ -244,6 +245,42 @@ describe("markJobFailed", () => {
           status: "failed",
           finishedAt: now,
           errorMessage: "sync boom",
+        }),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("markJobFailedBeforeOrDuringRun", () => {
+  it("writes failed status when a background batch run dies before entering the steady running state", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const now = new Date("2026-05-04T07:04:30.000Z");
+
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    try {
+      await markJobFailedBeforeOrDuringRun(
+        {
+          importJob: { updateMany },
+        } as any,
+        "job-1",
+        "background boom",
+      );
+
+      expect(updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "job-1",
+          status: {
+            in: ["pending", "running", "paused"],
+          },
+        },
+        data: expect.objectContaining({
+          status: "failed",
+          finishedAt: now,
+          errorMessage: "background boom",
         }),
       });
     } finally {

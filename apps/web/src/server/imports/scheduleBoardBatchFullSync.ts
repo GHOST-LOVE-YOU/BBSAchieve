@@ -4,6 +4,7 @@ import {
   findJobById,
   markJobPaused,
   markJobFailed,
+  markJobFailedBeforeOrDuringRun,
   markJobRunning,
   markJobSucceeded,
   updateJobProgress,
@@ -25,7 +26,7 @@ export function scheduleBoardBatchFullSyncRun(input: {
     const failUnexpectedRun = async (error: unknown) => {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown batch full sync error";
-      await markJobFailed(prisma, input.jobId, errorMessage);
+      await markJobFailedBeforeOrDuringRun(prisma, input.jobId, errorMessage);
       console.error("scheduleBoardBatchFullSync background run failed", error);
     };
 

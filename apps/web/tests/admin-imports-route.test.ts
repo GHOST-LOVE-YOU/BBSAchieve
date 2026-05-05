@@ -167,6 +167,52 @@ describe("admin byr sync route", () => {
     });
   });
 
+  it("redirects form submissions back to admin imports instead of rendering raw json", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "IWhisper",
+      window_minutes: 30,
+      scanned_pages: 0,
+      cutoff_at: "2026-05-03T21:40:00",
+      threads: [],
+    });
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper",
+      boards: [
+        {
+          slug: "iwhisper",
+          name: "IWhisper",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-3",
+      importedThreads: 1,
+      importedReplies: 2,
+      skippedReplies: 0,
+    });
+
+    const response = await POST(
+      new Request("http://localhost/admin/api/imports/byr-sync", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: "redirectTo=%2Fadmin%2Fimports",
+      }),
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "/admin/imports?action=sync&status=succeeded",
+    );
+  });
+
   it("fills in the original post when incremental updates only include replies", async () => {
     routeMocks.prisma.thread.findUnique.mockResolvedValue({
       id: "thread-1",

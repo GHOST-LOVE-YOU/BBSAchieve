@@ -69,12 +69,42 @@ describe("scheduleBoardBatchFullSync", () => {
     expect(schedulerMocks.prisma.importJob.updateMany).toHaveBeenCalledWith({
       where: {
         id: "job-batch-1",
-        status: "running",
+        status: {
+          in: ["pending", "running", "paused"],
+        },
       },
       data: {
         status: "failed",
         finishedAt: expect.any(Date),
         errorMessage: "background boom",
+      },
+    });
+    expect(consoleError).toHaveBeenCalledWith(
+      "scheduleBoardBatchFullSync background run failed",
+      error,
+    );
+  });
+
+  it("marks a pending batch job failed when the runner crashes before it can enter running", async () => {
+    const error = new Error("pre-run boom");
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    schedulerMocks.runBoardBatchFullSyncJob.mockRejectedValue(error);
+    schedulerMocks.prisma.importJob.updateMany.mockResolvedValue({ count: 1 });
+
+    scheduleBoardBatchFullSync("job-batch-2");
+    await vi.runAllTimersAsync();
+
+    expect(schedulerMocks.prisma.importJob.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "job-batch-2",
+        status: {
+          in: ["pending", "running", "paused"],
+        },
+      },
+      data: {
+        status: "failed",
+        finishedAt: expect.any(Date),
+        errorMessage: "pre-run boom",
       },
     });
     expect(consoleError).toHaveBeenCalledWith(

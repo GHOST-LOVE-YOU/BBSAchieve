@@ -69,6 +69,25 @@ describe("admin import job routes", () => {
     await expect(response.json()).resolves.toEqual({ ok: true, jobId: "job-batch-1" });
   });
 
+  it("redirects batch start form submissions back to admin imports", async () => {
+    routeMocks.createBoardBatchFullSyncJob.mockResolvedValue({ id: "job-batch-1" });
+    const formData = new FormData();
+    formData.append("boardNames", "JobInfo");
+    formData.append("boardNames", "IWhisper");
+    formData.append("redirectTo", "/admin/imports");
+    const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync-batch", {
+      method: "POST",
+      body: formData,
+    });
+
+    const response = await startPOST(request);
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "/admin/imports?action=batch_start&status=queued&jobId=job-batch-1",
+    );
+  });
+
   it("returns 400 when no boards are selected", async () => {
     const formData = new FormData();
     const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync-batch", {
@@ -200,6 +219,41 @@ describe("admin import job routes", () => {
     });
   });
 
+  it("redirects batch resume form submissions back to admin imports", async () => {
+    routeMocks.findJobById.mockResolvedValue({
+      id: "job-batch-1",
+      jobType: "byr_board_full_sync_batch",
+      status: "failed",
+      metadataJson: {
+        selectedBoardNames: ["JobInfo", "IWhisper"],
+        orderedBoardNames: ["IWhisper", "JobInfo"],
+        completedBoardNames: ["IWhisper"],
+        currentBoardName: "JobInfo",
+        failedBoardName: "JobInfo",
+        currentBoardIndex: 1,
+        perBoardStats: {},
+      },
+    });
+
+    const response = await resumePOST(
+      new Request("http://localhost/admin/api/import-jobs/job-batch-1/resume", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: "redirectTo=%2Fadmin%2Fimports",
+      }),
+      {
+        params: Promise.resolve({ jobId: "job-batch-1" }),
+      },
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "/admin/imports?action=batch_resume&status=running&jobId=job-batch-1",
+    );
+  });
+
   it("does not resume a batch full-sync job if the running transition is rejected after cancellation", async () => {
     routeMocks.findJobById.mockResolvedValue({
       id: "job-batch-2",
@@ -251,6 +305,33 @@ describe("admin import job routes", () => {
       jobId: "job-3",
       status: "cancelled",
     });
+  });
+
+  it("redirects batch stop form submissions back to admin imports", async () => {
+    routeMocks.findJobById.mockResolvedValue({
+      id: "job-3",
+      status: "running",
+      jobType: "byr_board_full_sync_batch",
+    });
+    routeMocks.markJobCancelled.mockResolvedValue({ count: 1 });
+
+    const response = await stopPOST(
+      new Request("http://localhost/admin/api/import-jobs/job-3/stop", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: "redirectTo=%2Fadmin%2Fimports",
+      }),
+      {
+        params: Promise.resolve({ jobId: "job-3" }),
+      },
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "/admin/imports?action=batch_stop&status=cancelled&jobId=job-3",
+    );
   });
 
   it("does not stop a batch full-sync job if the cancel transition is rejected at write time", async () => {

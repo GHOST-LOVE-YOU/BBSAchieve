@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import type { PrismaClient } from "@prisma/client";
 
+import {
+  buildAdminImportsRedirectUrl,
+  readRedirectTo,
+} from "@/src/server/admin/adminImportsRedirect";
 import { prisma } from "@/src/server/db/client";
 import { resolveBoardIdentity } from "@/src/server/boardSync/resolveBoardIdentity";
 import { fetchSyncOriginalPost } from "@/src/server/imports/fetchSyncOriginalPost";
@@ -135,7 +139,9 @@ export async function runByrSyncImport(input: {
   return importSyncBatch(input.prisma, batch);
 }
 
-export async function POST() {
+export async function POST(request?: Request) {
+  const redirectTo = request ? await readRedirectTo(request) : null;
+
   try {
     const result = await runByrSyncImport({
       prisma,
@@ -143,8 +149,34 @@ export async function POST() {
       windowMinutes: 30,
     });
 
+    if (redirectTo) {
+      return new NextResponse(null, {
+        status: 303,
+        headers: {
+          location: buildAdminImportsRedirectUrl(redirectTo, {
+            action: "sync",
+            status: "succeeded",
+          }),
+        },
+      });
+    }
+
     return NextResponse.json({ ok: true, result });
   } catch (error) {
+    if (redirectTo) {
+      return new NextResponse(null, {
+        status: 303,
+        headers: {
+          location: buildAdminImportsRedirectUrl(redirectTo, {
+            action: "sync",
+            status: "failed",
+            message:
+              error instanceof Error ? error.message : "Unknown sync import error",
+          }),
+        },
+      });
+    }
+
     return NextResponse.json(
       {
         ok: false,
