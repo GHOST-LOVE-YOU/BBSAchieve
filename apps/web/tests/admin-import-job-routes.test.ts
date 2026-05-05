@@ -37,6 +37,7 @@ vi.mock("@/src/server/imports/scheduleBoardBatchFullSync", () => ({
 import { POST as startPOST } from "../app/admin/api/import-jobs/byr-board-full-sync-batch/route";
 import { POST as resumePOST } from "../app/admin/api/import-jobs/[jobId]/resume/route";
 import { POST as stopPOST } from "../app/admin/api/import-jobs/[jobId]/stop/route";
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 import { boardSyncBoards } from "@/src/server/boardSync/boardRegistry";
 
 describe("admin import job routes", () => {
@@ -47,10 +48,12 @@ describe("admin import job routes", () => {
   });
 
   it("creates one batch job from multiple selected boards and reorders them by catalog order", async () => {
+    const selectedBoardNames = ["JobInfo", "IWhisper"];
     routeMocks.createBoardBatchFullSyncJob.mockResolvedValue({ id: "job-batch-1" });
     const formData = new FormData();
-    formData.append("boardNames", "JobInfo");
-    formData.append("boardNames", "IWhisper");
+    for (const boardName of selectedBoardNames) {
+      formData.append("boardNames", boardName);
+    }
     const request = new Request("http://localhost/admin/api/import-jobs/byr-board-full-sync-batch", {
       method: "POST",
       body: formData,
@@ -58,11 +61,15 @@ describe("admin import job routes", () => {
 
     const response = await startPOST(request);
 
+    const expectedOrderedBoardNames = boardCatalog
+      .map((board) => board.boardName)
+      .filter((boardName) => selectedBoardNames.includes(boardName));
+
     expect(routeMocks.createBoardBatchFullSyncJob).toHaveBeenCalledWith(
       routeMocks.prisma,
       {
-        selectedBoardNames: ["JobInfo", "IWhisper"],
-        orderedBoardNames: ["IWhisper", "JobInfo"],
+        selectedBoardNames,
+        orderedBoardNames: expectedOrderedBoardNames,
       },
     );
     expect(routeMocks.scheduleBoardBatchFullSync).toHaveBeenCalled();

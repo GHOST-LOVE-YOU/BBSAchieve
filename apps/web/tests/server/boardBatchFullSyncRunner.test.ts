@@ -8,7 +8,14 @@ import {
   createBatchJobMetadata,
   markBoardCompleted,
 } from "@/src/server/imports/boardBatchJobMetadata";
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
 import { runBoardBatchFullSyncJob } from "@/src/server/imports/boardBatchFullSyncRunner";
+
+const orderedBoardNames = boardCatalog.map((board) => board.boardName);
+const defaultSelectedBoardNames = ["JobInfo", "IWhisper"];
+const defaultOrderedBoardNames = orderedBoardNames.filter((boardName) =>
+  defaultSelectedBoardNames.includes(boardName),
+);
 
 function makeThrottle() {
   return {
@@ -39,8 +46,8 @@ function makeDeps(options?: {
   const metadata =
     options?.metadata ??
     createBatchJobMetadata({
-      selectedBoardNames: ["JobInfo", "IWhisper"],
-      orderedBoardNames: ["IWhisper", "JobInfo"],
+      selectedBoardNames: defaultSelectedBoardNames,
+      orderedBoardNames: defaultOrderedBoardNames,
     });
 
   return {
@@ -221,8 +228,8 @@ describe("runBoardBatchFullSyncJob", () => {
   it("resumes from the failed current board and skips boards already completed", async () => {
     const metadata = markBoardCompleted(
       createBatchJobMetadata({
-        selectedBoardNames: ["JobInfo", "IWhisper"],
-        orderedBoardNames: ["IWhisper", "JobInfo"],
+        selectedBoardNames: defaultSelectedBoardNames,
+        orderedBoardNames: defaultOrderedBoardNames,
       }),
       {
         boardName: "IWhisper",
@@ -333,8 +340,8 @@ describe("runBoardBatchFullSyncJob", () => {
 
   it("re-checks cancellation between boards so later boards do not start", async () => {
     const metadata = createBatchJobMetadata({
-      selectedBoardNames: ["JobInfo", "IWhisper"],
-      orderedBoardNames: ["IWhisper", "JobInfo"],
+      selectedBoardNames: defaultSelectedBoardNames,
+      orderedBoardNames: defaultOrderedBoardNames,
     });
     const findJobById = vi
       .fn()
