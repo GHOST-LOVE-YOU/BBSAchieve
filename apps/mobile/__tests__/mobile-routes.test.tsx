@@ -5,7 +5,15 @@ import { fetchBoards } from "@/features/reading/client";
 const appDir = "./src/app";
 
 const originalWebBaseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL;
+const originalKindeDomain = process.env.EXPO_PUBLIC_KINDE_DOMAIN;
+const originalKindeClientId = process.env.EXPO_PUBLIC_KINDE_CLIENT_ID;
+const originalKindeApiAudience = process.env.EXPO_PUBLIC_KINDE_API_AUDIENCE;
 const fetchMock = jest.fn<typeof fetch>();
+const authenticatedFetchOptions = {
+  headers: {
+    Authorization: "Bearer route-test-token",
+  },
+};
 
 function renderMobileRoute(initialUrl?: string) {
   return renderRouter(appDir, initialUrl ? { initialUrl } : undefined);
@@ -16,10 +24,16 @@ describe("mobile routes", () => {
     fetchMock.mockReset();
     global.fetch = fetchMock as typeof fetch;
     process.env.EXPO_PUBLIC_WEB_BASE_URL = "https://web.example.com";
+    process.env.EXPO_PUBLIC_KINDE_DOMAIN = "https://orlco.kinde.com";
+    process.env.EXPO_PUBLIC_KINDE_CLIENT_ID = "mobile-client-id";
+    process.env.EXPO_PUBLIC_KINDE_API_AUDIENCE = "https://bbsachieve.orlco/api";
   });
 
   afterAll(() => {
     process.env.EXPO_PUBLIC_WEB_BASE_URL = originalWebBaseUrl;
+    process.env.EXPO_PUBLIC_KINDE_DOMAIN = originalKindeDomain;
+    process.env.EXPO_PUBLIC_KINDE_CLIENT_ID = originalKindeClientId;
+    process.env.EXPO_PUBLIC_KINDE_API_AUDIENCE = originalKindeApiAudience;
   });
 
   it("throws a clear error when EXPO_PUBLIC_WEB_BASE_URL is missing", async () => {
@@ -60,7 +74,10 @@ describe("mobile routes", () => {
 
     expect(await screen.findByText("Jobs and Offers")).toBeTruthy();
     expect(screen.getByText("Hot Reading")).toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledWith("https://web.example.com/api/public/boards");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://web.example.com/api/public/boards",
+      authenticatedFetchOptions,
+    );
   });
 
   it("renders board detail thread titles", async () => {
@@ -102,10 +119,12 @@ describe("mobile routes", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       "https://web.example.com/api/public/boards/job",
+      authenticatedFetchOptions,
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "https://web.example.com/api/public/boards/job/threads?limit=20",
+      authenticatedFetchOptions,
     );
   });
 
@@ -156,10 +175,12 @@ describe("mobile routes", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       "https://web.example.com/api/public/threads/first-offer",
+      authenticatedFetchOptions,
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "https://web.example.com/api/public/threads/first-offer/replies?limit=20",
+      authenticatedFetchOptions,
     );
   });
 

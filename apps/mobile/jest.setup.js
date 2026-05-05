@@ -11,6 +11,22 @@ jest.mock("./src/components/app-tabs", () => {
   };
 });
 
+jest.mock("@kinde/expo", () => {
+  const React = require("react");
+
+  return {
+    KindeAuthProvider: ({ children }) => <>{children}</>,
+    useKindeAuth: () => ({
+      getAccessToken: jest.fn(async () => "route-test-token"),
+      isAuthenticated: true,
+      isLoading: false,
+      login: jest.fn(async () => ({ success: true })),
+      logout: jest.fn(async () => ({ success: true })),
+      register: jest.fn(async () => ({ success: true })),
+    }),
+  };
+});
+
 afterEach(() => {
   jest.restoreAllMocks();
 });

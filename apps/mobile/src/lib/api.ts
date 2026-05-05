@@ -1,3 +1,5 @@
+import { getRequiredMobileAccessToken } from "@/features/auth/mobileAuthToken";
+
 function getWebBaseUrl() {
   const value = process.env.EXPO_PUBLIC_WEB_BASE_URL?.trim();
 
@@ -9,7 +11,13 @@ function getWebBaseUrl() {
 }
 
 export async function apiGetJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${getWebBaseUrl()}${path}`);
+  const url = `${getWebBaseUrl()}${path}`;
+  const accessToken = await getRequiredMobileAccessToken();
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
