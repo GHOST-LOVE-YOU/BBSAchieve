@@ -6,6 +6,7 @@ import {
   identityFromJwtClaims,
   readOrgCodesFromClaims,
 } from "@/src/server/auth/identity";
+import { identityFromWebSession } from "@/src/server/auth/webSession";
 
 describe("Kinde identity parsing", () => {
   it("reads org codes from common Kinde claim shapes", () => {
@@ -80,5 +81,35 @@ describe("Kinde identity parsing", () => {
         name: null,
       }),
     ).toBe("alice@example.com");
+  });
+});
+
+describe("Kinde web session parsing", () => {
+  it("combines Kinde user and organization response into a shared identity", () => {
+    expect(
+      identityFromWebSession({
+        user: {
+          id: "kp_web",
+          email: "web@example.com",
+          given_name: "Web",
+          family_name: "User",
+          picture: null,
+        },
+        organizations: {
+          orgCodes: ["org_ed7de8344b99"],
+          orgs: [],
+        },
+      }),
+    ).toEqual({
+      provider: "kinde",
+      subject: "kp_web",
+      email: "web@example.com",
+      givenName: "Web",
+      familyName: "User",
+      name: "Web User",
+      picture: null,
+      orgCodes: ["org_ed7de8344b99"],
+      source: "web",
+    });
   });
 });
