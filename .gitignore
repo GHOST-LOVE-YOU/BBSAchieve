@@ -2,3 +2,5 @@
 node_modules/
 apps/*/node_modules/
 packages/*/dist/
+
+kinde_export/

@@ -11,11 +11,14 @@
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy"
+    "prisma:deploy": "prisma migrate deploy",
+    "import:kinde-users": "tsx scripts/import-kinde-users.ts"
   },
   "dependencies": {
     "@bbs/state": "workspace:*",
+    "@kinde-oss/kinde-auth-nextjs": "2.12.1",
     "@prisma/client": "^6.19.0",
+    "jose": "6.2.3",
     "next": "16.2.4",
     "pg": "^8.20.0",
     "react": "19.2.4",
@@ -36,6 +39,7 @@
     "jsdom": "^26.1.0",
     "prisma": "^6.19.0",
     "tailwindcss": "^4",
+    "tsx": "4.21.0",
     "typescript": "^5",
     "vitest": "^3.2.4"
   }
