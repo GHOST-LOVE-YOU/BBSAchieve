@@ -15,6 +15,12 @@ describe("boardRegistry", () => {
     expect(getBoardFullSyncDefinition("JobInfo")).toEqual(jobInfo);
   });
 
+  it("uses a 30-year default full-sync window for catalog boards", () => {
+    expect(getBoardFullSyncDefinition("Xyq")?.fullSyncWindowMinutes).toBe(
+      60 * 24 * 365 * 30,
+    );
+  });
+
   it("returns null when a board is missing from the catalog-derived registry", () => {
     expect(getBoardFullSyncDefinition("MissingBoard")).toBeNull();
   });

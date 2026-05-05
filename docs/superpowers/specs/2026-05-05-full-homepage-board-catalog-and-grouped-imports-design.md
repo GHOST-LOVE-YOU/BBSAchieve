@@ -146,7 +146,7 @@ type BoardCatalogEntry = {
 建议默认值如下：
 
 - `fullSyncEnabled = true`
-- `fullSyncWindowMinutes = 60 * 24 * 365 * 10`
+- `fullSyncWindowMinutes = 60 * 24 * 365 * 30`
 - `scheduledSyncEnabled = false`
 - `scheduledIntervalMinutes = 120`
 - `scheduledWindowMinutes = 180`

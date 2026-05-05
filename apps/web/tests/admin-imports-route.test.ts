@@ -948,7 +948,7 @@ describe("admin byr sync route", () => {
     routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
     routeMocks.fetchSyncUpdates.mockResolvedValue({
       board_name: "JobInfo",
-      window_minutes: 60 * 24 * 365 * 10,
+      window_minutes: 60 * 24 * 365 * 30,
       scanned_pages: 3,
       cutoff_at: "2026-05-03T21:40:00",
       threads: [],
@@ -977,13 +977,13 @@ describe("admin byr sync route", () => {
     await runByrSyncImport({
       prisma: routeMocks.prisma as never,
       boardName: "JobInfo",
-      windowMinutes: 60 * 24 * 365 * 10,
+      windowMinutes: 60 * 24 * 365 * 30,
       limit: null,
     });
 
     expect(routeMocks.fetchSyncUpdates).toHaveBeenCalledWith({
       boardName: "JobInfo",
-      windowMinutes: 60 * 24 * 365 * 10,
+      windowMinutes: 60 * 24 * 365 * 30,
       limit: null,
     });
   });
