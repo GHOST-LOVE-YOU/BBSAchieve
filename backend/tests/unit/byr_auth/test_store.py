@@ -45,3 +45,22 @@ def test_load_returns_empty_when_file_is_missing(tmp_path) -> None:
 
     assert list(cookies.jar) == []
 
+
+def test_load_returns_empty_when_file_is_empty(tmp_path) -> None:
+    path = tmp_path / "cookies.json"
+    path.write_text("", encoding="utf-8")
+    store = CookieStore(path)
+
+    cookies = store.load()
+
+    assert list(cookies.jar) == []
+
+
+def test_load_returns_empty_when_file_contains_invalid_json(tmp_path) -> None:
+    path = tmp_path / "cookies.json"
+    path.write_text("{not-json", encoding="utf-8")
+    store = CookieStore(path)
+
+    cookies = store.load()
+
+    assert list(cookies.jar) == []
