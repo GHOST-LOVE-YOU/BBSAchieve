@@ -5,3 +5,4 @@ export * from "./jwt";
 export * from "./webSession";
 export * from "./routeGuards";
 export * from "./pageGuards";
+export * from "./kindeExport";

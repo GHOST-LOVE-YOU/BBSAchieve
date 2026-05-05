@@ -17,6 +17,7 @@
   "dependencies": {
     "@bbs/state": "workspace:*",
     "@kinde-oss/kinde-auth-nextjs": "2.12.1",
+    "@next/env": "16.2.4",
     "@prisma/client": "^6.19.0",
     "jose": "6.2.3",
     "next": "16.2.4",
