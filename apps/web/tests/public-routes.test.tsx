@@ -33,6 +33,43 @@ vi.mock("next/link", () => ({
   },
 }));
 
+vi.mock("@kinde-oss/kinde-auth-nextjs/server", () => ({
+  LoginLink: ({
+    children,
+    postLoginRedirectURL,
+  }: {
+    children: React.ReactNode;
+    postLoginRedirectURL?: string;
+  }) => (
+    <a
+      href={`/api/auth/login${
+        postLoginRedirectURL
+          ? `?post_login_redirect_url=${encodeURIComponent(postLoginRedirectURL)}`
+          : ""
+      }`}
+    >
+      {children}
+    </a>
+  ),
+  LogoutLink: ({
+    children,
+    postLogoutRedirectURL,
+  }: {
+    children: React.ReactNode;
+    postLogoutRedirectURL?: string;
+  }) => (
+    <a
+      href={`/api/auth/logout${
+        postLogoutRedirectURL
+          ? `?post_logout_redirect_url=${encodeURIComponent(postLogoutRedirectURL)}`
+          : ""
+      }`}
+    >
+      {children}
+    </a>
+  ),
+}));
+
 const nextNavigation = vi.hoisted(() => {
   const error = Object.assign(new Error("NEXT_NOT_FOUND"), {
     digest: "NEXT_NOT_FOUND",
@@ -94,6 +131,19 @@ describe("web public routes", () => {
 
     expect(screen.getByText("Jobs and Offers")).toBeTruthy();
     expect(screen.getByText("Hot Reading")).toBeTruthy();
+  });
+
+  it("renders Kinde login and logout links on the home page", async () => {
+    publicReadingMock.listBoards.mockResolvedValue({ boards: [] });
+
+    render(await HomePage());
+
+    expect(screen.getByRole("link", { name: "登录 / 切换账号" }).getAttribute("href")).toBe(
+      "/api/auth/login?post_login_redirect_url=%2F",
+    );
+    expect(screen.getByRole("link", { name: "登出" }).getAttribute("href")).toBe(
+      "/api/auth/logout?post_logout_redirect_url=%2F",
+    );
   });
 
   it("renders board detail and thread summaries from the public reading service", async () => {
