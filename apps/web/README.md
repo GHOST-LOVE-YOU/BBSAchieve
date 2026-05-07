@@ -2,19 +2,72 @@
 
 ## 本地开发
 
+首次准备依赖：
+
 ```bash
-npx pnpm@10.11.0 db:up
-npx pnpm@10.11.0 --filter @bbs/web prisma:migrate
-npx pnpm@10.11.0 --filter @bbs/web dev
+npx pnpm@10.11.0 install
 ```
 
-默认会连接 `apps/web/.env` 中的本地 PostgreSQL：
+Web 本地开发默认使用 Docker 中的 PostgreSQL，不再默认直连云端库：
+
+```bash
+npx pnpm@10.11.0 db:up
+```
+
+默认会连接 [`.env`](/Users/ghost/code/BBSAchieve/apps/web/.env) 中的本地 PostgreSQL：
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5433/bbsachieve"
 ```
 
+如果确实需要临时切回其他数据库，再手动覆盖 `DATABASE_URL` 即可。
+
+首次启动本地库后，先跑一次迁移把表建好：
+
+```bash
+npx pnpm@10.11.0 --filter @bbs/web prisma:generate
+npx pnpm@10.11.0 --filter @bbs/web prisma:migrate
+```
+
+启动 Web 开发服务器：
+
+```bash
+npx pnpm@10.11.0 --filter @bbs/web dev
+```
+
 开发服务器默认运行在本机 `3000` 端口，本地 PostgreSQL 暴露在 `5433` 端口。
+
+## 常用校验
+
+Web 侧真实数据导入相关的常用验证顺序是先跑 Prisma 生成/迁移，再跑导入与路由测试，最后做类型检查：
+
+```bash
+npx pnpm@10.11.0 --filter @bbs/web prisma:generate
+npx pnpm@10.11.0 --filter @bbs/web prisma:migrate
+npx pnpm@10.11.0 vitest run apps/web/tests/server/importSyncBatch.test.ts apps/web/tests/server/fetchSyncUpdates.test.ts
+npx pnpm@10.11.0 vitest run apps/web/tests/admin-imports-route.test.ts apps/web/tests/admin-imports-page.test.tsx apps/web/tests/public-routes.test.tsx apps/web/tests/admin-create-bot-and-thread.test.tsx
+npx pnpm@10.11.0 --filter @bbs/web typecheck
+```
+
+跨前端包的完整阅读链路校验可以按下面顺序执行：
+
+```bash
+npx pnpm@10.11.0 vitest run packages/domain/tests/entities.test.ts
+npx pnpm@10.11.0 vitest run packages/state/tests/createBotAndThread.test.ts packages/state/tests/importForumData.test.ts packages/state/tests/getBoardSummaries.test.ts packages/state/tests/getBoardDetail.test.ts packages/state/tests/getThreadDetail.test.ts
+npx pnpm@10.11.0 vitest run apps/web/tests/public-routes.test.tsx apps/web/tests/admin-create-bot-and-thread.test.tsx
+npx pnpm@10.11.0 --filter @bbs/web typecheck
+npx pnpm@10.11.0 --filter @bbs/web build
+npx pnpm@10.11.0 --filter @bbs/mobile exec jest __tests__/mobile-routes.test.tsx --runInBand
+npx pnpm@10.11.0 --filter @bbs/mobile typecheck
+npx pnpm@10.11.0 --filter @bbs/mobile exec tsc --noEmit -p tsconfig.test.json
+```
+
+## 当前范围
+
+- Web 公开区只读阅读链路
+- Web `/admin` 内容运营骨架
+- 共享领域模型、仓储接口、读取用例与本地运行时装配
+- Mobile 最小只读阅读链路与通知/绑定占位通过 Web 公开 API 联调
 
 ## Docker 构建
 
