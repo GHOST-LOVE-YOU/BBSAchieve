@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from byr_api.auth import _load_sync_token
 from byr_api import app as app_module
 from byr_api.app import create_app
+from byr_auth import AuthError
 from byr_sync import InMemorySyncCache
 from byr_sync.models import BackfillResult, SyncPost, SyncThread
 from byr_sync.service import SyncService, SyncUpdateResult
@@ -128,6 +129,17 @@ class RaisingSyncService:
         max_backfill_window: int,
     ) -> BackfillResult:
         raise ValueError("Requested rewind exceeds max backfill window")
+
+
+class AuthRaisingSyncService:
+    def list_updates(
+        self,
+        *,
+        board_name: str,
+        limit: int | None,
+        window_minutes: int | None = None,
+    ) -> SyncUpdateResult:
+        raise AuthError("Expected JSON response from https://bbs.byr.cn/user/ajax_session.json")
 
 
 def test_build_sync_service_injects_real_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -283,6 +295,23 @@ def test_sync_endpoint_returns_window_metadata(monkeypatch: pytest.MonkeyPatch) 
     assert response.json()["window_minutes"] == 15
     assert response.json()["scanned_pages"] == 2
     assert response.json()["cutoff_at"] == "2026-05-03T21:40:00"
+
+
+def test_sync_endpoint_maps_auth_error_to_bad_gateway(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    client = TestClient(create_app(sync_service=AuthRaisingSyncService()))
+
+    response = client.get(
+        "/api/sync/updates",
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "detail": "Upstream BYR authentication failed: Expected JSON response from https://bbs.byr.cn/user/ajax_session.json"
+    }
 
 
 def test_backfill_endpoint_returns_requested_thread_posts(monkeypatch: pytest.MonkeyPatch) -> None:

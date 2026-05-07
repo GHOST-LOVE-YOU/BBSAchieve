@@ -14,6 +14,23 @@ import {
   tryAcquireGlobalSyncThrottle,
 } from "@/src/server/syncThrottle/globalSyncThrottle";
 
+const DEFAULT_BOARD_COOLDOWN_MS = 60_000;
+
+function getBoardCooldownMs() {
+  const raw = process.env.BYR_BATCH_FULL_SYNC_BOARD_COOLDOWN_MS;
+  if (!raw || raw.trim().length === 0) {
+    return DEFAULT_BOARD_COOLDOWN_MS;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? Math.max(parsed, 0) : DEFAULT_BOARD_COOLDOWN_MS;
+}
+
+function sleep(milliseconds: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
 export function scheduleBoardBatchFullSync(jobId: string) {
   scheduleBoardBatchFullSyncRun({ jobId });
 }
@@ -45,6 +62,12 @@ export function scheduleBoardBatchFullSyncRun(input: {
         markJobSucceeded: (scheduledJobId: string) => markJobSucceeded(prisma, scheduledJobId),
         markJobFailed: (scheduledJobId: string, errorMessage: string) =>
           markJobFailed(prisma, scheduledJobId, errorMessage),
+        sleepBetweenBoards: async () => {
+          const cooldownMs = getBoardCooldownMs();
+          if (cooldownMs > 0) {
+            await sleep(cooldownMs);
+          }
+        },
       } as never,
       {
         jobId: input.jobId,

@@ -14,7 +14,7 @@ Web 本地开发默认使用 Docker 中的 PostgreSQL，不再默认直连云端
 npx pnpm@10.11.0 db:up
 ```
 
-默认会连接 [`.env`](/Users/ghost/code/BBSAchieve/apps/web/.env) 中的本地 PostgreSQL：
+默认会连接 `apps/web/.env` 中的本地 PostgreSQL：
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5433/bbsachieve"
@@ -34,6 +34,14 @@ npx pnpm@10.11.0 --filter @bbs/web prisma:migrate
 ```bash
 npx pnpm@10.11.0 --filter @bbs/web dev
 ```
+
+如果低配机器访问 `localhost:3000` 时 CPU 或内存被开发服务器打满，可以改用 Webpack 开发模式：
+
+```bash
+npx pnpm@10.11.0 --filter @bbs/web dev:webpack
+```
+
+当前项目使用 Next.js 16，`next dev` 默认启用 Turbopack。`dev:webpack` 只影响本地开发服务器，不改变生产构建和运行方式。
 
 开发服务器默认运行在本机 `3000` 端口，本地 PostgreSQL 暴露在 `5433` 端口。
 

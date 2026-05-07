@@ -30,7 +30,50 @@ describe("fetchSyncUpdates", () => {
     await expect(
       fetchSyncUpdates({ boardName: "IWhisper", windowMinutes: 30 }),
     ).rejects.toThrow(
-      "Sync API request failed: 401",
+      "Sync API request failed for board IWhisper: 401; detail: bad token",
+    );
+  });
+
+  it("includes response body detail for non-2xx responses", async () => {
+    vi.stubEnv("BYR_SYNC_API_BASE_URL", "https://sync.example.test");
+    vi.stubEnv("BYR_SYNC_API_TOKEN", "secret-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          {
+            detail:
+              "Upstream BYR authentication failed: Expected JSON response from https://bbs.byr.cn/user/ajax_session.json",
+          },
+          { status: 502 },
+        ),
+      ),
+    );
+
+    await expect(
+      fetchSyncUpdates({ boardName: "Xyq", windowMinutes: 15768000 }),
+    ).rejects.toThrow(
+      "Sync API request failed for board Xyq: 502; detail: Upstream BYR authentication failed: Expected JSON response from https://bbs.byr.cn/user/ajax_session.json",
+    );
+  });
+
+  it("includes request context when fetch fails before receiving a response", async () => {
+    vi.stubEnv("BYR_SYNC_API_BASE_URL", "https://sync.example.test");
+    vi.stubEnv("BYR_SYNC_API_TOKEN", "secret-token");
+    const cause = Object.assign(new Error("connect ECONNREFUSED 10.0.1.20:8000"), {
+      code: "ECONNREFUSED",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed", { cause });
+      }),
+    );
+
+    await expect(
+      fetchSyncUpdates({ boardName: "Xyq", windowMinutes: 15768000 }),
+    ).rejects.toThrow(
+      "Sync API fetch failed for board Xyq at https://sync.example.test/api/sync/updates?board_name=Xyq&window_minutes=15768000: fetch failed; cause: connect ECONNREFUSED 10.0.1.20:8000",
     );
   });
 

@@ -12,7 +12,7 @@ from .models import (
     SyncThreadResponse,
     SyncUpdatesResponse,
 )
-from byr_auth import ByrAuthClient
+from byr_auth import AuthError, ByrAuthClient
 from byr_boards import BoardService
 from byr_sync.cache import RedisSyncCache
 from byr_sync.service import SyncService
@@ -49,11 +49,17 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
         limit: int | None = Query(default=None, ge=1),
         _: str = Depends(require_sync_token),
     ) -> SyncUpdatesResponse:
-        result = app.state.sync_service.list_updates(
-            board_name=board_name,
-            limit=limit,
-            window_minutes=window_minutes,
-        )
+        try:
+            result = app.state.sync_service.list_updates(
+                board_name=board_name,
+                limit=limit,
+                window_minutes=window_minutes,
+            )
+        except AuthError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Upstream BYR authentication failed: {exc}",
+            ) from exc
         return SyncUpdatesResponse(
             board_name=result.board_name,
             window_minutes=result.window_minutes,

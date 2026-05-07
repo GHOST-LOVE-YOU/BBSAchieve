@@ -10,6 +10,10 @@ class AuthError(RuntimeError):
     """Raised when authentication state cannot be established."""
 
 
+class AuthRateLimitError(AuthError):
+    """Raised when BYR rejects frequent authentication checks."""
+
+
 @dataclass(slots=True)
 class SessionInfo:
     raw: dict[str, Any]

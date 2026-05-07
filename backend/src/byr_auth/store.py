@@ -16,7 +16,13 @@ class CookieStore:
         if not self.path.exists():
             return cookies
 
-        payload = json.loads(self.path.read_text(encoding="utf-8"))
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return cookies
+        if not isinstance(payload, dict):
+            return cookies
+
         for item in payload.get("cookies", []):
             cookies.set(
                 item["name"],

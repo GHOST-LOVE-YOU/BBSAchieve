@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from byr_auth import AuthError, ByrAuthClient
+from byr_auth.encoding import decode_response_text
 
 from .models import ThreadPageResult
 from .parser import parse_thread_page
@@ -45,5 +46,4 @@ class ThreadService:
 
     @staticmethod
     def _decode_text(response) -> str:
-        encoding = response.encoding or "utf-8"
-        return response.content.decode(encoding)
+        return decode_response_text(response)

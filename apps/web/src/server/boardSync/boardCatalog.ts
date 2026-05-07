@@ -21,7 +21,7 @@ export type BoardCatalogEntry = BoardCatalogSectionEntry & {
   sectionSlug: string;
 };
 
-const DEFAULT_FULL_SYNC_WINDOW_MINUTES = 60 * 24 * 365 * 10;
+const DEFAULT_FULL_SYNC_WINDOW_MINUTES = 60 * 24 * 365 * 30;
 const DEFAULT_SCHEDULED_INTERVAL_MINUTES = 120;
 const DEFAULT_SCHEDULED_WINDOW_MINUTES = 180;
 
