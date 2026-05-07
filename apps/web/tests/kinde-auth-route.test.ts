@@ -1,10 +1,16 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const handleAuthMock = vi.hoisted(() => vi.fn());
-
-vi.mock("@kinde-oss/kinde-auth-nextjs/server", () => ({
-  handleAuth: handleAuthMock,
+const kindeServerMock = vi.hoisted(() => ({
+  handleAuth: vi.fn(),
+  importCount: 0,
 }));
+
+vi.mock("@kinde-oss/kinde-auth-nextjs/server", () => {
+  kindeServerMock.importCount += 1;
+  return {
+    handleAuth: kindeServerMock.handleAuth,
+  };
+});
 
 const kindeEnvNames = [
   "KINDE_ISSUER_URL",
@@ -17,8 +23,13 @@ const kindeEnvNames = [
 ] as const;
 
 describe("Kinde auth route", () => {
-  afterEach(() => {
+  beforeEach(() => {
+    vi.resetModules();
     vi.resetAllMocks();
+    kindeServerMock.importCount = 0;
+  });
+
+  afterEach(() => {
     vi.unstubAllEnvs();
   });
 
@@ -30,20 +41,21 @@ describe("Kinde auth route", () => {
     await expect(import("../app/api/auth/[kindeAuth]/route")).resolves.toMatchObject({
       GET: expect.any(Function),
     });
-    expect(handleAuthMock).not.toHaveBeenCalled();
+    expect(kindeServerMock.importCount).toBe(0);
+    expect(kindeServerMock.handleAuth).not.toHaveBeenCalled();
   });
 
   it("delegates GET requests to the Kinde auth handler", async () => {
     const response = new Response("ok", { status: 200 });
     const sdkRouteHandler = vi.fn().mockResolvedValue(response);
-    handleAuthMock.mockReturnValue(sdkRouteHandler);
+    kindeServerMock.handleAuth.mockReturnValue(sdkRouteHandler);
 
     const { GET } = await import("../app/api/auth/[kindeAuth]/route");
     const request = new Request("http://localhost/api/auth/login");
     const context = { params: Promise.resolve({ kindeAuth: "login" }) };
 
     await expect(GET(request, context)).resolves.toBe(response);
-    expect(handleAuthMock).toHaveBeenCalledTimes(1);
+    expect(kindeServerMock.handleAuth).toHaveBeenCalledTimes(1);
     expect(sdkRouteHandler).toHaveBeenCalledWith(request, context);
   });
 });
