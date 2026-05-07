@@ -136,3 +136,15 @@ def test_decode_text_falls_back_when_response_encoding_is_wrong() -> None:
     response.encoding = "gbk"
 
     assert ThreadService._decode_text(response) == "悄悄话"
+
+
+def test_decode_text_preserves_gbk_page_when_one_byte_is_invalid() -> None:
+    request = httpx.Request("GET", "https://bbs.byr.cn/article/Xyq/23955")
+    response = httpx.Response(
+        200,
+        content="楼主".encode("gbk") + b"\xa3 " + "正文".encode("gbk"),
+        request=request,
+    )
+    response.encoding = "gbk"
+
+    assert ThreadService._decode_text(response) == "楼主� 正文"

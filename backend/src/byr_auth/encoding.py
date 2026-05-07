@@ -13,4 +13,10 @@ def decode_response_text(response: Any) -> str:
             return response.content.decode(encoding)
         except (LookupError, UnicodeDecodeError):
             continue
+
+    for encoding in attempted_encodings:
+        try:
+            return response.content.decode(encoding, errors="replace")
+        except LookupError:
+            continue
     return response.content.decode("utf-8", errors="replace")

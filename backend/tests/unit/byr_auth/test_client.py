@@ -52,6 +52,17 @@ def test_parse_json_falls_back_when_response_encoding_is_invalid() -> None:
     assert payload["ajax_msg"] == "登录成功"
 
 
+def test_decode_text_uses_declared_encoding_with_replacement_after_strict_failures() -> None:
+    response = make_response(
+        content="楼主".encode("gbk") + b"\xa3 " + "正文".encode("gbk"),
+        encoding="gbk",
+    )
+
+    text = ByrAuthClient._decode_text(response)
+
+    assert text == "楼主� 正文"
+
+
 def test_parse_json_raises_auth_error_for_non_json_response() -> None:
     response = make_response(
         content=b"<html><title>blocked</title></html>",
