@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const routeMocks = vi.hoisted(() => ({
+  SyncOriginalPostNotFoundError: class SyncOriginalPostNotFoundError extends Error {
+    constructor(message = "Original post not found") {
+      super(message);
+      this.name = "SyncOriginalPostNotFoundError";
+    }
+  },
   fetchSyncOriginalPost: vi.fn(),
   fetchSyncThreadSnapshot: vi.fn(),
   fetchSyncUpdates: vi.fn(),
@@ -31,6 +37,9 @@ vi.mock("@/src/server/imports/fetchSyncUpdates", () => ({
 
 vi.mock("@/src/server/imports/fetchSyncOriginalPost", () => ({
   fetchSyncOriginalPost: routeMocks.fetchSyncOriginalPost,
+  SyncOriginalPostNotFoundError: routeMocks.SyncOriginalPostNotFoundError,
+  isSyncOriginalPostNotFoundError: (error: unknown) =>
+    error instanceof routeMocks.SyncOriginalPostNotFoundError,
 }));
 
 vi.mock("@/src/server/imports/fetchSyncThreadSnapshot", () => ({
@@ -340,6 +349,80 @@ describe("admin byr sync route", () => {
       ],
     });
     expect(response.status).toBe(200);
+  });
+
+  it("skips a missing new source thread when its original post is unavailable", async () => {
+    routeMocks.prisma.thread.findUnique.mockResolvedValue(null);
+    routeMocks.fetchSyncUpdates.mockResolvedValue({
+      board_name: "Xyq",
+      window_minutes: 60 * 24 * 365 * 30,
+      scanned_pages: 1,
+      cutoff_at: "1996-05-10T00:00:00",
+      threads: [
+        {
+          article_id: "123456",
+          title: "源站主楼已不可取",
+          reply_count: 1,
+          posts: [
+            {
+              post_id: "123457",
+              floor_label: "第1楼",
+              author_display_name: "alice",
+              posted_at: "Sun May 3 00:08:00 2026",
+              body: "reply 1",
+            },
+          ],
+        },
+      ],
+    });
+    routeMocks.fetchSyncOriginalPost.mockRejectedValue(
+      new routeMocks.SyncOriginalPostNotFoundError(),
+    );
+    routeMocks.mapSyncPayload.mockReturnValue({
+      sourceType: "byr_sync_api",
+      sourceLabel: "Xyq",
+      boards: [
+        {
+          slug: "xyq",
+          name: "Xyq",
+          description: "",
+        },
+      ],
+      botUsers: [],
+      threads: [],
+      replies: [],
+    });
+    routeMocks.importSyncBatch.mockResolvedValue({
+      importId: "import-xyq",
+      importedThreads: 0,
+      importedReplies: 0,
+      skippedReplies: 0,
+    });
+
+    const result = await runByrSyncImport({
+      prisma: routeMocks.prisma as never,
+      boardName: "Xyq",
+      windowMinutes: 60 * 24 * 365 * 30,
+      limit: null,
+    });
+
+    expect(routeMocks.fetchSyncOriginalPost).toHaveBeenCalledWith({
+      boardName: "Xyq",
+      articleId: "123456",
+    });
+    expect(routeMocks.mapSyncPayload).toHaveBeenCalledWith({
+      board_name: "Xyq",
+      window_minutes: 60 * 24 * 365 * 30,
+      scanned_pages: 1,
+      cutoff_at: "1996-05-10T00:00:00",
+      threads: [],
+    });
+    expect(result).toEqual({
+      importId: "import-xyq",
+      importedThreads: 0,
+      importedReplies: 0,
+      skippedReplies: 0,
+    });
   });
 
   it("fills in the original post when updates are empty and the local thread is missing", async () => {

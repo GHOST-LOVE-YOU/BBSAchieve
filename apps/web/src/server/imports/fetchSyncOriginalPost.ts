@@ -1,8 +1,46 @@
 import type { ByrSyncPostPayload } from "./syncTypes";
 
+export class SyncOriginalPostNotFoundError extends Error {
+  constructor(message = "Original post not found") {
+    super(message);
+    this.name = "SyncOriginalPostNotFoundError";
+  }
+}
+
+export function isSyncOriginalPostNotFoundError(
+  error: unknown,
+): error is SyncOriginalPostNotFoundError {
+  return error instanceof SyncOriginalPostNotFoundError;
+}
+
 function getRequiredEnv(name: string): string | null {
   const value = process.env[name];
   return value && value.trim().length > 0 ? value : null;
+}
+
+async function readErrorDetail(response: Response): Promise<string | null> {
+  const text = await response.text();
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(trimmed) as unknown;
+    if (
+      payload &&
+      typeof payload === "object" &&
+      "detail" in payload &&
+      typeof payload.detail === "string" &&
+      payload.detail.trim().length > 0
+    ) {
+      return payload.detail.trim();
+    }
+  } catch {
+    // Fall through to returning a text preview below.
+  }
+
+  return trimmed.slice(0, 240);
 }
 
 export async function fetchSyncOriginalPost(input: {
@@ -32,7 +70,17 @@ export async function fetchSyncOriginalPost(input: {
   );
 
   if (!response.ok) {
-    throw new Error(`Sync original post request failed: ${response.status}`);
+    const detail = await readErrorDetail(response);
+    if (response.status === 400 && detail === "Original post not found") {
+      throw new SyncOriginalPostNotFoundError(
+        `Original post not found for board ${input.boardName} article ${input.articleId}`,
+      );
+    }
+    throw new Error(
+      `Sync original post request failed: ${response.status}${
+        detail ? `; detail: ${detail}` : ""
+      }`,
+    );
   }
 
   return (await response.json()) as ByrSyncPostPayload;

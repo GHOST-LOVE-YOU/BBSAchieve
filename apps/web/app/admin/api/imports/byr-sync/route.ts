@@ -8,7 +8,10 @@ import {
 import { requireAdminRouteUser } from "@/src/server/auth/routeGuards";
 import { prisma } from "@/src/server/db/client";
 import { resolveBoardIdentity } from "@/src/server/boardSync/resolveBoardIdentity";
-import { fetchSyncOriginalPost } from "@/src/server/imports/fetchSyncOriginalPost";
+import {
+  fetchSyncOriginalPost,
+  isSyncOriginalPostNotFoundError,
+} from "@/src/server/imports/fetchSyncOriginalPost";
 import { fetchSyncThreadSnapshot } from "@/src/server/imports/fetchSyncThreadSnapshot";
 import { fetchSyncUpdates } from "@/src/server/imports/fetchSyncUpdates";
 import {
@@ -107,10 +110,25 @@ async function enrichThreadsWithSourceData(
         continue;
       }
 
-      const originalPost = await fetchSyncOriginalPost({
-        boardName: payload.board_name,
-        articleId: thread.article_id,
-      });
+      let originalPost;
+      try {
+        originalPost = await fetchSyncOriginalPost({
+          boardName: payload.board_name,
+          articleId: thread.article_id,
+        });
+      } catch (error) {
+        if (isSyncOriginalPostNotFoundError(error)) {
+          if (!existingThread) {
+            continue;
+          }
+          threads.push({
+            ...thread,
+            posts,
+          });
+          continue;
+        }
+        throw error;
+      }
       const postIds = new Set(posts.map((post) => post.post_id));
       threads.push({
         ...thread,

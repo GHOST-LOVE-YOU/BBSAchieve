@@ -1,6 +1,9 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
-import { fetchSyncOriginalPost } from "@/src/server/imports/fetchSyncOriginalPost";
+import {
+  fetchSyncOriginalPost,
+  SyncOriginalPostNotFoundError,
+} from "@/src/server/imports/fetchSyncOriginalPost";
 
 describe("fetchSyncOriginalPost", () => {
   afterEach(() => {
@@ -57,5 +60,19 @@ describe("fetchSyncOriginalPost", () => {
     await expect(
       fetchSyncOriginalPost({ boardName: "IWhisper", articleId: "8843752" }),
     ).rejects.toThrow("Sync original post request failed: 500");
+  });
+
+  it("classifies a missing original post response from the sync API", async () => {
+    vi.stubEnv("BYR_SYNC_API_BASE_URL", "https://sync.example.test");
+    vi.stubEnv("BYR_SYNC_API_TOKEN", "secret-token");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ detail: "Original post not found" }), {
+        status: 400,
+      }),
+    );
+
+    await expect(
+      fetchSyncOriginalPost({ boardName: "Xyq", articleId: "123456" }),
+    ).rejects.toBeInstanceOf(SyncOriginalPostNotFoundError);
   });
 });
