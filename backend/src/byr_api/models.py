@@ -26,6 +26,8 @@ class SyncUpdatesResponse:
     threads: list[SyncThreadResponse]
     window_minutes: int
     scanned_pages: int = 1
+    next_page: int | None = None
+    has_more: bool = False
     cutoff_at: str | None = None
 
 

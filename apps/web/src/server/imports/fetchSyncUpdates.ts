@@ -48,6 +48,8 @@ export async function fetchSyncUpdates(input: {
   boardName: string;
   windowMinutes: number;
   limit?: number | null;
+  startPage?: number | null;
+  maxPages?: number | null;
 }): Promise<ByrSyncUpdatesPayload> {
   const baseUrl = getRequiredEnv("BYR_SYNC_API_BASE_URL");
   const token = getRequiredEnv("BYR_SYNC_API_TOKEN");
@@ -62,6 +64,12 @@ export async function fetchSyncUpdates(input: {
   });
   if (input.limit != null) {
     params.set("limit", String(input.limit));
+  }
+  if (input.startPage != null) {
+    params.set("start_page", String(input.startPage));
+  }
+  if (input.maxPages != null) {
+    params.set("max_pages", String(input.maxPages));
   }
 
   const url = `${baseUrl.replace(/\/$/, "")}/api/sync/updates?${params.toString()}`;

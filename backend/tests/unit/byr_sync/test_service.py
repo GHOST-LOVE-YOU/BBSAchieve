@@ -825,6 +825,54 @@ def test_list_updates_collects_past_two_hundred_threads_when_limit_is_unset() ->
     assert board_service.calls == [("JobInfo", 1), ("JobInfo", 2)]
 
 
+def test_list_updates_can_scan_a_bounded_page_chunk() -> None:
+    page_2 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id="a21",
+                title="thread 21",
+                reply_count=0,
+                post_time="21:50:00",
+                latest_reply_time="22:00:00",
+            ),
+        ],
+        has_next_page=True,
+    )
+    page_3 = FakeBoardPage(
+        threads=[
+            FakeBoardThread(
+                article_id="a31",
+                title="thread 31",
+                reply_count=0,
+                post_time="21:45:00",
+                latest_reply_time="21:55:00",
+            ),
+        ],
+        has_next_page=True,
+    )
+    board_service = FakePagedBoardService({2: page_2, 3: page_3})
+    service = SyncService(
+        board_service=board_service,
+        thread_service=FakeThreadService(),
+        cache=InMemorySyncCache(),
+    )
+
+    result = service.list_updates(
+        board_name="Xyq",
+        limit=None,
+        window_minutes=30,
+        now=datetime(2026, 5, 3, 22, 10, 0),
+        start_page=2,
+        max_pages=2,
+    )
+
+    assert [thread.article_id for thread in result.threads] == ["a21", "a31"]
+    assert result.scanned_pages == 3
+    assert result.next_page == 4
+    assert result.has_more is True
+    assert board_service.calls == [("Xyq", 2), ("Xyq", 3)]
+
+
 def test_backfill_thread_rejects_rewind_beyond_limit() -> None:
     thread_service = FakeThreadService(
         thread_page=FakeThreadPage(

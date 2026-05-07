@@ -174,6 +174,42 @@ describe("fetchSyncUpdates", () => {
     );
   });
 
+  it("includes page chunk query params when provided", async () => {
+    vi.stubEnv("BYR_SYNC_API_BASE_URL", "https://sync.example.test");
+    vi.stubEnv("BYR_SYNC_API_TOKEN", "secret-token");
+
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        board_name: "Xyq",
+        window_minutes: 999999,
+        scanned_pages: 3,
+        next_page: 4,
+        has_more: true,
+        cutoff_at: "2026-05-03T21:40:00",
+        threads: [],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchSyncUpdates({
+      boardName: "Xyq",
+      windowMinutes: 999999,
+      startPage: 2,
+      maxPages: 2,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://sync.example.test/api/sync/updates?board_name=Xyq&window_minutes=999999&start_page=2&max_pages=2",
+      {
+        cache: "no-store",
+        method: "GET",
+        headers: { "X-Sync-Token": "secret-token" },
+      },
+    );
+    expect(result.next_page).toBe(4);
+    expect(result.has_more).toBe(true);
+  });
+
   it("omits the limit query param when explicitly requesting unbounded sync", async () => {
     vi.stubEnv("BYR_SYNC_API_BASE_URL", "https://sync.example.test");
     vi.stubEnv("BYR_SYNC_API_TOKEN", "secret-token");

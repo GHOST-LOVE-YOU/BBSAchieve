@@ -16,7 +16,7 @@ from byr_sync.service import SyncService, SyncUpdateResult
 
 class FakeSyncService:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, int | None, int | None]] = []
+        self.calls: list[tuple[str, int | None, int | None, int, int | None]] = []
 
     def list_updates(
         self,
@@ -24,8 +24,10 @@ class FakeSyncService:
         board_name: str,
         limit: int | None,
         window_minutes: int | None = None,
+        start_page: int = 1,
+        max_pages: int | None = None,
     ) -> SyncUpdateResult:
-        self.calls.append((board_name, limit, window_minutes))
+        self.calls.append((board_name, limit, window_minutes, start_page, max_pages))
         return SyncUpdateResult(
             board_name=board_name,
             threads=[
@@ -45,7 +47,9 @@ class FakeSyncService:
                 ),
             ],
             window_minutes=window_minutes,
-            scanned_pages=2,
+            scanned_pages=start_page + 1,
+            next_page=start_page + 2 if max_pages is not None else None,
+            has_more=max_pages is not None,
             cutoff_at=datetime.fromisoformat("2026-05-03T21:40:00"),
         )
 
@@ -138,6 +142,8 @@ class AuthRaisingSyncService:
         board_name: str,
         limit: int | None,
         window_minutes: int | None = None,
+        start_page: int = 1,
+        max_pages: int | None = None,
     ) -> SyncUpdateResult:
         raise AuthError("Expected JSON response from https://bbs.byr.cn/user/ajax_session.json")
 
@@ -191,6 +197,8 @@ def test_sync_endpoint_returns_threads_with_valid_token(monkeypatch: pytest.Monk
         "board_name": "IWhisper",
         "window_minutes": 30,
         "scanned_pages": 2,
+        "next_page": None,
+        "has_more": False,
         "cutoff_at": "2026-05-03T21:40:00",
         "threads": [
             {
@@ -225,7 +233,7 @@ def test_sync_endpoint_passes_board_name_and_window_minutes(
     )
 
     assert response.status_code == 200
-    assert service.calls == [("TestBoard", None, 15)]
+    assert service.calls == [("TestBoard", None, 15, 1, None)]
     assert response.json()["board_name"] == "TestBoard"
     assert response.json()["window_minutes"] == 15
 
@@ -244,7 +252,7 @@ def test_sync_endpoint_passes_large_window_minutes(
     )
 
     assert response.status_code == 200
-    assert service.calls == [("JobInfo", None, 5256000)]
+    assert service.calls == [("JobInfo", None, 5256000, 1, None)]
 
 
 def test_sync_endpoint_passes_explicit_limit(
@@ -261,7 +269,7 @@ def test_sync_endpoint_passes_explicit_limit(
     )
 
     assert response.status_code == 200
-    assert service.calls == [("JobInfo", 200, 5256000)]
+    assert service.calls == [("JobInfo", 200, 5256000, 1, None)]
 
 
 def test_sync_endpoint_uses_no_limit_when_query_param_is_unset(
@@ -278,7 +286,32 @@ def test_sync_endpoint_uses_no_limit_when_query_param_is_unset(
     )
 
     assert response.status_code == 200
-    assert service.calls == [("JobInfo", None, 5256000)]
+    assert service.calls == [("JobInfo", None, 5256000, 1, None)]
+
+
+def test_sync_endpoint_passes_page_chunk_params(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    service = FakeSyncService()
+    client = TestClient(create_app(sync_service=service))
+
+    response = client.get(
+        "/api/sync/updates",
+        params={
+            "board_name": "Xyq",
+            "window_minutes": 5256000,
+            "start_page": 3,
+            "max_pages": 2,
+        },
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert service.calls == [("Xyq", None, 5256000, 3, 2)]
+    assert response.json()["scanned_pages"] == 4
+    assert response.json()["next_page"] == 5
+    assert response.json()["has_more"] is True
 
 
 def test_sync_endpoint_returns_window_metadata(monkeypatch: pytest.MonkeyPatch) -> None:

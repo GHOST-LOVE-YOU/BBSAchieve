@@ -43,6 +43,7 @@ function makeDeps(options?: {
   markJobPaused?: ReturnType<typeof vi.fn>;
   findJobById?: ReturnType<typeof vi.fn>;
   getBoardFullSyncWindowMinutes?: ReturnType<typeof vi.fn>;
+  boardPageChunkSize?: number;
   sleepBetweenBoards?: ReturnType<typeof vi.fn>;
   status?: string;
 }) {
@@ -83,6 +84,7 @@ function makeDeps(options?: {
     getBoardFullSyncWindowMinutes:
       options?.getBoardFullSyncWindowMinutes ??
       vi.fn((boardName: string) => (boardName === "IWhisper" ? 30 : 180)),
+    boardPageChunkSize: options?.boardPageChunkSize,
     sleepBetweenBoards: options?.sleepBetweenBoards,
     prisma: {},
   };
@@ -412,6 +414,8 @@ describe("runBoardBatchFullSyncJob", () => {
       expect.objectContaining({
         boardName: firstBoardName,
         windowMinutes: firstBoardName === "IWhisper" ? 45 : 90,
+        startPage: 1,
+        maxPages: 3,
       }),
     );
     expect(deps.runByrSyncImport).toHaveBeenNthCalledWith(
@@ -419,6 +423,90 @@ describe("runBoardBatchFullSyncJob", () => {
       expect.objectContaining({
         boardName: secondBoardName,
         windowMinutes: secondBoardName === "IWhisper" ? 45 : 90,
+      }),
+    );
+    expect(result.status).toBe("succeeded");
+  });
+
+  it("continues a board in page chunks until the sync API reports no more pages", async () => {
+    const metadata = createBatchJobMetadata({
+      selectedBoardNames: ["Xyq"],
+      orderedBoardNames: ["Xyq"],
+    });
+    const runByrSyncImport = vi
+      .fn()
+      .mockResolvedValueOnce({
+        importedThreads: 40,
+        importedReplies: 3,
+        skippedReplies: 0,
+        hasMore: true,
+        nextPage: 3,
+      })
+      .mockResolvedValueOnce({
+        importedThreads: 20,
+        importedReplies: 5,
+        skippedReplies: 0,
+        hasMore: false,
+        nextPage: null,
+      });
+    const updateJobProgress = vi.fn();
+    const deps = makeDeps({
+      metadata,
+      runByrSyncImport,
+      updateJobProgress,
+      boardPageChunkSize: 2,
+      getBoardFullSyncWindowMinutes: vi.fn(() => 999),
+    });
+
+    const result = await runBoardBatchFullSyncJob(deps as never, {
+      jobId: "batch-1",
+      ...makeThrottle(),
+    });
+
+    expect(runByrSyncImport).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        boardName: "Xyq",
+        windowMinutes: 999,
+        limit: null,
+        startPage: 1,
+        maxPages: 2,
+      }),
+    );
+    expect(runByrSyncImport).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        boardName: "Xyq",
+        windowMinutes: 999,
+        limit: null,
+        startPage: 3,
+        maxPages: 2,
+      }),
+    );
+    expect(updateJobProgress).toHaveBeenNthCalledWith(
+      1,
+      "batch-1",
+      expect.objectContaining({
+        processedThreads: 40,
+        processedReplies: 3,
+        progressNote: "当前板块 Xyq，下一页 3",
+        metadataJson: expect.objectContaining({
+          currentBoardName: "Xyq",
+          currentBoardPageByName: { Xyq: 3 },
+          completedBoardNames: [],
+        }),
+      }),
+    );
+    expect(updateJobProgress).toHaveBeenLastCalledWith(
+      "batch-1",
+      expect.objectContaining({
+        processedThreads: 60,
+        processedReplies: 8,
+        progressNote: "全部板块已完成",
+        metadataJson: expect.objectContaining({
+          currentBoardName: null,
+          completedBoardNames: ["Xyq"],
+        }),
       }),
     );
     expect(result.status).toBe("succeeded");

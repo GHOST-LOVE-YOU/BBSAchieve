@@ -47,6 +47,8 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
         board_name: str = Query(default="IWhisper"),
         window_minutes: int = Query(default=30, ge=1),
         limit: int | None = Query(default=None, ge=1),
+        start_page: int = Query(default=1, ge=1),
+        max_pages: int | None = Query(default=None, ge=1),
         _: str = Depends(require_sync_token),
     ) -> SyncUpdatesResponse:
         try:
@@ -54,6 +56,8 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
                 board_name=board_name,
                 limit=limit,
                 window_minutes=window_minutes,
+                start_page=start_page,
+                max_pages=max_pages,
             )
         except AuthError as exc:
             raise HTTPException(
@@ -64,6 +68,8 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
             board_name=result.board_name,
             window_minutes=result.window_minutes,
             scanned_pages=result.scanned_pages,
+            next_page=result.next_page,
+            has_more=result.has_more,
             cutoff_at=result.cutoff_at.isoformat() if result.cutoff_at else None,
             threads=[
                 SyncThreadResponse(

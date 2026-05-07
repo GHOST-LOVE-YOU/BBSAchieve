@@ -68,11 +68,11 @@ uv run byr-sync-cache
 
 - `GET /api/sync/updates?board_name=IWhisper&window_minutes=30`
 
-`/api/sync/updates` 既服务最近窗口同步，也服务 Web 端的批量全量抓取。全量抓取不会新增独立接口，而是通过更大的 `window_minutes` 复用同一条同步链路。为避免影响主站，抓取循环会在多页请求之间执行固定等待。
+`/api/sync/updates` 既服务最近窗口同步，也服务 Web 端的批量全量抓取。全量抓取不会新增独立接口，而是通过更大的 `window_minutes` 复用同一条同步链路。为避免单次请求长时间不返回，Web 会带 `start_page` 和 `max_pages` 按板块页分块循环调用；后端会在响应中返回 `next_page` 和 `has_more` 供 Web 继续推进。为避免影响主站，抓取循环会在多页请求之间执行固定等待。
 
 当前分支里，Web 会先在代码中固化一份首页板块目录，再由前端多选创建一条批量全量抓取总任务；后端不需要为每个板块暴露独立全量接口，只需继续把 `/api/sync/updates` 作为统一入口。Web 最近同步通常会带较小的 `limit`，而批量全量抓取会复用同一接口、传入更大的 `window_minutes`，并且不附带 `limit` 参数，让服务按时间窗口持续翻页。
 
-`/api/sync/updates` 会从第 1 页开始按最近活动顺序翻页，并在遇到窗口外主题后停止继续翻页；如果请求带了 `limit`，则会在达到条数后提前停止。版面列表中的 `HH:MM:SS` 按当天时间解析，`YYYY-MM-DD` 按当日 `23:59:59` 解析。
+`/api/sync/updates` 默认从第 1 页开始按最近活动顺序翻页，也可以通过 `start_page` 指定起始页，并通过 `max_pages` 限制本次最多扫描的板块页数。接口会在遇到窗口外主题后停止继续翻页；如果请求带了 `limit`，则会在达到条数后提前停止。版面列表中的 `HH:MM:SS` 按当天时间解析，`YYYY-MM-DD` 按当日 `23:59:59` 解析。
 
 `/api/sync/backfill` 继续用于指定帖子补拉，供 Web 在已知帖子或回复需要追补时单独请求，不参与批量全量抓取的主流程。
 

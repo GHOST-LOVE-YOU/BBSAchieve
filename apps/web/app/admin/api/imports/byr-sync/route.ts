@@ -147,15 +147,24 @@ export async function runByrSyncImport(input: {
   boardName: string;
   windowMinutes: number;
   limit?: number | null;
+  startPage?: number | null;
+  maxPages?: number | null;
 }) {
   const payload = await fetchSyncUpdates({
     boardName: input.boardName,
     windowMinutes: input.windowMinutes,
     limit: input.limit === undefined ? 20 : input.limit,
+    startPage: input.startPage,
+    maxPages: input.maxPages,
   });
   const enrichedPayload = await enrichThreadsWithSourceData(input.prisma, payload);
   const batch = mapSyncPayload(enrichedPayload);
-  return importSyncBatch(input.prisma, batch);
+  const importResult = await importSyncBatch(input.prisma, batch);
+  return {
+    ...importResult,
+    ...(payload.next_page === undefined ? {} : { nextPage: payload.next_page }),
+    ...(payload.has_more === undefined ? {} : { hasMore: payload.has_more }),
+  };
 }
 
 export async function POST(request?: Request) {

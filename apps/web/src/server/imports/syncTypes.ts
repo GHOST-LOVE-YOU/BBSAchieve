@@ -59,6 +59,8 @@ export type ByrSyncUpdatesPayload = {
   board_name: string;
   window_minutes: number;
   scanned_pages: number;
+  next_page?: number | null;
+  has_more?: boolean;
   cutoff_at: string;
   threads: ByrSyncThreadPayload[];
 };

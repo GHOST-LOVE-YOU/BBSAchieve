@@ -3,8 +3,10 @@ import { getBoardFullSyncDefinition } from "@/src/server/boardSync/boardRegistry
 
 import {
   getCurrentBoardName,
+  getCurrentBoardPage,
   markBoardCompleted,
   markBoardFailed,
+  markBoardPageCompleted,
   type BoardBatchJobMetadata,
 } from "./boardBatchJobMetadata";
 
@@ -22,6 +24,7 @@ type BatchRunnerDeps = {
   prisma: unknown;
   runByrSyncImport?: typeof runByrSyncImport;
   getBoardFullSyncWindowMinutes?: (boardName: string) => number;
+  boardPageChunkSize?: number;
   sleepBetweenBoards?: (input: {
     completedBoardName: string;
     nextBoardName: string;
@@ -40,6 +43,7 @@ export async function runBoardBatchFullSyncJob(
   input: BatchRunnerInput,
 ) {
   const runImport = deps.runByrSyncImport ?? runByrSyncImport;
+  const boardPageChunkSize = deps.boardPageChunkSize ?? 3;
   const getBoardFullSyncWindowMinutes =
     deps.getBoardFullSyncWindowMinutes ??
     ((boardName: string) => {
@@ -115,64 +119,107 @@ export async function runBoardBatchFullSyncJob(
       const boardName = current.orderedBoardNames[index]!;
 
       try {
-        const importResult = await runImport({
-          prisma: deps.prisma as never,
-          boardName,
-          windowMinutes: getBoardFullSyncWindowMinutes(boardName),
-          limit: null,
-        });
-
-        const nextMetadata = markBoardCompleted(current, {
-          boardName,
-          processedThreads: importResult.importedThreads,
-          processedReplies: importResult.importedReplies,
-        });
-
-        try {
-          await deps.updateJobProgress(input.jobId, {
-            metadataJson: nextMetadata,
-            processedThreads: Object.values(nextMetadata.perBoardStats).reduce(
-              (sum, stat) => sum + stat.processedThreads,
-              0,
-            ),
-            processedReplies: Object.values(nextMetadata.perBoardStats).reduce(
-              (sum, stat) => sum + stat.processedReplies,
-              0,
-            ),
-            progressNote: nextMetadata.currentBoardName
-              ? `当前板块 ${nextMetadata.currentBoardName}`
-              : "全部板块已完成",
+        let boardCompleted = false;
+        while (!boardCompleted) {
+          const startPage = getCurrentBoardPage(current, boardName);
+          const importResult = await runImport({
+            prisma: deps.prisma as never,
+            boardName,
+            windowMinutes: getBoardFullSyncWindowMinutes(boardName),
+            limit: null,
+            startPage,
+            maxPages: boardPageChunkSize,
           });
-          current = nextMetadata;
-          if (nextMetadata.currentBoardName) {
-            await deps.sleepBetweenBoards?.({
-              completedBoardName: boardName,
-              nextBoardName: nextMetadata.currentBoardName,
+
+          if (importResult.hasMore && importResult.nextPage) {
+            const pageMetadata = markBoardPageCompleted(current, {
+              boardName,
+              nextPage: importResult.nextPage,
+              processedThreads: importResult.importedThreads,
+              processedReplies: importResult.importedReplies,
             });
+            await deps.updateJobProgress(input.jobId, {
+              metadataJson: pageMetadata,
+              processedThreads: Object.values(pageMetadata.perBoardStats).reduce(
+                (sum, stat) => sum + stat.processedThreads,
+                0,
+              ),
+              processedReplies: Object.values(pageMetadata.perBoardStats).reduce(
+                (sum, stat) => sum + stat.processedReplies,
+                0,
+              ),
+              progressNote: `当前板块 ${boardName}，下一页 ${importResult.nextPage}`,
+            });
+            current = pageMetadata;
+
+            const latestJob = await deps.findJobById(input.jobId);
+            if (!latestJob) {
+              throw new Error(`Batch job ${input.jobId} not found`);
+            }
+            if (latestJob.status === "cancelled") {
+              return { status: "cancelled" as const };
+            }
+
+            continue;
           }
-        } catch (error) {
-          const failedMetadata = nextMetadata.currentBoardName
-            ? markBoardFailed(nextMetadata, nextMetadata.currentBoardName)
-            : nextMetadata;
-          await deps.updateJobProgress(input.jobId, {
-            metadataJson: failedMetadata,
-            progressNote: failedMetadata.failedBoardName
-              ? `板块 ${failedMetadata.failedBoardName} 失败`
-              : "全部板块已完成",
+
+          const currentStats = current.perBoardStats[boardName] ?? {
+            processedThreads: 0,
+            processedReplies: 0,
+          };
+          const nextMetadata = markBoardCompleted(current, {
+            boardName,
+            processedThreads: currentStats.processedThreads + importResult.importedThreads,
+            processedReplies: currentStats.processedReplies + importResult.importedReplies,
           });
-          const failedResult = await deps.markJobFailed(
-            input.jobId,
-            error instanceof Error ? error.message : "Unknown batch full sync error",
-          );
-          if (
-            failedResult &&
-            typeof failedResult === "object" &&
-            "count" in failedResult &&
-            failedResult.count === 0
-          ) {
-            return { status: "cancelled" as const };
+
+          try {
+            await deps.updateJobProgress(input.jobId, {
+              metadataJson: nextMetadata,
+              processedThreads: Object.values(nextMetadata.perBoardStats).reduce(
+                (sum, stat) => sum + stat.processedThreads,
+                0,
+              ),
+              processedReplies: Object.values(nextMetadata.perBoardStats).reduce(
+                (sum, stat) => sum + stat.processedReplies,
+                0,
+              ),
+              progressNote: nextMetadata.currentBoardName
+                ? `当前板块 ${nextMetadata.currentBoardName}`
+                : "全部板块已完成",
+            });
+            current = nextMetadata;
+            boardCompleted = true;
+            if (nextMetadata.currentBoardName) {
+              await deps.sleepBetweenBoards?.({
+                completedBoardName: boardName,
+                nextBoardName: nextMetadata.currentBoardName,
+              });
+            }
+          } catch (error) {
+            const failedMetadata = nextMetadata.currentBoardName
+              ? markBoardFailed(nextMetadata, nextMetadata.currentBoardName)
+              : nextMetadata;
+            await deps.updateJobProgress(input.jobId, {
+              metadataJson: failedMetadata,
+              progressNote: failedMetadata.failedBoardName
+                ? `板块 ${failedMetadata.failedBoardName} 失败`
+                : "全部板块已完成",
+            });
+            const failedResult = await deps.markJobFailed(
+              input.jobId,
+              error instanceof Error ? error.message : "Unknown batch full sync error",
+            );
+            if (
+              failedResult &&
+              typeof failedResult === "object" &&
+              "count" in failedResult &&
+              failedResult.count === 0
+            ) {
+              return { status: "cancelled" as const };
+            }
+            return { status: "failed" as const };
           }
-          return { status: "failed" as const };
         }
       } catch (error) {
         const failedMetadata = markBoardFailed(current, boardName);

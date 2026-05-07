@@ -5,6 +5,7 @@ export type BoardBatchJobMetadata = {
   currentBoardName: string | null;
   failedBoardName: string | null;
   currentBoardIndex: number;
+  currentBoardPageByName?: Record<string, number>;
   perBoardStats: Record<
     string,
     {
@@ -39,6 +40,7 @@ export function createBatchJobMetadata(input: {
     currentBoardName: input.orderedBoardNames[0] ?? null,
     failedBoardName: null,
     currentBoardIndex: 0,
+    currentBoardPageByName: {},
     perBoardStats: {},
   };
 }
@@ -80,6 +82,53 @@ export function markBoardCompleted(
       [input.boardName]: {
         processedThreads: input.processedThreads,
         processedReplies: input.processedReplies,
+      },
+    },
+  };
+}
+
+export function getCurrentBoardPage(
+  metadata: BoardBatchJobMetadata,
+  boardName: string,
+) {
+  assertKnownBoard(metadata, boardName);
+  return metadata.currentBoardPageByName?.[boardName] ?? 1;
+}
+
+export function markBoardPageCompleted(
+  metadata: BoardBatchJobMetadata,
+  input: {
+    boardName: string;
+    nextPage: number;
+    processedThreads: number;
+    processedReplies: number;
+  },
+): BoardBatchJobMetadata {
+  assertKnownBoard(metadata, input.boardName);
+
+  if (metadata.currentBoardName !== input.boardName) {
+    throw new Error(
+      `cannot update board "${input.boardName}" while current board is "${metadata.currentBoardName}"`,
+    );
+  }
+
+  const currentStats = metadata.perBoardStats[input.boardName] ?? {
+    processedThreads: 0,
+    processedReplies: 0,
+  };
+
+  return {
+    ...metadata,
+    failedBoardName: null,
+    currentBoardPageByName: {
+      ...(metadata.currentBoardPageByName ?? {}),
+      [input.boardName]: input.nextPage,
+    },
+    perBoardStats: {
+      ...metadata.perBoardStats,
+      [input.boardName]: {
+        processedThreads: currentStats.processedThreads + input.processedThreads,
+        processedReplies: currentStats.processedReplies + input.processedReplies,
       },
     },
   };

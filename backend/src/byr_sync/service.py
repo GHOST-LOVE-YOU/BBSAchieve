@@ -18,6 +18,8 @@ class SyncUpdateResult:
     threads: list["SyncThread"]
     window_minutes: int | None = None
     scanned_pages: int = 1
+    next_page: int | None = None
+    has_more: bool = False
     cutoff_at: datetime | None = None
 
 
@@ -111,13 +113,17 @@ class SyncService:
         limit: int | None,
         window_minutes: int | None = None,
         now: datetime | None = None,
+        start_page: int = 1,
+        max_pages: int | None = None,
     ) -> SyncUpdateResult:
         reference_now = self._normalize_reference_now(now)
-        candidate_threads, scanned_pages = self._collect_candidate_threads(
+        candidate_threads, scanned_pages, next_page, has_more = self._collect_candidate_threads(
             board_name=board_name,
             limit=limit,
             window_minutes=window_minutes,
             now=reference_now,
+            start_page=start_page,
+            max_pages=max_pages,
         )
         threads: list[SyncThread] = []
 
@@ -169,6 +175,8 @@ class SyncService:
             threads=threads,
             window_minutes=window_minutes,
             scanned_pages=scanned_pages,
+            next_page=next_page,
+            has_more=has_more,
             cutoff_at=(
                 reference_now - timedelta(minutes=window_minutes)
                 if window_minutes is not None
@@ -321,19 +329,43 @@ class SyncService:
         limit: int | None,
         window_minutes: int | None,
         now: datetime,
-    ) -> tuple[list[BoardThreadLike], int]:
+        start_page: int = 1,
+        max_pages: int | None = None,
+    ) -> tuple[list[BoardThreadLike], int, int | None, bool]:
+        if start_page < 1:
+            raise ValueError("start_page must be greater than or equal to 1")
+        if max_pages is not None and max_pages < 1:
+            raise ValueError("max_pages must be greater than or equal to 1")
+
         if window_minutes is None:
-            board_page = self.board_service.fetch_page(board_name=board_name, page=1)
+            board_page = self.board_service.fetch_page(board_name=board_name, page=start_page)
             if limit is None:
-                return list(board_page.threads), 1
-            return board_page.threads[:limit], 1
+                return (
+                    list(board_page.threads),
+                    start_page,
+                    start_page + 1 if board_page.has_next_page else None,
+                    board_page.has_next_page,
+                )
+            return (
+                board_page.threads[:limit],
+                start_page,
+                start_page + 1 if board_page.has_next_page else None,
+                board_page.has_next_page,
+            )
 
         cutoff = now - timedelta(minutes=window_minutes)
         collected: list[BoardThreadLike] = []
-        page = 1
+        page = start_page
+        pages_scanned = 0
+        last_scanned_page = start_page
 
         while limit is None or len(collected) < limit:
+            if max_pages is not None and pages_scanned >= max_pages:
+                return collected, last_scanned_page, page, True
+
             board_page = self.board_service.fetch_page(board_name=board_name, page=page)
+            pages_scanned += 1
+            last_scanned_page = page
             page_has_in_window_thread = False
             for thread in board_page.threads:
                 observed_time = self._resolve_thread_observed_time(thread, now=now)
@@ -341,13 +373,15 @@ class SyncService:
                     page_has_in_window_thread = True
                     collected.append(thread)
                     if limit is not None and len(collected) >= limit:
-                        return collected, page
+                        return collected, page, None, False
             if not page_has_in_window_thread or not board_page.has_next_page:
                 break
+            if max_pages is not None and pages_scanned >= max_pages:
+                return collected, page, page + 1, True
             self._sleep_between_requests()
             page += 1
 
-        return collected, page
+        return collected, last_scanned_page, None, False
 
     @staticmethod
     def _build_posts(

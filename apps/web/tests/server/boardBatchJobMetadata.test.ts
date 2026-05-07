@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   createBatchJobMetadata,
   getCurrentBoardName,
+  getCurrentBoardPage,
   markBoardCompleted,
   markBoardFailed,
+  markBoardPageCompleted,
 } from "@/src/server/imports/boardBatchJobMetadata";
 
 describe("boardBatchJobMetadata", () => {
@@ -30,7 +32,31 @@ describe("boardBatchJobMetadata", () => {
       currentBoardName: "IWhisper",
       failedBoardName: null,
       currentBoardIndex: 0,
+      currentBoardPageByName: {},
       perBoardStats: {},
+    });
+  });
+
+  it("records partial board page progress before the board is complete", () => {
+    const metadata = markBoardPageCompleted(
+      createBatchJobMetadata({
+        selectedBoardNames: ["Xyq"],
+        orderedBoardNames: ["Xyq"],
+      }),
+      {
+        boardName: "Xyq",
+        nextPage: 4,
+        processedThreads: 60,
+        processedReplies: 12,
+      },
+    );
+
+    expect(getCurrentBoardPage(metadata, "Xyq")).toBe(4);
+    expect(metadata.currentBoardName).toBe("Xyq");
+    expect(metadata.completedBoardNames).toEqual([]);
+    expect(metadata.perBoardStats.Xyq).toEqual({
+      processedThreads: 60,
+      processedReplies: 12,
     });
   });
 
