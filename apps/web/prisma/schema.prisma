@@ -52,9 +52,14 @@ enum ProfileStatus {
   disabled
 }
 
-enum BindingStatus {
-  pending
+enum SubscriptionTargetType {
+  thread
+  reply
+}
+
+enum SubscriptionStatus {
   active
+  muted
   revoked
 }
 
@@ -71,7 +76,7 @@ model Board {
 }
 
 model Thread {
-  id              String    @id @default(uuid())
+  id              String                @id @default(uuid())
   boardId         String
   sourceBoardSlug String
   sourceThreadId  String
@@ -80,12 +85,13 @@ model Thread {
   body            String
   publishedAt     DateTime
   lastReplyAt     DateTime?
-  replyCount      Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  board           Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  author          User      @relation("ThreadAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  replyCount      Int                   @default(0)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  board           Board                 @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  author          User                  @relation("ThreadAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
   replies         Reply[]
+  subscriptions   ContentSubscription[] @relation("ThreadSubscriptions")
 
   @@unique([sourceBoardSlug, sourceThreadId])
   @@index([boardId, lastReplyAt])
@@ -95,16 +101,17 @@ model Thread {
 }
 
 model Reply {
-  id           String   @id @default(uuid())
-  threadId     String
-  replyIndex   Int
-  authorUserId String
-  body         String
-  publishedAt  DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  thread       Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  author       User     @relation("ReplyAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  id            String                @id @default(uuid())
+  threadId      String
+  replyIndex    Int
+  authorUserId  String
+  body          String
+  publishedAt   DateTime
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  thread        Thread                @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author        User                  @relation("ReplyAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  subscriptions ContentSubscription[] @relation("ReplySubscriptions")
 
   @@unique([threadId, replyIndex])
   @@index([threadId, publishedAt])
@@ -113,22 +120,21 @@ model Reply {
 }
 
 model User {
-  id              String           @id @default(uuid())
-  username        String
-  displayName     String
-  avatarUrl       String?
-  bio             String?
-  userType        UserType
-  status          String
-  mailboxKey      String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  authoredThreads Thread[]         @relation("ThreadAuthor")
-  authoredReplies Reply[]          @relation("ReplyAuthor")
-  humanProfile    HumanProfile?
-  botProfile      BotProfile?
-  bindingsAsHuman UserBotBinding[] @relation("BindingHuman")
-  bindingsAsBot   UserBotBinding[] @relation("BindingBot")
+  id                   String                @id @default(uuid())
+  username             String
+  displayName          String
+  avatarUrl            String?
+  bio                  String?
+  userType             UserType
+  status               String
+  mailboxKey           String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  authoredThreads      Thread[]              @relation("ThreadAuthor")
+  authoredReplies      Reply[]               @relation("ReplyAuthor")
+  humanProfile         HumanProfile?
+  botProfile           BotProfile?
+  contentSubscriptions ContentSubscription[] @relation("HumanContentSubscriptions")
 
   @@index([username])
   @@map("users")
@@ -164,19 +170,25 @@ model BotProfile {
   @@map("bot_profiles")
 }
 
-model UserBotBinding {
-  id            String        @id @default(uuid())
-  humanUserId   String
-  botUserId     String
-  bindingStatus BindingStatus
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  humanUser     User          @relation("BindingHuman", fields: [humanUserId], references: [id], onDelete: Cascade)
-  botUser       User          @relation("BindingBot", fields: [botUserId], references: [id], onDelete: Cascade)
+model ContentSubscription {
+  id                 String                 @id @default(uuid())
+  humanUserId        String
+  targetType         SubscriptionTargetType
+  threadId           String?
+  replyId            String?
+  subscriptionStatus SubscriptionStatus     @default(active)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  humanUser          User                   @relation("HumanContentSubscriptions", fields: [humanUserId], references: [id], onDelete: Cascade)
+  thread             Thread?                @relation("ThreadSubscriptions", fields: [threadId], references: [id], onDelete: Cascade)
+  reply              Reply?                 @relation("ReplySubscriptions", fields: [replyId], references: [id], onDelete: Cascade)
 
-  @@unique([humanUserId, botUserId])
-  @@index([botUserId])
-  @@map("user_bot_bindings")
+  @@unique([humanUserId, targetType, threadId])
+  @@unique([humanUserId, targetType, replyId])
+  @@index([humanUserId, subscriptionStatus])
+  @@index([targetType, threadId])
+  @@index([targetType, replyId])
+  @@map("content_subscriptions")
 }
 
 model Import {

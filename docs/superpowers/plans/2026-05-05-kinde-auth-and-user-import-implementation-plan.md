@@ -2512,7 +2512,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="boards/[boardId]" options={{ title: '版面帖子' }} />
           <Stack.Screen name="threads/[threadId]" options={{ title: '帖子详情' }} />
-          <Stack.Screen name="inbox-binding" options={{ title: '通知与绑定入口' }} />
+          <Stack.Screen name="inbox-binding" options={{ title: '通知订阅' }} />
         </Stack>
       </ThemeProvider>
     </MobileAuthProvider>

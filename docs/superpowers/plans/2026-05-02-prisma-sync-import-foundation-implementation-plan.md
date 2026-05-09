@@ -13,7 +13,7 @@
 ## File Structure
 
 - Create: `apps/web/prisma/schema.prisma`
-  - Prisma schema for boards, threads, replies, users, humanProfiles, botProfiles, userBotBindings, imports
+  - Prisma schema for boards, threads, replies, users, humanProfiles, botProfiles, contentSubscriptions, imports
 - Create: `apps/web/prisma/migrations/*`
   - Initial migration for the schema above
 - Create: `apps/web/src/server/db/client.ts`
@@ -169,8 +169,7 @@ model User {
   botProfile      BotProfile?
   authoredThreads Thread[]         @relation("ThreadAuthor")
   authoredReplies Reply[]          @relation("ReplyAuthor")
-  humanBindings   UserBotBinding[] @relation("HumanBindings")
-  botBindings     UserBotBinding[] @relation("BotBindings")
+  contentSubscriptions ContentSubscription[] @relation("HumanContentSubscriptions")
 
   @@index([username])
 }
@@ -198,15 +197,16 @@ model BotProfile {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model UserBotBinding {
-  id            String   @id @default(uuid())
-  humanUserId   String
-  botUserId     String
-  bindingStatus String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  humanUser     User     @relation("HumanBindings", fields: [humanUserId], references: [id], onDelete: Cascade)
-  botUser       User     @relation("BotBindings", fields: [botUserId], references: [id], onDelete: Cascade)
+model ContentSubscription {
+  id                 String   @id @default(uuid())
+  humanUserId        String
+  targetType         String
+  threadId           String?
+  replyId            String?
+  subscriptionStatus String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  humanUser          User     @relation("HumanContentSubscriptions", fields: [humanUserId], references: [id], onDelete: Cascade)
 }
 
 model Thread {

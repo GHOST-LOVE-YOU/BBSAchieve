@@ -75,7 +75,7 @@ npx pnpm@10.11.0 --filter @bbs/mobile exec tsc --noEmit -p tsconfig.test.json
 - Web 公开区只读阅读链路
 - Web `/admin` 内容运营骨架
 - 共享领域模型、仓储接口、读取用例与本地运行时装配
-- Mobile 最小只读阅读链路与通知/绑定占位通过 Web 公开 API 联调
+- Mobile 最小只读阅读链路与通知订阅占位通过 Web 公开 API 联调
 
 ## Docker 构建
 

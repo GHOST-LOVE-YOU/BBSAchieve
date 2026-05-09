@@ -237,9 +237,10 @@ describe("mobile routes", () => {
     expect(await screen.findByText("读取失败：服务不可用")).toBeTruthy();
   });
 
-  it("renders binding placeholder", async () => {
+  it("renders notification subscription placeholder", async () => {
     renderMobileRoute("/inbox-binding");
 
-    expect(screen.getByText("通知与绑定入口")).toBeTruthy();
+    expect(screen.getByText("通知订阅")).toBeTruthy();
+    expect(screen.getByText("这里保留未来订阅镜像帖子或回复的入口。")).toBeTruthy();
   });
 });

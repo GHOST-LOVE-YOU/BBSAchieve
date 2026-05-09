@@ -35,7 +35,7 @@
 - 修改: `apps/web/app/*`
   - 把模板默认页面改成论坛公开区与 `/admin` 管理区骨架。
 - 修改: `apps/mobile/app/*`
-  - 把模板默认页面改成版面列表、帖子详情、通知/绑定占位入口。
+  - 把模板默认页面改成版面列表、帖子详情、通知订阅占位入口。
 
 ### Task 1: 建立 monorepo 根骨架与统一工具链
 
@@ -239,9 +239,9 @@ describe("mobile routes", () => {
     expect(screen.getByText("移动端版面列表")).toBeTruthy();
   });
 
-  it("renders binding placeholder", () => {
+  it("renders notification subscription placeholder", () => {
     render(<InboxBindingScreen />);
-    expect(screen.getByText("通知与绑定入口")).toBeTruthy();
+    expect(screen.getByText("通知订阅")).toBeTruthy();
   });
 });
 ```
@@ -273,8 +273,8 @@ import { Text, View } from "react-native";
 export default function InboxBindingScreen() {
   return (
     <View>
-      <Text>通知与绑定入口</Text>
-      <Text>这里保留未来绑定机器人收件箱的入口。</Text>
+      <Text>通知订阅</Text>
+      <Text>这里保留未来订阅镜像帖子或回复的入口。</Text>
     </View>
   );
 }
