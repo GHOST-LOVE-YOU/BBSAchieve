@@ -101,6 +101,7 @@ model Thread {
   replies         Reply[]
   subscriptions   ContentSubscription[] @relation("ThreadSubscriptions")
   notifications   Notification[]        @relation("ThreadNotifications")
+  bookmarks       ThreadBookmark[]      @relation("ThreadBookmarks")
 
   @@unique([sourceBoardSlug, sourceThreadId])
   @@index([boardId, lastReplyAt])
@@ -146,6 +147,7 @@ model User {
   botProfile           BotProfile?
   contentSubscriptions ContentSubscription[] @relation("HumanContentSubscriptions")
   notifications        Notification[]        @relation("RecipientNotifications")
+  bookmarks            ThreadBookmark[]      @relation("UserBookmarks")
 
   @@index([username])
   @@map("users")
@@ -239,6 +241,19 @@ model Notification {
   @@index([recipientUserId, occurredAt])
   @@index([type, occurredAt])
   @@map("notifications")
+}
+
+model ThreadBookmark {
+  id          String   @id @default(uuid())
+  humanUserId String
+  threadId    String
+  createdAt   DateTime @default(now())
+  humanUser   User     @relation("UserBookmarks", fields: [humanUserId], references: [id], onDelete: Cascade)
+  thread      Thread   @relation("ThreadBookmarks", fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([humanUserId, threadId])
+  @@index([humanUserId, createdAt])
+  @@map("thread_bookmarks")
 }
 
 model Import {
