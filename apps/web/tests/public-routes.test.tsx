@@ -1,6 +1,8 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { FeedResult } from "@/src/server/forum/feedService";
+
 // ---- Hoisted mocks for the new shadcn-driven pages ----
 // The new pages use distinct services per concern (feed / thread detail /
 // reading service for board metadata). Each test mocks just what it needs.
@@ -45,15 +47,23 @@ vi.mock("next/link", () => ({
     children,
     href,
     className,
+    onClick,
   }: {
     children: React.ReactNode;
     href: string;
     className?: string;
-  }) => (
-    <a href={href} className={className}>
-      {children}
-    </a>
-  ),
+    onClick?: unknown;
+  }) => {
+    if (typeof onClick === "function") {
+      throw new Error("Server-rendered links must not receive event handlers");
+    }
+
+    return (
+      <a href={href} className={className}>
+        {children}
+      </a>
+    );
+  },
 }));
 
 vi.mock("@kinde-oss/kinde-auth-nextjs/server", () => ({
@@ -82,11 +92,24 @@ import BoardPage from "../app/boards/[boardId]/page";
 import HomePage from "../app/page";
 import ThreadPage from "../app/threads/[threadId]/page";
 
-function makeFeedResult(overrides: Partial<ReturnType<typeof emptyFeed>> = {}) {
+beforeEach(() => {
+  window.matchMedia = () => ({
+    matches: false,
+    media: "(prefers-color-scheme: dark)",
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  });
+});
+
+function makeFeedResult(overrides: Partial<FeedResult> = {}): FeedResult {
   return { ...emptyFeed(), ...overrides };
 }
 
-function emptyFeed() {
+function emptyFeed(): FeedResult {
   return {
     items: [],
     page: 1,

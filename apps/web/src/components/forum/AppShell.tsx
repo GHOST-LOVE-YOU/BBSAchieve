@@ -285,7 +285,6 @@ function SectionGroup({
         <Link
           href={`/sections/${section.sectionSlug}`}
           className="flex-1 truncate"
-          onClick={(event) => event.stopPropagation()}
         >
           {section.sectionName}
         </Link>
