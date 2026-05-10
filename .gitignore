@@ -4,3 +4,4 @@ apps/*/node_modules/
 packages/*/dist/
 
 kinde_export/
+.claude/settings.json

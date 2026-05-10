@@ -1,80 +1,70 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// ---- Hoisted mocks for the new shadcn-driven pages ----
+// The new pages use distinct services per concern (feed / thread detail /
+// reading service for board metadata). Each test mocks just what it needs.
+
+const feedMock = vi.hoisted(() => ({
+  listFeed: vi.fn(),
+}));
+
+const threadDetailMock = vi.hoisted(() => ({
+  getThreadDetail: vi.fn(),
+  getThreadReplies: vi.fn(),
+}));
+
 const publicReadingMock = vi.hoisted(() => ({
-  listBoards: vi.fn(),
   getBoard: vi.fn(),
-  getBoardThreadsFeed: vi.fn(),
-  getThread: vi.fn(),
-  getThreadRepliesFeed: vi.fn(),
+  listBoards: vi.fn(),
 }));
 
 const pageGuardMock = vi.hoisted(() => ({
   requireWebPageUser: vi.fn(),
 }));
 
-const listBoardThreadsMock = vi.hoisted(() => vi.fn());
+const prismaMock = vi.hoisted(() => ({
+  user: { count: vi.fn() },
+  thread: { count: vi.fn() },
+  humanProfile: { findUnique: vi.fn() },
+  board: { findMany: vi.fn() },
+}));
 
+vi.mock("@/src/server/forum/feedService", () => feedMock);
+vi.mock("@/src/server/forum/threadDetailService", () => threadDetailMock);
 vi.mock("@/src/server/reading/publicReadingService", () => ({
   createPublicReadingService: () => publicReadingMock,
 }));
-
 vi.mock("@/src/server/auth/pageGuards", () => ({
   requireWebPageUser: pageGuardMock.requireWebPageUser,
 }));
-
-vi.mock("@/src/server/reading/listBoardThreads", () => ({
-  listBoardThreads: listBoardThreadsMock,
-}));
+vi.mock("@/src/server/db/client", () => ({ prisma: prismaMock }));
 
 vi.mock("next/link", () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => {
-    return <a href={href}>{children}</a>;
-  },
+  default: ({
+    children,
+    href,
+    className,
+  }: {
+    children: React.ReactNode;
+    href: string;
+    className?: string;
+  }) => (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  ),
 }));
 
 vi.mock("@kinde-oss/kinde-auth-nextjs/server", () => ({
-  LoginLink: ({
-    children,
-    postLoginRedirectURL,
-  }: {
-    children: React.ReactNode;
-    postLoginRedirectURL?: string;
-  }) => (
-    <a
-      href={`/api/auth/login${
-        postLoginRedirectURL
-          ? `?post_login_redirect_url=${encodeURIComponent(postLoginRedirectURL)}`
-          : ""
-      }`}
-    >
-      {children}
-    </a>
-  ),
-  LogoutLink: ({
-    children,
-    postLogoutRedirectURL,
-  }: {
-    children: React.ReactNode;
-    postLogoutRedirectURL?: string;
-  }) => (
-    <a
-      href={`/api/auth/logout${
-        postLogoutRedirectURL
-          ? `?post_logout_redirect_url=${encodeURIComponent(postLogoutRedirectURL)}`
-          : ""
-      }`}
-    >
-      {children}
-    </a>
-  ),
+  LoginLink: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+  LogoutLink: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
 
 const nextNavigation = vi.hoisted(() => {
   const error = Object.assign(new Error("NEXT_NOT_FOUND"), {
     digest: "NEXT_NOT_FOUND",
   });
-
   return {
     error,
     notFound: vi.fn(() => {
@@ -85,13 +75,168 @@ const nextNavigation = vi.hoisted(() => {
 
 vi.mock("next/navigation", () => ({
   notFound: nextNavigation.notFound,
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
 import BoardPage from "../app/boards/[boardId]/page";
 import HomePage from "../app/page";
 import ThreadPage from "../app/threads/[threadId]/page";
 
-describe("web public routes", () => {
+function makeFeedResult(overrides: Partial<ReturnType<typeof emptyFeed>> = {}) {
+  return { ...emptyFeed(), ...overrides };
+}
+
+function emptyFeed() {
+  return {
+    items: [],
+    page: 1,
+    perPage: 15,
+    totalCount: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  };
+}
+
+describe("home page (shadcn shell)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    prismaMock.user.count.mockResolvedValue(4);
+    prismaMock.thread.count.mockResolvedValue(20);
+    feedMock.listFeed.mockResolvedValue(emptyFeed());
+  });
+
+  afterEach(() => cleanup());
+
+  it("renders the bot feed by default", async () => {
+    feedMock.listFeed.mockResolvedValue(
+      makeFeedResult({
+        totalCount: 1,
+        items: [
+          {
+            id: "thread:bot-1",
+            title: "[镜像] 北邮人首页热门：宿舍空调改造",
+            body: "正文内容",
+            excerpt: "正文内容",
+            authorId: "bot-id",
+            authorName: "镜花",
+            authorIsBot: true,
+            publishedAt: "2026-05-01T00:00:00.000Z",
+            lastReplyAt: "2026-05-01T05:00:00.000Z",
+            lastReplyAuthorName: "夜半敲代码",
+            replyCount: 12,
+            boardId: "board:campus",
+            boardSlug: "iwhisper",
+            boardName: "校园生活",
+            sourceBoardSlug: "IWhisper",
+            sourceThreadId: "8830220",
+          },
+        ],
+      }),
+    );
+
+    render(await HomePage({ searchParams: Promise.resolve({}) }));
+
+    expect(
+      screen.getByText("[镜像] 北邮人首页热门：宿舍空调改造"),
+    ).toBeTruthy();
+    expect(feedMock.listFeed).toHaveBeenCalledWith({
+      kind: "bot",
+      sortBy: "lastReply",
+      page: 1,
+      perPage: 15,
+    });
+  });
+
+  it("switches to the real feed when the query param requests it", async () => {
+    feedMock.listFeed.mockResolvedValue(emptyFeed());
+
+    await HomePage({ searchParams: Promise.resolve({ feed: "real" }) });
+
+    expect(feedMock.listFeed).toHaveBeenCalledWith({
+      kind: "real",
+      sortBy: "lastReply",
+      page: 1,
+      perPage: 15,
+    });
+  });
+});
+
+describe("board page", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    feedMock.listFeed.mockResolvedValue(emptyFeed());
+  });
+
+  afterEach(() => cleanup());
+
+  it("renders board hero and threads from the feed service", async () => {
+    publicReadingMock.getBoard.mockResolvedValue({
+      id: "board:job",
+      slug: "job",
+      name: "Jobs and Offers",
+      description: "Signals for roles, openings, and practical next steps.",
+    });
+    feedMock.listFeed.mockResolvedValue(
+      makeFeedResult({
+        totalCount: 1,
+        items: [
+          {
+            id: "thread:1",
+            title: "Newest active thread",
+            body: "正文",
+            excerpt: "正文",
+            authorId: "user-1",
+            authorName: "Alice",
+            authorIsBot: false,
+            publishedAt: "2026-05-01T00:00:00.000Z",
+            lastReplyAt: "2026-05-01T09:05:00.000Z",
+            lastReplyAuthorName: null,
+            replyCount: 5,
+            boardId: "board:job",
+            boardSlug: "job",
+            boardName: "Jobs and Offers",
+            sourceBoardSlug: "JobInfo",
+            sourceThreadId: "100",
+          },
+        ],
+      }),
+    );
+
+    render(
+      await BoardPage({
+        params: Promise.resolve({ boardId: "job" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(screen.getByRole("heading", { name: "Jobs and Offers" })).toBeTruthy();
+    expect(screen.getByText("Newest active thread")).toBeTruthy();
+    expect(feedMock.listFeed).toHaveBeenCalledWith({
+      kind: "all",
+      boardId: "board:job",
+      sortBy: "lastReply",
+      page: 1,
+      perPage: 15,
+    });
+  });
+
+  it("calls notFound for an unknown board", async () => {
+    nextNavigation.notFound.mockClear();
+    publicReadingMock.getBoard.mockResolvedValue(null);
+
+    await expect(
+      BoardPage({
+        params: Promise.resolve({ boardId: "missing" }),
+        searchParams: Promise.resolve({}),
+      }),
+    ).rejects.toThrow(nextNavigation.error);
+
+    expect(nextNavigation.notFound).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("thread page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     pageGuardMock.requireWebPageUser.mockResolvedValue({
@@ -99,366 +244,124 @@ describe("web public routes", () => {
       subject: "kp_test",
       orgCodes: [],
     });
+    prismaMock.humanProfile.findUnique.mockResolvedValue({ userId: "viewer-1" });
   });
 
-  afterEach(() => {
-    cleanup();
-  });
+  afterEach(() => cleanup());
 
-  it("renders board entries on the home page", async () => {
-    publicReadingMock.listBoards.mockResolvedValue({
-      boards: [
-        {
-          id: "board:job",
-          slug: "job",
-          name: "Jobs and Offers",
-          description: "Signals for roles, openings, and practical next steps.",
-          threadCount: 1,
-          latestThreadTitle: "First offer from the mirror",
-        },
-        {
-          id: "board:hot",
-          slug: "hot",
-          name: "Hot Reading",
-          description: "Fast-moving threads and the replies that follow them.",
-          threadCount: 1,
-          latestThreadTitle: "Follow up on the hot thread",
-        },
-      ],
-    });
-
-    render(await HomePage());
-
-    expect(screen.getByText("Jobs and Offers")).toBeTruthy();
-    expect(screen.getByText("Hot Reading")).toBeTruthy();
-  });
-
-  it("renders Kinde login and logout links on the home page", async () => {
-    publicReadingMock.listBoards.mockResolvedValue({ boards: [] });
-
-    render(await HomePage());
-
-    expect(screen.getByRole("link", { name: "登录 / 切换账号" }).getAttribute("href")).toBe(
-      "/api/auth/login?post_login_redirect_url=%2F",
-    );
-    expect(screen.getByRole("link", { name: "登出" }).getAttribute("href")).toBe(
-      "/api/auth/logout?post_logout_redirect_url=%2F",
-    );
-  });
-
-  it("renders board detail and thread summaries from the public reading service", async () => {
-    publicReadingMock.getBoard.mockResolvedValue({
-      id: "board:job",
-      slug: "job",
-      name: "Jobs and Offers",
-      description: "Signals for roles, openings, and practical next steps.",
-    });
-    listBoardThreadsMock.mockResolvedValue({
-      threads: [
-        {
-          id: "thread:newest",
-          title: "Newest active thread",
-          lastReplyAt: "2026-05-01T09:05:00.000Z",
-        },
-        {
-          id: "thread:older",
-          title: "Older active thread",
-          lastReplyAt: null,
-        },
-      ],
-      page: 1,
-      totalPages: 1,
-      totalCount: 2,
-      hasPreviousPage: false,
-      hasNextPage: false,
-    });
-
-    const ui = await BoardPage({
-      params: Promise.resolve({ boardId: "job" }),
-      searchParams: Promise.resolve({}),
-    });
-    const { container } = render(ui);
-    const threadLinks = within(container)
-      .getAllByRole("link")
-      .map((node) => node.textContent);
-
-    expect(threadLinks).toEqual(["Newest active thread", "Older active thread"]);
-    expect(publicReadingMock.getBoard).toHaveBeenCalledWith("job");
-    expect(listBoardThreadsMock).toHaveBeenCalledWith({
-      boardId: "board:job",
-      boardSlug: "job",
-      limit: 20,
-      page: 1,
-    });
-    expect(
-      within(container).getByText("Signals for roles, openings, and practical next steps."),
-    ).toBeTruthy();
-    expect(screen.queryByText(/第 \d+ 页/)).toBeNull();
-  });
-
-  it("renders page-based board pagination links", async () => {
-    publicReadingMock.getBoard.mockResolvedValue({
-      id: "board:iwhisper",
-      slug: "iwhisper",
-      name: "IWhisper",
-      description: "悄悄话",
-    });
-    listBoardThreadsMock.mockResolvedValue({
-      threads: [
-        {
-          id: "thread:middle",
-          title: "Middle page thread",
-          lastReplyAt: "2026-05-01T09:05:00.000Z",
-        },
-      ],
-      page: 2,
-      totalPages: 5,
-      totalCount: 81,
-      hasPreviousPage: true,
-      hasNextPage: true,
-    });
-
-    render(
-      await BoardPage({
-        params: Promise.resolve({ boardId: "iwhisper" }),
-        searchParams: Promise.resolve({ page: "2" }),
-      }),
-    );
-
-    expect(screen.getByText("第 2 / 5 页")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "上一页" }).getAttribute("href")).toBe(
-      "/boards/iwhisper?page=1",
-    );
-    expect(screen.getByRole("link", { name: "下一页" }).getAttribute("href")).toBe(
-      "/boards/iwhisper?page=3",
-    );
-    expect(listBoardThreadsMock).toHaveBeenCalledWith({
-      boardId: "board:iwhisper",
-      boardSlug: "iwhisper",
-      limit: 20,
-      page: 2,
-    });
-  });
-
-  it("renders thread detail from the public reading service", async () => {
-    publicReadingMock.getThread.mockResolvedValue({
-      board: {
-        id: "board:job",
-        slug: "job",
-        name: "Jobs and Offers",
-      },
+  it("renders the main post body and a reply", async () => {
+    threadDetailMock.getThreadDetail.mockResolvedValue({
       thread: {
         id: "thread:first-offer",
         title: "First offer from the mirror",
         body: "A new listing has been mirrored and is ready to read.",
-        authorName: "Robot 1",
         publishedAt: "2026-05-01T08:00:00.000Z",
-        replyCount: 2,
+        lastReplyAt: "2026-05-01T08:10:00.000Z",
+        replyCount: 1,
+        sourceBoardSlug: "JobInfo",
+        sourceThreadId: "1124871",
+        mirrored: true,
+        sourceStale: false,
+        authorId: "bot-1",
+        authorName: "镜花",
+        authorIsBot: true,
       },
+      board: { id: "board:job", slug: "job", name: "Jobs and Offers" },
+      threadSubscriptionId: null,
     });
-    publicReadingMock.getThreadRepliesFeed.mockResolvedValue({
+    threadDetailMock.getThreadReplies.mockResolvedValue({
       items: [
         {
           id: "reply:1",
+          floor: 2,
           body: "Reply 1",
+          publishedAt: "2026-05-01T08:10:00.000Z",
           authorName: "Alice",
-          publishedAt: "2026-05-01T08:05:00.000Z",
-          replyIndex: 1,
+          authorId: "user-1",
+          authorIsBot: false,
+          subscriptionId: null,
         },
       ],
-      page: {
-        limit: 20,
-        nextCursor: null,
-        hasMore: false,
-      },
+      page: 1,
+      perPage: 20,
+      totalCount: 1,
+      totalPages: 1,
     });
 
     render(
       await ThreadPage({
         params: Promise.resolve({ threadId: "first-offer" }),
+        searchParams: Promise.resolve({}),
       }),
     );
 
-    expect(screen.getByText("First offer from the mirror")).toBeTruthy();
+    expect(
+      screen.getByText("A new listing has been mirrored and is ready to read."),
+    ).toBeTruthy();
     expect(screen.getByText("Reply 1")).toBeTruthy();
-  });
-
-  it("requires login before rendering thread detail", async () => {
-    publicReadingMock.getThread.mockResolvedValue({
-      board: {
-        id: "board:job",
-        slug: "job",
-        name: "Jobs and Offers",
-      },
-      thread: {
-        id: "thread:first-offer",
-        title: "First offer from the mirror",
-        body: "A new listing has been mirrored and is ready to read.",
-        authorName: "Robot 1",
-        publishedAt: "2026-05-01T08:00:00.000Z",
-        replyCount: 2,
-      },
-    });
-    publicReadingMock.getThreadRepliesFeed.mockResolvedValue({
-      items: [],
-      page: { limit: 20, nextCursor: null, hasMore: false },
-    });
-
-    render(
-      await ThreadPage({
-        params: Promise.resolve({ threadId: "first-offer" }),
-      }),
+    expect(pageGuardMock.requireWebPageUser).toHaveBeenCalledWith(
+      "/threads/first-offer",
     );
-
-    expect(pageGuardMock.requireWebPageUser).toHaveBeenCalledWith("/threads/first-offer");
+    expect(screen.getByRole("button", { name: /订阅该帖/ })).toBeTruthy();
   });
 
-  it("renders thread detail for prisma uuid route params", async () => {
-    publicReadingMock.getThread.mockResolvedValue({
-      board: {
-        id: "board:iwhisper",
-        slug: "iwhisper",
-        name: "IWhisper",
-      },
+  it("calls notFound for an unknown thread", async () => {
+    nextNavigation.notFound.mockClear();
+    threadDetailMock.getThreadDetail.mockResolvedValue(null);
+    threadDetailMock.getThreadReplies.mockResolvedValue(null);
+
+    await expect(
+      ThreadPage({
+        params: Promise.resolve({ threadId: "missing" }),
+        searchParams: Promise.resolve({}),
+      }),
+    ).rejects.toThrow(nextNavigation.error);
+
+    expect(nextNavigation.notFound).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports prisma uuid route params", async () => {
+    threadDetailMock.getThreadDetail.mockResolvedValue({
       thread: {
         id: "fd45468e-de16-48f2-82cd-8500aec9c7cd",
         title: "Mirrored UUID thread",
         body: "This thread is stored with a Prisma UUID id.",
-        authorName: "Robot 1",
         publishedAt: "2026-05-01T08:00:00.000Z",
-        replyCount: 1,
+        lastReplyAt: null,
+        replyCount: 0,
+        sourceBoardSlug: "IWhisper",
+        sourceThreadId: "9000000",
+        mirrored: true,
+        sourceStale: false,
+        authorId: "bot-1",
+        authorName: "镜花",
+        authorIsBot: true,
       },
+      board: { id: "board:iwhisper", slug: "iwhisper", name: "IWhisper" },
+      threadSubscriptionId: null,
     });
-    publicReadingMock.getThreadRepliesFeed.mockResolvedValue({
-      items: [
-        {
-          id: "reply:uuid-thread-1",
-          body: "The UUID route works now.",
-          authorName: "Robot 1",
-          publishedAt: "2026-05-01T08:10:00.000Z",
-          replyIndex: 1,
-        },
-      ],
-      page: {
-        limit: 20,
-        nextCursor: null,
-        hasMore: false,
-      },
+    threadDetailMock.getThreadReplies.mockResolvedValue({
+      items: [],
+      page: 1,
+      perPage: 20,
+      totalCount: 0,
+      totalPages: 1,
     });
 
     const ui = await ThreadPage({
-      params: Promise.resolve({ threadId: "fd45468e-de16-48f2-82cd-8500aec9c7cd" }),
+      params: Promise.resolve({
+        threadId: "fd45468e-de16-48f2-82cd-8500aec9c7cd",
+      }),
+      searchParams: Promise.resolve({}),
     });
-    render(ui);
+    const { container } = render(ui);
 
-    expect(screen.getByText("This thread is stored with a Prisma UUID id.")).toBeTruthy();
-    expect(screen.getByText("The UUID route works now.")).toBeTruthy();
-    expect(publicReadingMock.getThread).toHaveBeenCalledWith(
-      "fd45468e-de16-48f2-82cd-8500aec9c7cd",
-    );
-  });
-
-  it("calls notFound for missing board or thread", async () => {
-    nextNavigation.notFound.mockClear();
-    publicReadingMock.getBoard.mockResolvedValue(null);
-    publicReadingMock.getThread.mockResolvedValue(null);
-
-    await expect(
-      BoardPage({
-        params: Promise.resolve({ boardId: "missing-board" }),
-        searchParams: Promise.resolve({}),
-      }),
-    ).rejects.toThrow(nextNavigation.error);
-
-    await expect(
-      ThreadPage({
-        params: Promise.resolve({ threadId: "missing-thread" }),
-      }),
-    ).rejects.toThrow(nextNavigation.error);
-
-    expect(nextNavigation.notFound).toHaveBeenCalledTimes(2);
-  });
-
-  it("renders board fallback UI when service calls fail", async () => {
-    publicReadingMock.getBoard.mockRejectedValueOnce(new Error("board failed"));
-
-    const firstRender = render(
-      await BoardPage({
-        params: Promise.resolve({ boardId: "job" }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-
-    expect(within(firstRender.container).getByText("版面帖子")).toBeTruthy();
-    expect(within(firstRender.container).getByText("读取版面失败。")).toBeTruthy();
-    expect(nextNavigation.notFound).not.toHaveBeenCalled();
-
-    cleanup();
-    vi.resetAllMocks();
-
-    publicReadingMock.getBoard.mockResolvedValue({
-      id: "board:job",
-      slug: "job",
-      name: "Jobs and Offers",
-      description: "Signals for roles, openings, and practical next steps.",
+    expect(
+      within(container).getByText("This thread is stored with a Prisma UUID id."),
+    ).toBeTruthy();
+    expect(threadDetailMock.getThreadDetail).toHaveBeenCalledWith({
+      threadId: "fd45468e-de16-48f2-82cd-8500aec9c7cd",
+      viewerHumanUserId: "viewer-1",
     });
-    listBoardThreadsMock.mockRejectedValueOnce(new Error("board threads failed"));
-
-    const secondRender = render(
-      await BoardPage({
-        params: Promise.resolve({ boardId: "job" }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-
-    expect(within(secondRender.container).getByText("版面帖子")).toBeTruthy();
-    expect(within(secondRender.container).getByText("读取版面失败。")).toBeTruthy();
-    expect(nextNavigation.notFound).not.toHaveBeenCalled();
-  });
-
-  it("renders thread fallback UI when service calls fail", async () => {
-    publicReadingMock.getThread.mockRejectedValueOnce(new Error("thread failed"));
-
-    const firstRender = render(
-      await ThreadPage({
-        params: Promise.resolve({ threadId: "first-offer" }),
-      }),
-    );
-
-    expect(within(firstRender.container).getByText("帖子详情")).toBeTruthy();
-    expect(within(firstRender.container).getByText("读取帖子失败。")).toBeTruthy();
-    expect(nextNavigation.notFound).not.toHaveBeenCalled();
-
-    cleanup();
-    vi.resetAllMocks();
-
-    publicReadingMock.getThread.mockResolvedValue({
-      board: {
-        id: "board:job",
-        slug: "job",
-        name: "Jobs and Offers",
-      },
-      thread: {
-        id: "thread:first-offer",
-        title: "First offer from the mirror",
-        body: "A new listing has been mirrored and is ready to read.",
-        authorName: "Robot 1",
-        publishedAt: "2026-05-01T08:00:00.000Z",
-        replyCount: 2,
-      },
-    });
-    publicReadingMock.getThreadRepliesFeed.mockRejectedValueOnce(
-      new Error("thread replies failed"),
-    );
-
-    const secondRender = render(
-      await ThreadPage({
-        params: Promise.resolve({ threadId: "first-offer" }),
-      }),
-    );
-
-    expect(within(secondRender.container).getByText("帖子详情")).toBeTruthy();
-    expect(within(secondRender.container).getByText("读取帖子失败。")).toBeTruthy();
-    expect(nextNavigation.notFound).not.toHaveBeenCalled();
   });
 });

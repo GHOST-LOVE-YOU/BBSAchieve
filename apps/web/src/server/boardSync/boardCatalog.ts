@@ -370,3 +370,31 @@ export const boardCatalog: readonly BoardCatalogEntry[] = boardCatalogSections.f
     sectionSlug: section.sectionSlug,
   })),
 );
+
+const _bySlug = new Map(
+  boardCatalog.map((entry) => [entry.boardSlug, entry] as const),
+);
+const _byName = new Map(
+  boardCatalog.map((entry) => [entry.boardName, entry] as const),
+);
+const _sectionBySlug = new Map(
+  boardCatalogSections.map((section) => [section.sectionSlug, section] as const),
+);
+
+export function findCatalogEntryByBoardSlug(
+  slug: string,
+): BoardCatalogEntry | null {
+  return _bySlug.get(slug) ?? null;
+}
+
+export function findCatalogEntryByBoardName(
+  name: string,
+): BoardCatalogEntry | null {
+  return _byName.get(name) ?? null;
+}
+
+export function findCatalogSection(
+  sectionSlug: string,
+): BoardCatalogSection | null {
+  return _sectionBySlug.get(sectionSlug) ?? null;
+}

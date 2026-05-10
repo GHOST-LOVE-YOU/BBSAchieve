@@ -63,6 +63,14 @@ enum SubscriptionStatus {
   revoked
 }
 
+enum NotificationType {
+  thread_reply
+  reply_quote
+  mirror_source_stale
+  bot_rotated
+  system
+}
+
 model Board {
   id          String   @id @default(uuid())
   slug        String   @unique
@@ -92,6 +100,7 @@ model Thread {
   author          User                  @relation("ThreadAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
   replies         Reply[]
   subscriptions   ContentSubscription[] @relation("ThreadSubscriptions")
+  notifications   Notification[]        @relation("ThreadNotifications")
 
   @@unique([sourceBoardSlug, sourceThreadId])
   @@index([boardId, lastReplyAt])
@@ -112,6 +121,7 @@ model Reply {
   thread        Thread                @relation(fields: [threadId], references: [id], onDelete: Cascade)
   author        User                  @relation("ReplyAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
   subscriptions ContentSubscription[] @relation("ReplySubscriptions")
+  notifications Notification[]        @relation("ReplyNotifications")
 
   @@unique([threadId, replyIndex])
   @@index([threadId, publishedAt])
@@ -135,6 +145,7 @@ model User {
   humanProfile         HumanProfile?
   botProfile           BotProfile?
   contentSubscriptions ContentSubscription[] @relation("HumanContentSubscriptions")
+  notifications        Notification[]        @relation("RecipientNotifications")
 
   @@index([username])
   @@map("users")
@@ -156,16 +167,20 @@ model HumanProfile {
 }
 
 model BotProfile {
-  id             String        @id @default(uuid())
-  userId         String        @unique
-  mailboxKey     String?
-  sourceLabel    String
-  canPost        Boolean       @default(false)
-  personaSummary String?
-  profileStatus  ProfileStatus
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String        @id @default(uuid())
+  userId           String        @unique
+  mailboxKey       String?
+  sourceLabel      String
+  /// Optional comma-separated hint set of upstream usernames this bot mirrors.
+  /// The product brief notes a single bot can map to multiple source-site
+  /// users, so this is purely advisory metadata for admins/UI.
+  sourceUserHints  String?
+  canPost          Boolean       @default(false)
+  personaSummary   String?
+  profileStatus    ProfileStatus
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("bot_profiles")
 }
@@ -182,6 +197,7 @@ model ContentSubscription {
   humanUser          User                   @relation("HumanContentSubscriptions", fields: [humanUserId], references: [id], onDelete: Cascade)
   thread             Thread?                @relation("ThreadSubscriptions", fields: [threadId], references: [id], onDelete: Cascade)
   reply              Reply?                 @relation("ReplySubscriptions", fields: [replyId], references: [id], onDelete: Cascade)
+  notifications      Notification[]         @relation("SubscriptionNotifications")
 
   @@unique([humanUserId, targetType, threadId])
   @@unique([humanUserId, targetType, replyId])
@@ -189,6 +205,40 @@ model ContentSubscription {
   @@index([targetType, threadId])
   @@index([targetType, replyId])
   @@map("content_subscriptions")
+}
+
+model Notification {
+  id              String              @id @default(uuid())
+  recipientUserId String
+  type            NotificationType
+  /// Optional subscription that fanned out this notification — used to
+  /// support "unsubscribe from this notification's source" affordances and to
+  /// short-circuit notifications when a subscription is later revoked.
+  subscriptionId  String?
+  threadId        String?
+  replyId         String?
+  /// User-facing summary text. Keeping it denormalized lets us render notif
+  /// rows without rejoining onto Thread/Reply rows that may have been pruned
+  /// after the upstream source was deleted.
+  body            String
+  /// Short pseudo-anonymous label for who/what triggered this notification.
+  /// E.g. "@镜像收件箱 mirror-flower@today" or "@电子荒野旅人 在 12 楼回复".
+  sourceLabel     String?
+  /// Optional ISO time string from the upstream event ("镜像同步于 1 小时前").
+  occurredAt      DateTime            @default(now())
+  readAt          DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  recipient       User                 @relation("RecipientNotifications", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  subscription    ContentSubscription? @relation("SubscriptionNotifications", fields: [subscriptionId], references: [id], onDelete: SetNull)
+  thread          Thread?              @relation("ThreadNotifications", fields: [threadId], references: [id], onDelete: SetNull)
+  reply           Reply?               @relation("ReplyNotifications", fields: [replyId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, readAt])
+  @@index([recipientUserId, occurredAt])
+  @@index([type, occurredAt])
+  @@map("notifications")
 }
 
 model Import {

@@ -1,26 +1,295 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Design tokens from BYR Achieve design (claude.ai/design export)
+ * Source: docs/设计师UI设计提示词（Web+Mobile）.md + design bundle
+ *
+ * shadcn/ui-style HSL tokens are mapped onto the design's flat hex palette so
+ * Tailwind utilities like `bg-background`, `text-foreground`, `border-border`,
+ * `bg-card`, etc. continue to work for shadcn primitives.
+ */
+
+:root,
+:root[data-theme="light"] {
+  --primary: #1863dc;
+  --primary-soft: #2e77e5;
+  --on-primary: #fdfdfd;
+
+  --ink: #2d2f34;
+  --ink-strong: #000000;
+  --ink-secondary: #3f434a;
+  --ink-tertiary: #5e646e;
+  --ash: #969ca6;
+  --mute: #acb1b9;
+
+  --canvas: #f6e9d8;
+  --canvas-soft: #f9efe4;
+  --canvas-cream: #f0e4d6;
+  --surface: #fdfdfd;
+  --surface-elevated: #ffffff;
+  --surface-blush: #fce0e0;
+  --surface-butter: #f7e6a1;
+  --surface-sage: #c3dfc7;
+  --surface-sky: #dbe7f2;
+  --surface-peach: #f9d9c4;
+  --surface-mauve: #efd4e3;
+
+  --hairline: #d8dadf;
+  --hairline-soft: #e4e2dc;
+
+  --tag-yellow-bg: #f7e6a1;
+  --tag-yellow-ink: #7f6c1f;
+  --tag-green-bg: #c3dfc7;
+  --tag-green-ink: #547358;
+  --tag-blue-bg: #dbe7f2;
+  --tag-blue-ink: #446aa7;
+  --tag-mauve-bg: #efd4e3;
+  --tag-mauve-ink: #b1729b;
+  --tag-turquoise-bg: #cfe2e7;
+  --tag-turquoise-ink: #437184;
+  --tag-red-bg: #f4d6d6;
+  --tag-red-ink: #bf6969;
+
+  --error: #bf6969;
+  --success: #547358;
+
+  --shadow-1:
+    0 1px 4px rgba(0, 0, 0, 0.08),
+    0 2px 12px rgba(0, 0, 0, 0.06),
+    0 4px 16px rgba(0, 0, 0, 0.04);
+  --shadow-2:
+    0 1px 3px rgba(0, 0, 0, 0.10),
+    0 2px 6px rgba(0, 0, 0, 0.05);
+
+  /* shadcn-style aliases */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary-foreground: var(--on-primary);
+  --secondary: var(--canvas-soft);
+  --secondary-foreground: var(--ink);
+  --muted: var(--canvas-soft);
+  --muted-foreground: var(--ink-tertiary);
+  --accent: var(--canvas-cream);
+  --accent-foreground: var(--ink);
+  --destructive: var(--error);
+  --destructive-foreground: #ffffff;
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--primary);
+  --radius: 0.75rem;
+}
+
+:root[data-theme="dark"] {
+  --primary: #2e77e5;
+  --primary-soft: #5a98ee;
+  --on-primary: #0c0d10;
+
+  --ink: #ffffff;
+  --ink-strong: #ffffff;
+  --ink-secondary: rgba(255, 255, 255, 0.72);
+  --ink-tertiary: rgba(255, 255, 255, 0.55);
+  --ash: rgba(255, 255, 255, 0.40);
+  --mute: rgba(255, 255, 255, 0.28);
+
+  --canvas: #0c0d10;
+  --canvas-soft: #15171c;
+  --canvas-cream: #1d1f25;
+  --surface: #1d1f25;
+  --surface-elevated: #262931;
+  --surface-deep: #06070a;
+  --surface-blush: #3a1a25;
+  --surface-butter: #3a3215;
+  --surface-sage: #1d3326;
+  --surface-sky: #1a2839;
+  --surface-peach: #3a251a;
+  --surface-mauve: #321f2c;
+
+  --hairline: rgba(255, 255, 255, 0.10);
+  --hairline-soft: rgba(255, 255, 255, 0.06);
+
+  --tag-yellow-bg: #3a3215;
+  --tag-yellow-ink: #f7e6a1;
+  --tag-green-bg: #1d3326;
+  --tag-green-ink: #a8d0ad;
+  --tag-blue-bg: #1a2839;
+  --tag-blue-ink: #9bb6dc;
+  --tag-mauve-bg: #321f2c;
+  --tag-mauve-ink: #e6b9d3;
+  --tag-turquoise-bg: #13282e;
+  --tag-turquoise-ink: #9ec4ce;
+  --tag-red-bg: #3a1a1a;
+  --tag-red-ink: #e6a3a3;
+
+  --error: #e6a3a3;
+  --success: #a8d0ad;
+
+  --shadow-1:
+    0 1px 3px rgba(0, 0, 0, 0.45),
+    0 2px 12px rgba(0, 0, 0, 0.40),
+    0 4px 16px rgba(0, 0, 0, 0.30);
+  --shadow-2:
+    0 1px 3px rgba(0, 0, 0, 0.50),
+    0 2px 6px rgba(0, 0, 0, 0.40);
+
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary-foreground: var(--on-primary);
+  --secondary: var(--canvas-soft);
+  --secondary-foreground: var(--ink);
+  --muted: var(--canvas-soft);
+  --muted-foreground: var(--ink-tertiary);
+  --accent: var(--canvas-cream);
+  --accent-foreground: var(--ink);
+  --destructive: var(--error);
+  --destructive-foreground: #ffffff;
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--primary);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-canvas: var(--canvas);
+  --color-canvas-soft: var(--canvas-soft);
+  --color-canvas-cream: var(--canvas-cream);
+  --color-surface: var(--surface);
+  --color-surface-blush: var(--surface-blush);
+  --color-surface-butter: var(--surface-butter);
+  --color-surface-sage: var(--surface-sage);
+  --color-surface-sky: var(--surface-sky);
+  --color-surface-peach: var(--surface-peach);
+  --color-surface-mauve: var(--surface-mauve);
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-tertiary: var(--ink-tertiary);
+  --color-hairline: var(--hairline);
+  --color-hairline-soft: var(--hairline-soft);
+  --radius: var(--radius);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+  border-color: var(--border);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background: var(--canvas);
+  color-scheme: light dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family:
+    "Inter",
+    "Noto Sans SC",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-feature-settings: "ss01", "ss02";
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Pill swatches reused across pages */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.pill-yellow {
+  background: var(--tag-yellow-bg);
+  color: var(--tag-yellow-ink);
+}
+.pill-green {
+  background: var(--tag-green-bg);
+  color: var(--tag-green-ink);
+}
+.pill-blue {
+  background: var(--tag-blue-bg);
+  color: var(--tag-blue-ink);
+}
+.pill-mauve {
+  background: var(--tag-mauve-bg);
+  color: var(--tag-mauve-ink);
+}
+.pill-turquoise {
+  background: var(--tag-turquoise-bg);
+  color: var(--tag-turquoise-ink);
+}
+.pill-red {
+  background: var(--tag-red-bg);
+  color: var(--tag-red-ink);
+}
+
+/* Skeleton shimmer */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--canvas-soft) 0%,
+    var(--canvas-cream) 50%,
+    var(--canvas-soft) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 8px;
+}
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
