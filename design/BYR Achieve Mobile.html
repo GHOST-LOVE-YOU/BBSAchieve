@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>BYR Achieve · 移动端</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="mobile.css">
+<style>
+  body {
+    font-family: 'Inter', 'Noto Sans SC', -apple-system, sans-serif;
+    font-feature-settings: "ss01", "ss02";
+    background: #ece5db;
+    margin: 0;
+  }
+  [data-theme="dark"] body { background: #14161a; }
+
+  /* canvas chrome */
+  .canvas-stage {
+    min-height: 100vh;
+    padding: 60px 40px 80px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .stage-head { max-width: 920px; text-align: center; margin-bottom: 50px; }
+  .stage-head .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-tertiary); margin-bottom: 10px;
+  }
+  .stage-head h1 {
+    font-size: 36px; font-weight: 500; letter-spacing: -0.01em;
+    margin: 0 0 12px; color: var(--ink-strong);
+  }
+  .stage-head p { color: var(--ink-secondary); font-size: 15px; margin: 0; max-width: 560px; margin: 0 auto; line-height: 1.6; }
+
+  .frames-row {
+    display: flex; gap: 28px;
+    flex-wrap: wrap; justify-content: center;
+    align-items: flex-start;
+  }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .frame-label {
+    font-size: 12px; font-weight: 600; color: var(--ink);
+    letter-spacing: -0.005em;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(8px);
+    padding: 6px 14px; border-radius: 50px;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  [data-theme="dark"] .frame-label { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); color: #fff; }
+  .frame-sub { font-size: 11.5px; color: var(--ink-tertiary); margin-top: -6px; }
+
+  .row-divider {
+    width: 80%; max-width: 920px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.08), transparent);
+    margin: 60px auto;
+  }
+  .section-title {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-tertiary); margin: 0 0 28px; text-align: center;
+  }
+
+  /* Override iOS frame's status bar to be transparent on our canvas (light status bar text on dark hero) */
+  .ios-stage {
+    /* keep things simple — frame ships its own status bar already */
+  }
+
+  .interactive-banner {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    background: var(--ink); color: var(--canvas);
+    border-radius: 50px;
+    font-size: 12px; font-weight: 500;
+    margin-top: 8px;
+  }
+  .interactive-banner::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: #6ee7b7; box-shadow: 0 0 8px #6ee7b7;
+  }
+</style>
+</head>
+<body data-theme-target>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="data.js"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="mobile-app.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState } = React;
+
+/* a single phone frame — wraps a route preview of MobileApp */
+function PhoneFrame({ label, sub, route, dark = false }) {
+  return (
+    <div className="frame-wrap">
+      <div className="frame-label">{label}</div>
+      {sub && <div className="frame-sub">{sub}</div>}
+      <div className="ios-stage">
+        <IOSDevice width={390} height={780} dark={dark}>
+          {/* fill the device viewport; reserve 54px for the status bar.
+              MobileApp handles its own internal scroll — outer must NOT scroll. */}
+          <div style={{ height: '100%', paddingTop: 54, boxSizing: 'border-box' }}>
+            <MobileApp initialRoute={route}/>
+          </div>
+        </IOSDevice>
+      </div>
+    </div>
+  );
+}
+
+function Stage() {
+  return (
+    <div className="canvas-stage">
+      <div className="stage-head">
+        <div className="eyebrow">BYR Achieve</div>
+        <h1>移动端 · 镜像论坛</h1>
+        <p>底部 4 栏：首页（机器人镜像信息流）/ 收藏（板块 + 帖子）/ 通知 / 我。所有列表无限滚动，板块通过「分区 → 子分区 → 板块」三级浏览后用⭐收藏。</p>
+        <div className="interactive-banner">下方第一个手机为完整可交互原型</div>
+      </div>
+
+      <div className="frames-row">
+        <PhoneFrame label="① 完整可交互原型" sub="底部 Tab + 板块浏览 + 帖子收藏均可点" route={{ name: "home" }}/>
+      </div>
+
+      <div className="row-divider"/>
+      <div className="section-title">主要屏幕预览</div>
+
+      <div className="frames-row">
+        <PhoneFrame label="② 首页 · 镜像信息流" sub="按最新回复 · 无限滚动" route={{ name: "home" }}/>
+        <PhoneFrame label="③ 帖子详情" sub="无限加载回复 · 顶部收藏" route={{ name: "post", post: makePosts(1, { bot: true, idStart: 1 })[0] }}/>
+        <PhoneFrame label="④ 收藏首页" sub="板块 / 帖子 双 Tab" route={{ name: "favorites" }}/>
+      </div>
+
+      <div style={{ height: 28 }}/>
+
+      <div className="frames-row">
+        <PhoneFrame label="⑤ 浏览全部分区" sub="分区列表（点入查看子分区/板块）" route={{ name: "browse" }}/>
+        <PhoneFrame label="⑥ 子分区与板块" sub="⭐ 收藏到「我的板块」" route={{ name: "browseSub", sectionId: "tech" }}/>
+        <PhoneFrame label="⑦ 板块帖子列表" sub="无限滚动 · 顶部可收藏板块" route={{ name: "board", board: window.findBoard("b-fe") }}/>
+      </div>
+
+      <div style={{ height: 28 }}/>
+
+      <div className="frames-row">
+        <PhoneFrame label="⑧ 通知中心" route={{ name: "notifs" }}/>
+        <PhoneFrame label="⑨ 机器人主页" sub="按帖/楼订阅" route={{ name: "bot", bot: window.BOTS[0] }}/>
+        <PhoneFrame label="⑩ 个人中心" sub="通道 / 路由 / 偏好" route={{ name: "profile" }}/>
+      </div>
+
+      <div style={{ marginTop: 28, color: "var(--ink-tertiary)", fontSize: 12.5, textAlign: "center" }}>
+        💡 提示：在个人中心 → 外观 中切换深色主题，所有手机会同步切换
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<Stage/>);
+</script>
+</body>
+</html>
