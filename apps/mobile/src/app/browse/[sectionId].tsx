@@ -46,7 +46,7 @@ export default function BrowseSubsScreen() {
           <Link
             href={{ pathname: "/boards/[boardId]", params: { boardId: item.slug } }}
             asChild>
-            <Pressable style={[styles.row, { backgroundColor: theme.surface }]}>
+            <Pressable style={StyleSheet.flatten([styles.row, { backgroundColor: theme.surface }])}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.boardName, { color: theme.ink }]}>{item.name}</Text>
                 <Text style={[styles.boardDesc, { color: theme.ash }]}>{item.desc}</Text>

@@ -1,4 +1,3 @@
-import { useKindeAuth } from "@kinde/expo";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Platform,
@@ -15,6 +14,7 @@ import { Avatar } from "@/components/avatar";
 import { BottomTabInset, Radius, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useKindeUser } from "@/features/auth/useKindeUser";
+import { useMobileAuth } from "@/features/auth/useMobileAuth";
 import { useNotificationPreferences } from "@/features/favorites/useNotificationPreferences";
 import { fetchSubscriptions, deleteSubscription } from "@/features/reading/client";
 import type { SubscriptionItem } from "@/features/reading/types";
@@ -35,7 +35,7 @@ const EVENT_LABELS: Record<string, string> = {
 export default function ProfileScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const auth = useKindeAuth();
+  const auth = useMobileAuth();
   const user = useKindeUser();
   const userId = user?.id ?? null;
   const prefs = useNotificationPreferences(userId);

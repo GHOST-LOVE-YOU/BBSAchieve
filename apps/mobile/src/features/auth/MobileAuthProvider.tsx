@@ -3,6 +3,7 @@ import type { KindeAuthHook } from "@kinde/expo";
 import React, { useLayoutEffect } from "react";
 import { ActivityIndicator, Button, StyleSheet, Text, View } from "react-native";
 
+import { getCurrentExpoSecureStoreRuntimeIssue } from "./expoSecureStoreRuntime";
 import {
   clearMobileAccessTokenGetter,
   setMobileAccessTokenGetter,
@@ -20,6 +21,10 @@ function requirePublicEnv(name: string, env: PublicEnv = process.env) {
     throw new Error(`Missing ${name}`);
   }
   return value;
+}
+
+export function isMobileAuthDisabled(env: PublicEnv = process.env) {
+  return env.EXPO_PUBLIC_DISABLE_AUTH?.trim().toLowerCase() === "true";
 }
 
 export function getMobileKindeLoginOptions(env: PublicEnv = process.env) {
@@ -69,6 +74,28 @@ function MobileAuthGate({ children }: MobileAuthGateProps) {
 }
 
 export function MobileAuthProvider({ children }: MobileAuthGateProps) {
+  if (isMobileAuthDisabled()) {
+    if (__DEV__) {
+      console.warn("EXPO_PUBLIC_DISABLE_AUTH is enabled — bypassing Kinde authentication");
+    }
+    return <>{children}</>;
+  }
+
+  const secureStoreRuntimeIssue = getCurrentExpoSecureStoreRuntimeIssue();
+
+  if (secureStoreRuntimeIssue) {
+    if (__DEV__) {
+      console.error("Kinde SecureStore runtime unavailable:", secureStoreRuntimeIssue);
+    }
+
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.title}>{secureStoreRuntimeIssue.title}</Text>
+        <Text style={styles.message}>{secureStoreRuntimeIssue.message}</Text>
+      </View>
+    );
+  }
+
   return (
     <KindeAuthProvider
       config={{
@@ -93,5 +120,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "600",
+  },
+  message: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
   },
 });

@@ -1,5 +1,6 @@
-import { useKindeAuth } from "@kinde/expo";
 import { useEffect, useState } from "react";
+
+import { useMobileAuth } from "./useMobileAuth";
 
 type KindeUser = {
   id: string;
@@ -9,7 +10,7 @@ type KindeUser = {
 };
 
 export function useKindeUser() {
-  const auth = useKindeAuth();
+  const auth = useMobileAuth();
   const [user, setUser] = useState<KindeUser | null>(null);
 
   useEffect(() => {

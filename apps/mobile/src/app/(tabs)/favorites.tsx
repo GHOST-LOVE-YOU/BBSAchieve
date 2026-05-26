@@ -65,7 +65,7 @@ export default function FavoritesScreen() {
               return (
                 <Link href="/browse" asChild>
                   <Pressable
-                    style={[styles.browseRow, { backgroundColor: theme.surface }]}>
+                    style={StyleSheet.flatten([styles.browseRow, { backgroundColor: theme.surface }])}>
                     <Text style={[styles.browseText, { color: theme.primary }]}>
                       浏览所有分区 →
                     </Text>
@@ -80,7 +80,7 @@ export default function FavoritesScreen() {
                 href={{ pathname: "/boards/[boardId]", params: { boardId: info.board.slug } }}
                 asChild>
                 <Pressable
-                  style={[styles.boardRow, { backgroundColor: theme.surface }]}>
+                  style={StyleSheet.flatten([styles.boardRow, { backgroundColor: theme.surface }])}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.boardName, { color: theme.ink }]}>
                       {info.board.name}

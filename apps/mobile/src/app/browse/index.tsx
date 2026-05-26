@@ -20,7 +20,7 @@ export default function BrowseSectionsScreen() {
           <Link
             href={{ pathname: "/browse/[sectionId]", params: { sectionId: item.id } }}
             asChild>
-            <Pressable style={[styles.card, { backgroundColor: theme.surface }]}>
+            <Pressable style={StyleSheet.flatten([styles.card, { backgroundColor: theme.surface }])}>
               <Text style={styles.icon}>{item.icon}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.name, { color: theme.ink }]}>{item.name}</Text>

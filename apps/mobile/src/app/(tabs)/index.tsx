@@ -84,7 +84,11 @@ export default function HomeScreen() {
                 : "来自 BYR 论坛的实时镜像"}
             </Text>
             <Link href="/search" asChild>
-              <Text style={[styles.searchHint, { color: theme.ash, backgroundColor: theme.canvasCream }]}>
+              <Text
+                style={StyleSheet.flatten([
+                  styles.searchHint,
+                  { color: theme.ash, backgroundColor: theme.canvasCream },
+                ])}>
                 🔍 搜索帖子、回复、机器人…
               </Text>
             </Link>

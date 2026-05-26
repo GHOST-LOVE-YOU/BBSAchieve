@@ -1,5 +1,6 @@
 import { renderRouter, screen } from "expo-router/testing-library";
 import * as ExpoRouter from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { fetchBoards } from "@/features/reading/client";
 
 const appDir = "./src/app";
@@ -22,6 +23,7 @@ function renderMobileRoute(initialUrl?: string) {
 describe("mobile routes", () => {
   beforeEach(() => {
     fetchMock.mockReset();
+    void AsyncStorage.clear();
     global.fetch = fetchMock as typeof fetch;
     process.env.EXPO_PUBLIC_WEB_BASE_URL = "https://web.example.com";
     process.env.EXPO_PUBLIC_KINDE_DOMAIN = "https://orlco.kinde.com";
@@ -45,37 +47,63 @@ describe("mobile routes", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("renders board entries on the home page from the public reading client", async () => {
+  it("renders feed entries on the home page from the public reading client", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
-        boards: [
+        items: [
           {
-            id: "board:job",
-            slug: "job",
-            name: "Jobs and Offers",
-            description: "Signals for roles, openings, and practical next steps.",
-            threadCount: 2,
-            latestThreadTitle: "First offer from the mirror",
+            id: "thread:first-offer",
+            title: "First offer from the mirror",
+            body: "A new listing has been mirrored and is ready to read.",
+            excerpt: "A new listing has been mirrored.",
+            authorId: "bot:alice",
+            authorName: "Alice Bot",
+            authorIsBot: true,
+            publishedAt: "2026-05-04T00:00:00.000Z",
+            lastReplyAt: "2026-05-04T01:00:00.000Z",
+            lastReplyAuthorName: "Bob",
+            replyCount: 2,
+            boardId: "board:job",
+            boardSlug: "job",
+            boardName: "Jobs and Offers",
+            sourceBoardSlug: "Job",
+            sourceThreadId: "12345",
           },
           {
-            id: "board:hot",
-            slug: "hot",
-            name: "Hot Reading",
-            description: "Popular mirrored discussions worth tracking.",
-            threadCount: 4,
-            latestThreadTitle: null,
+            id: "thread:hot-reading",
+            title: "Hot reading from the mirror",
+            body: "A popular discussion has been mirrored.",
+            excerpt: "A popular discussion has been mirrored.",
+            authorId: "bot:hot",
+            authorName: "Hot Bot",
+            authorIsBot: true,
+            publishedAt: "2026-05-04T02:00:00.000Z",
+            lastReplyAt: null,
+            lastReplyAuthorName: null,
+            replyCount: 4,
+            boardId: "board:hot",
+            boardSlug: "hot",
+            boardName: "Hot Reading",
+            sourceBoardSlug: "Hot",
+            sourceThreadId: "67890",
           },
         ],
+        page: 1,
+        perPage: 15,
+        totalCount: 2,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
       }),
     } as Response);
 
     renderMobileRoute("/");
 
-    expect(await screen.findByText("Jobs and Offers")).toBeTruthy();
-    expect(screen.getByText("Hot Reading")).toBeTruthy();
+    expect(await screen.findByText("First offer from the mirror")).toBeTruthy();
+    expect(screen.getByText("Hot reading from the mirror")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://web.example.com/api/public/boards",
+      "https://web.example.com/api/public/feed?kind=bot&page=1&perPage=15&sort=lastReply",
       authenticatedFetchOptions,
     );
   });
@@ -226,7 +254,7 @@ describe("mobile routes", () => {
 
     renderMobileRoute("/boards/job");
 
-    expect(await screen.findByText("读取失败：网络异常")).toBeTruthy();
+    expect(await screen.findByText("网络异常")).toBeTruthy();
   });
 
   it("shows visible copy when initial thread loading fails", async () => {
@@ -234,7 +262,7 @@ describe("mobile routes", () => {
 
     renderMobileRoute("/threads/first-offer");
 
-    expect(await screen.findByText("读取失败：服务不可用")).toBeTruthy();
+    expect(await screen.findByText("服务不可用")).toBeTruthy();
   });
 
   it("renders notification subscription placeholder", async () => {
