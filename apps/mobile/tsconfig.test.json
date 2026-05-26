@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["jest", "expo-router/types", "expo", "react", "react-native"]
+    "types": ["jest", "expo", "react", "react-native"]
   },
   "include": [
     "__tests__/**/*.ts",
@@ -9,6 +9,7 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.d.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    ".expo/types/**/*.ts"
   ]
 }

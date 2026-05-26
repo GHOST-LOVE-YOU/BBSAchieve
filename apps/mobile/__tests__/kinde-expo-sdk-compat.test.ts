@@ -34,7 +34,7 @@ describe("Kinde Expo SDK compatibility", () => {
     "expo-linking",
     "expo-secure-store",
     "expo-web-browser",
-  ])("%s resolves to the Expo SDK 55 package", (packageName) => {
-    expect(resolveKindeDependencyVersion(packageName)).toMatch(/^55\./);
+  ])("%s resolves to the Expo SDK 56 package", (packageName) => {
+    expect(resolveKindeDependencyVersion(packageName)).toMatch(/^56\./);
   });
 });

@@ -13,12 +13,12 @@
   },
   "pnpm": {
     "overrides": {
-      "@kinde/expo>expo-auth-session": "~55.0.15",
-      "@kinde/expo>expo-crypto": "~55.0.14",
-      "@kinde/expo>expo-linking": "~55.0.15",
-      "@kinde/expo>expo-secure-store": "~55.0.13",
-      "@kinde/expo>expo-web-browser": "~55.0.15",
-      "react-test-renderer": "19.2.0"
+      "@kinde/expo>expo-auth-session": "~56.0.11",
+      "@kinde/expo>expo-crypto": "~56.0.3",
+      "@kinde/expo>expo-linking": "~56.0.11",
+      "@kinde/expo>expo-secure-store": "~56.0.4",
+      "@kinde/expo>expo-web-browser": "~56.0.5",
+      "react-test-renderer": "19.2.3"
     }
   },
   "devDependencies": {
