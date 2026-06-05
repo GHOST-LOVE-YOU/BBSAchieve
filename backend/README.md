@@ -34,10 +34,12 @@ uv run byr-sync-cache
 
 ## 同步 API
 
-当前仓库已经具备可直接运行的同步 API，入口为 `byr-sync-api`。它负责向 Web 提供两类能力：
+当前仓库已经具备可直接运行的同步 API，入口为 `byr-sync-api`。它负责向 Web 提供下面几类采集能力：
 
 - 主拉取：`/api/sync/updates`
 - 指定帖子补拉：`/api/sync/backfill`
+- 原帖补拉：`/api/sync/thread-original-post`
+- 帖子快照：`/api/sync/thread-snapshot`
 
 1. 启动本地 Redis：
 
@@ -63,6 +65,8 @@ uv run byr-sync-cache
 - `GET /healthz`
 - `GET /api/sync/updates`
 - `GET /api/sync/backfill`
+- `GET /api/sync/thread-original-post`
+- `GET /api/sync/thread-snapshot`
 
 示例：
 
@@ -75,6 +79,10 @@ uv run byr-sync-cache
 `/api/sync/updates` 默认从第 1 页开始按最近活动顺序翻页，也可以通过 `start_page` 指定起始页，并通过 `max_pages` 限制本次最多扫描的板块页数。接口会在遇到窗口外主题后停止继续翻页；如果请求带了 `limit`，则会在达到条数后提前停止。版面列表中的 `HH:MM:SS` 按当天时间解析，`YYYY-MM-DD` 按当日 `23:59:59` 解析。
 
 `/api/sync/backfill` 继续用于指定帖子补拉，供 Web 在已知帖子或回复需要追补时单独请求，不参与批量全量抓取的主流程。
+
+`/api/sync/thread-original-post` 用于在 Web 已经知道帖子但缺少原帖正文时单独补拉楼主内容。
+
+`/api/sync/thread-snapshot` 用于按起始楼层获取帖子当前快照，适合 Web 在需要重新校准楼层、补齐局部内容时调用。
 
 同步接口会复用本地北邮人账号登录态，因此 `BBS_USERNAME` 和 `BBS_PASSWORD` 仍然需要在 `backend/.env` 中配置。`BYR_SYNC_API_TOKEN` 用于保护同步接口，`BYR_SYNC_REDIS_URL` 需要指向可用的 Redis 连接地址。
 

@@ -15,7 +15,7 @@
 所有移动端相关命令都应在本目录执行：
 
 ```bash
-cd /Users/ghost/code/BBSAchieve/apps/mobile
+cd apps/mobile
 ```
 
 不要在仓库根目录直接执行 `expo` 或 `eas` 命令。
@@ -50,7 +50,7 @@ npx expo start --web
 
 ## 构建配置
 
-当前已配置的 EAS profile 位于 [eas.json](/Users/ghost/code/BBSAchieve/apps/mobile/eas.json)：
+当前已配置的 EAS profile 位于 `apps/mobile/eas.json`：
 
 - `development`
   用于开发调试版，包含 development client。
@@ -59,7 +59,7 @@ npx expo start --web
 - `production`
   用于正式发布。
 
-应用基础配置位于 [app.json](/Users/ghost/code/BBSAchieve/apps/mobile/app.json)。
+应用基础配置位于 `apps/mobile/app.json`。
 
 ## 首次登录 Expo
 
@@ -121,7 +121,6 @@ npx eas-cli@latest submit --platform ios
 在仓库根目录执行：
 
 ```bash
-cd /Users/ghost/code/BBSAchieve
 git status
 git add .
 git commit -m "更新移动端内容"
@@ -145,7 +144,7 @@ git push
 重新发一个测试构建：
 
 ```bash
-cd /Users/ghost/code/BBSAchieve/apps/mobile
+cd apps/mobile
 npx eas-cli@latest build --platform android --profile preview
 ```
 
@@ -167,7 +166,7 @@ npx eas-cli@latest build --platform ios --profile preview
 重新构建 production 包：
 
 ```bash
-cd /Users/ghost/code/BBSAchieve/apps/mobile
+cd apps/mobile
 npx eas-cli@latest build --platform android --profile production
 ```
 
