@@ -11,6 +11,7 @@ export type BoardBatchJobMetadata = {
     {
       processedThreads: number;
       processedReplies: number;
+      skippedThreads?: number;
     }
   >;
 };
@@ -55,6 +56,7 @@ export function markBoardCompleted(
     boardName: string;
     processedThreads: number;
     processedReplies: number;
+    skippedThreads?: number;
   },
 ): BoardBatchJobMetadata {
   assertKnownBoard(metadata, input.boardName);
@@ -82,6 +84,9 @@ export function markBoardCompleted(
       [input.boardName]: {
         processedThreads: input.processedThreads,
         processedReplies: input.processedReplies,
+        ...(input.skippedThreads
+          ? { skippedThreads: input.skippedThreads }
+          : {}),
       },
     },
   };
@@ -102,6 +107,7 @@ export function markBoardPageCompleted(
     nextPage: number;
     processedThreads: number;
     processedReplies: number;
+    skippedThreads?: number;
   },
 ): BoardBatchJobMetadata {
   assertKnownBoard(metadata, input.boardName);
@@ -129,6 +135,12 @@ export function markBoardPageCompleted(
       [input.boardName]: {
         processedThreads: currentStats.processedThreads + input.processedThreads,
         processedReplies: currentStats.processedReplies + input.processedReplies,
+        ...((currentStats.skippedThreads ?? 0) + (input.skippedThreads ?? 0) > 0
+          ? {
+              skippedThreads:
+                (currentStats.skippedThreads ?? 0) + (input.skippedThreads ?? 0),
+            }
+          : {}),
       },
     },
   };

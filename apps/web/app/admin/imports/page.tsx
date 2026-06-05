@@ -117,6 +117,7 @@ export default async function AdminImportsPage() {
                   <th className="px-4 py-3 font-medium">状态</th>
                   <th className="px-4 py-3 font-medium">当前游标</th>
                   <th className="px-4 py-3 font-medium">已处理帖子</th>
+                  <th className="px-4 py-3 font-medium">已跳过帖子</th>
                   <th className="px-4 py-3 font-medium">已处理回复</th>
                   <th className="px-4 py-3 font-medium">说明</th>
                   <th className="px-4 py-3 font-medium">操作</th>
@@ -129,6 +130,7 @@ export default async function AdminImportsPage() {
                     <td className="px-4 py-3">{job.status}</td>
                     <td className="px-4 py-3">{job.cursorThreadKey ?? "—"}</td>
                     <td className="px-4 py-3">{job.processedThreads}</td>
+                    <td className="px-4 py-3">{job.skippedThreads}</td>
                     <td className="px-4 py-3">{job.processedReplies}</td>
                     <td className="px-4 py-3 text-red-600">
                       {job.progressNote ?? job.errorMessage ?? "—"}

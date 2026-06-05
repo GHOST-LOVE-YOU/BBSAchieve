@@ -4,9 +4,11 @@ import os
 import time
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+import httpx
 
 from .auth import require_sync_token
 from .models import (
+    SkippedThreadResponse,
     SyncBackfillResponse,
     SyncPostResponse,
     SyncThreadResponse,
@@ -21,8 +23,20 @@ from byr_threads import ThreadService
 
 def build_sync_service() -> SyncService:
     auth_client = ByrAuthClient()
-    board_service = BoardService(auth_client=auth_client)
-    thread_service = ThreadService(auth_client=auth_client)
+    retry_count = int(os.getenv("BYR_UPSTREAM_REQUEST_RETRY_COUNT", "1"))
+    retry_delay_seconds = float(os.getenv("BYR_UPSTREAM_REQUEST_RETRY_DELAY_SECONDS", "1"))
+    board_service = BoardService(
+        auth_client=auth_client,
+        sleep=time.sleep,
+        request_retry_count=retry_count,
+        request_retry_delay_seconds=retry_delay_seconds,
+    )
+    thread_service = ThreadService(
+        auth_client=auth_client,
+        sleep=time.sleep,
+        request_retry_count=retry_count,
+        request_retry_delay_seconds=retry_delay_seconds,
+    )
     cache = RedisSyncCache.from_env()
     interval_ms = int(os.getenv("BYR_SYNC_REQUEST_INTERVAL_MS", "500"))
     return SyncService(
@@ -37,6 +51,9 @@ def build_sync_service() -> SyncService:
 def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
     app = FastAPI()
     app.state.sync_service = sync_service or build_sync_service()
+
+    def upstream_timeout(detail: str, exc: httpx.TimeoutException) -> HTTPException:
+        return HTTPException(status_code=504, detail=detail)
 
     @app.get("/healthz")
     def healthz() -> dict[str, bool]:
@@ -64,6 +81,11 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
                 status_code=502,
                 detail=f"Upstream BYR authentication failed: {exc}",
             ) from exc
+        except httpx.TimeoutException as exc:
+            raise upstream_timeout(
+                f"Upstream BYR request timed out while syncing board {board_name}",
+                exc,
+            ) from exc
         return SyncUpdatesResponse(
             board_name=result.board_name,
             window_minutes=result.window_minutes,
@@ -89,6 +111,16 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
                 )
                 for thread in result.threads
             ],
+            skipped_threads=[
+                SkippedThreadResponse(
+                    board_name=thread.board_name,
+                    article_id=thread.article_id,
+                    title=thread.title,
+                    page=thread.page,
+                    reason=thread.reason,
+                )
+                for thread in result.skipped_threads
+            ],
         )
 
     @app.get("/api/sync/backfill")
@@ -107,6 +139,11 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except httpx.TimeoutException as exc:
+            raise upstream_timeout(
+                f"Upstream BYR request timed out while backfilling thread {board_name}/{article_id}",
+                exc,
+            ) from exc
 
         return SyncBackfillResponse(
             article_id=result.article_id,
@@ -136,6 +173,11 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except httpx.TimeoutException as exc:
+            raise upstream_timeout(
+                f"Upstream BYR request timed out while fetching original post {board_name}/{article_id}",
+                exc,
+            ) from exc
 
         return SyncPostResponse(
             post_id=post.post_id,
@@ -160,6 +202,11 @@ def create_app(*, sync_service: SyncService | None = None) -> FastAPI:
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except httpx.TimeoutException as exc:
+            raise upstream_timeout(
+                f"Upstream BYR request timed out while fetching thread snapshot {board_name}/{article_id}",
+                exc,
+            ) from exc
 
         return SyncBackfillResponse(
             article_id=result.article_id,

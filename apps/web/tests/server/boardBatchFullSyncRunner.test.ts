@@ -132,6 +132,61 @@ describe("runBoardBatchFullSyncJob", () => {
     expect(result.status).toBe("succeeded");
   });
 
+  it("continues when a board chunk skips a bad source thread", async () => {
+    const runByrSyncImport = vi.fn().mockResolvedValueOnce({
+      importedThreads: 2,
+      importedReplies: 5,
+      skippedReplies: 0,
+      skippedThreads: 1,
+      skippedThreadDetails: [
+        {
+          board_name: firstBoardName,
+          article_id: "bad-article",
+          title: "bad source thread",
+          page: 19,
+          reason: "ValueError: Unsupported board time format: 刚刚",
+        },
+      ],
+    });
+    const updateJobProgress = vi.fn();
+    const deps = makeDeps({
+      metadata: createBatchJobMetadata({
+        selectedBoardNames: [firstBoardName],
+        orderedBoardNames: [firstBoardName],
+      }),
+      runByrSyncImport,
+      updateJobProgress,
+    });
+
+    const result = await runBoardBatchFullSyncJob(deps as never, {
+      jobId: "batch-1",
+      ...makeThrottle(),
+    });
+
+    expect(updateJobProgress).toHaveBeenCalledWith(
+      "batch-1",
+      expect.objectContaining({
+        processedThreads: 2,
+        processedReplies: 5,
+        skippedThreads: 1,
+        progressNote: `全部板块已完成，跳过 1 个帖子：${firstBoardName}/bad-article 第 19 页 ValueError: Unsupported board time format: 刚刚`,
+        metadataJson: expect.objectContaining({
+          completedBoardNames: [firstBoardName],
+          currentBoardName: null,
+          perBoardStats: expect.objectContaining({
+            [firstBoardName]: expect.objectContaining({
+              processedThreads: 2,
+              processedReplies: 5,
+              skippedThreads: 1,
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(deps.markJobFailed).not.toHaveBeenCalled();
+    expect(result.status).toBe("succeeded");
+  });
+
   it("stops immediately when one board fails and records the failed board", async () => {
     const runByrSyncImport = vi
       .fn()

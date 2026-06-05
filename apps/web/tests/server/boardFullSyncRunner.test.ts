@@ -140,12 +140,14 @@ describe("runBoardFullSyncJob", () => {
     expect(runnerMocks.updateJobProgress).toHaveBeenCalledWith("job-1", {
       processedThreads: 1,
       processedReplies: 4,
+      skippedThreads: 0,
       skippedReplies: 2,
       progressNote: null,
     });
     expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1", {
       processedThreads: 1,
       processedReplies: 4,
+      skippedThreads: 0,
       skippedReplies: 2,
       progressNote: null,
     });
@@ -163,6 +165,7 @@ describe("runBoardFullSyncJob", () => {
     expect(runnerMocks.updateJobProgress).toHaveBeenCalledWith("job-1", {
       processedThreads: 7,
       processedReplies: 19,
+      skippedThreads: 0,
       skippedReplies: 3,
       progressNote: null,
     });
@@ -209,6 +212,7 @@ describe("runBoardFullSyncJob", () => {
     expect(runnerMocks.markJobSucceeded).toHaveBeenCalledWith("job-1", {
       processedThreads: 1,
       processedReplies: undefined,
+      skippedThreads: 0,
       skippedReplies: undefined,
       progressNote: null,
     });

@@ -11,9 +11,12 @@ from byr_boards.service import BoardService
 
 
 class FakeAuthClient:
-    def __init__(self) -> None:
+    def __init__(self, handler=None) -> None:
         self.last_force_relogin: bool | None = None
-        self.client = httpx.Client()
+        self.client = httpx.Client(
+            base_url="https://bbs.byr.cn",
+            transport=httpx.MockTransport(handler) if handler else None,
+        )
         self.session = SessionInfo({"is_login": 1, "id": 42})
 
     @contextmanager
@@ -74,3 +77,29 @@ def test_fetch_page_passes_sticky_filter_option() -> None:
 
     assert result == "parsed"
     assert parse_mock.call_args.kwargs["include_sticky_threads"] is True
+
+
+def test_fetch_page_retries_once_after_timeout() -> None:
+    calls = 0
+    sleeps: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.ReadTimeout("timed out", request=request)
+        return httpx.Response(200, content=b"<html></html>", request=request)
+
+    service = BoardService(
+        FakeAuthClient(handler),
+        sleep=sleeps.append,
+        request_retry_count=1,
+        request_retry_delay_seconds=2.5,
+    )
+
+    with patch("byr_boards.service.parse_board_page", return_value="parsed"):
+        result = service.fetch_page()
+
+    assert result == "parsed"
+    assert calls == 2
+    assert sleeps == [2.5]

@@ -55,6 +55,14 @@ export type ByrSyncThreadPayload = {
   posts: ByrSyncPostPayload[];
 };
 
+export type ByrSyncSkippedThreadPayload = {
+  board_name: string;
+  article_id: string;
+  title: string;
+  page: number | null;
+  reason: string;
+};
+
 export type ByrSyncUpdatesPayload = {
   board_name: string;
   window_minutes: number;
@@ -63,6 +71,7 @@ export type ByrSyncUpdatesPayload = {
   has_more?: boolean;
   cutoff_at: string;
   threads: ByrSyncThreadPayload[];
+  skipped_threads?: ByrSyncSkippedThreadPayload[];
 };
 
 export type ByrSyncBackfillPayload = {

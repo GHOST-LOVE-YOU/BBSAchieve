@@ -162,6 +162,8 @@ export async function runByrSyncImport(input: {
   const importResult = await importSyncBatch(input.prisma, batch);
   return {
     ...importResult,
+    skippedThreads: payload.skipped_threads?.length ?? 0,
+    skippedThreadDetails: payload.skipped_threads ?? [],
     ...(payload.next_page === undefined ? {} : { nextPage: payload.next_page }),
     ...(payload.has_more === undefined ? {} : { hasMore: payload.has_more }),
   };

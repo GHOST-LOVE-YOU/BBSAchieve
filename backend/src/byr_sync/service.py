@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
 from typing import Protocol
 from zoneinfo import ZoneInfo
+
+import httpx
+
+from byr_auth import AuthError
 
 from .models import SyncPost
 
@@ -16,11 +20,21 @@ FORUM_TIMEZONE = ZoneInfo("Asia/Shanghai")
 class SyncUpdateResult:
     board_name: str
     threads: list["SyncThread"]
+    skipped_threads: list["SkippedThread"] = field(default_factory=list)
     window_minutes: int | None = None
     scanned_pages: int = 1
     next_page: int | None = None
     has_more: bool = False
     cutoff_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class SkippedThread:
+    board_name: str
+    article_id: str
+    title: str
+    page: int | None
+    reason: str
 
 
 class BoardThreadLike(Protocol):
@@ -117,7 +131,13 @@ class SyncService:
         max_pages: int | None = None,
     ) -> SyncUpdateResult:
         reference_now = self._normalize_reference_now(now)
-        candidate_threads, scanned_pages, next_page, has_more = self._collect_candidate_threads(
+        (
+            candidate_threads,
+            scanned_pages,
+            next_page,
+            has_more,
+            skipped_threads,
+        ) = self._collect_candidate_threads(
             board_name=board_name,
             limit=limit,
             window_minutes=window_minutes,
@@ -146,15 +166,29 @@ class SyncService:
             if should_fetch_thread_page:
                 self._sleep_between_requests()
                 page = 1 if cached is None else max(1, ((cached_reply_count + 1) // 10) + 1)
-                thread_page = self.thread_service.fetch_page(
-                    board_name=board_name,
-                    article_id=thread.article_id,
-                    page=page,
-                )
-                posts = self._build_posts(
-                    thread_page.posts,
-                    cached_reply_count=cached_reply_count,
-                )
+                try:
+                    thread_page = self.thread_service.fetch_page(
+                        board_name=board_name,
+                        article_id=thread.article_id,
+                        page=page,
+                    )
+                    posts = self._build_posts(
+                        thread_page.posts,
+                        cached_reply_count=cached_reply_count,
+                    )
+                except AuthError:
+                    raise
+                except (httpx.HTTPError, ValueError) as exc:
+                    skipped_threads.append(
+                        SkippedThread(
+                            board_name=board_name,
+                            article_id=thread.article_id,
+                            title=thread.title,
+                            page=page,
+                            reason=f"{exc.__class__.__name__}: {exc}",
+                        )
+                    )
+                    continue
             self.cache.save_thread_progress(
                 board_name=board_name,
                 article_id=thread.article_id,
@@ -173,6 +207,7 @@ class SyncService:
         return SyncUpdateResult(
             board_name=board_name,
             threads=threads,
+            skipped_threads=skipped_threads,
             window_minutes=window_minutes,
             scanned_pages=scanned_pages,
             next_page=next_page,
@@ -331,7 +366,7 @@ class SyncService:
         now: datetime,
         start_page: int = 1,
         max_pages: int | None = None,
-    ) -> tuple[list[BoardThreadLike], int, int | None, bool]:
+    ) -> tuple[list[BoardThreadLike], int, int | None, bool, list[SkippedThread]]:
         if start_page < 1:
             raise ValueError("start_page must be greater than or equal to 1")
         if max_pages is not None and max_pages < 1:
@@ -345,43 +380,59 @@ class SyncService:
                     start_page,
                     start_page + 1 if board_page.has_next_page else None,
                     board_page.has_next_page,
+                    [],
                 )
             return (
                 board_page.threads[:limit],
                 start_page,
                 start_page + 1 if board_page.has_next_page else None,
                 board_page.has_next_page,
+                [],
             )
 
         cutoff = now - timedelta(minutes=window_minutes)
         collected: list[BoardThreadLike] = []
+        skipped_threads: list[SkippedThread] = []
         page = start_page
         pages_scanned = 0
         last_scanned_page = start_page
 
         while limit is None or len(collected) < limit:
             if max_pages is not None and pages_scanned >= max_pages:
-                return collected, last_scanned_page, page, True
+                return collected, last_scanned_page, page, True, skipped_threads
 
             board_page = self.board_service.fetch_page(board_name=board_name, page=page)
             pages_scanned += 1
             last_scanned_page = page
             page_has_in_window_thread = False
             for thread in board_page.threads:
-                observed_time = self._resolve_thread_observed_time(thread, now=now)
+                try:
+                    observed_time = self._resolve_thread_observed_time(thread, now=now)
+                except ValueError as exc:
+                    page_has_in_window_thread = True
+                    skipped_threads.append(
+                        SkippedThread(
+                            board_name=board_name,
+                            article_id=thread.article_id,
+                            title=thread.title,
+                            page=page,
+                            reason=f"{exc.__class__.__name__}: {exc}",
+                        )
+                    )
+                    continue
                 if observed_time >= cutoff:
                     page_has_in_window_thread = True
                     collected.append(thread)
                     if limit is not None and len(collected) >= limit:
-                        return collected, page, None, False
+                        return collected, page, None, False, skipped_threads
             if not page_has_in_window_thread or not board_page.has_next_page:
                 break
             if max_pages is not None and pages_scanned >= max_pages:
-                return collected, page, page + 1, True
+                return collected, page, page + 1, True, skipped_threads
             self._sleep_between_requests()
             page += 1
 
-        return collected, last_scanned_page, None, False
+        return collected, last_scanned_page, None, False, skipped_threads
 
     @staticmethod
     def _build_posts(

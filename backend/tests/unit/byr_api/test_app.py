@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -148,17 +149,42 @@ class AuthRaisingSyncService:
         raise AuthError("Expected JSON response from https://bbs.byr.cn/user/ajax_session.json")
 
 
+class TimeoutRaisingSyncService:
+    def list_updates(
+        self,
+        *,
+        board_name: str,
+        limit: int | None,
+        window_minutes: int | None = None,
+        start_page: int = 1,
+        max_pages: int | None = None,
+    ) -> SyncUpdateResult:
+        raise httpx.ReadTimeout("The read operation timed out")
+
+
 def test_build_sync_service_injects_real_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     captured_kwargs: dict[str, object] = {}
+    captured_board_kwargs: dict[str, object] = {}
+    captured_thread_kwargs: dict[str, object] = {}
 
     class FakeSyncServiceCtor:
         def __init__(self, **kwargs: object) -> None:
             captured_kwargs.update(kwargs)
 
     monkeypatch.setenv("BYR_SYNC_REQUEST_INTERVAL_MS", "250")
+    monkeypatch.setenv("BYR_UPSTREAM_REQUEST_RETRY_COUNT", "2")
+    monkeypatch.setenv("BYR_UPSTREAM_REQUEST_RETRY_DELAY_SECONDS", "3.5")
     monkeypatch.setattr(app_module, "ByrAuthClient", lambda: object())
-    monkeypatch.setattr(app_module, "BoardService", lambda auth_client: object())
-    monkeypatch.setattr(app_module, "ThreadService", lambda auth_client: object())
+    monkeypatch.setattr(
+        app_module,
+        "BoardService",
+        lambda auth_client, **kwargs: captured_board_kwargs.update(kwargs) or object(),
+    )
+    monkeypatch.setattr(
+        app_module,
+        "ThreadService",
+        lambda auth_client, **kwargs: captured_thread_kwargs.update(kwargs) or object(),
+    )
     monkeypatch.setattr(app_module.RedisSyncCache, "from_env", classmethod(lambda cls: object()))
     monkeypatch.setattr(app_module, "SyncService", FakeSyncServiceCtor)
 
@@ -166,6 +192,12 @@ def test_build_sync_service_injects_real_sleep(monkeypatch: pytest.MonkeyPatch) 
 
     assert captured_kwargs["request_interval_seconds"] == 0.25
     assert captured_kwargs["sleep"] is app_module.time.sleep
+    assert captured_board_kwargs == {
+        "sleep": app_module.time.sleep,
+        "request_retry_count": 2,
+        "request_retry_delay_seconds": 3.5,
+    }
+    assert captured_thread_kwargs == captured_board_kwargs
 
 
 def test_healthcheck_requires_no_token() -> None:
@@ -216,6 +248,7 @@ def test_sync_endpoint_returns_threads_with_valid_token(monkeypatch: pytest.Monk
                 ],
             }
         ],
+        "skipped_threads": [],
     }
 
 
@@ -344,6 +377,24 @@ def test_sync_endpoint_maps_auth_error_to_bad_gateway(
     assert response.status_code == 502
     assert response.json() == {
         "detail": "Upstream BYR authentication failed: Expected JSON response from https://bbs.byr.cn/user/ajax_session.json"
+    }
+
+
+def test_sync_endpoint_maps_upstream_timeout_to_gateway_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BYR_SYNC_API_TOKEN", "secret-token")
+    client = TestClient(create_app(sync_service=TimeoutRaisingSyncService()))
+
+    response = client.get(
+        "/api/sync/updates",
+        params={"board_name": "Ad_Agent"},
+        headers={"X-Sync-Token": "secret-token"},
+    )
+
+    assert response.status_code == 504
+    assert response.json() == {
+        "detail": "Upstream BYR request timed out while syncing board Ad_Agent"
     }
 
 

@@ -56,6 +56,7 @@ export async function runBoardFullSyncJob(
       progress: {
         processedThreads?: number;
         processedReplies?: number;
+        skippedThreads?: number;
         skippedReplies?: number;
         progressNote?: string | null;
       },
@@ -65,6 +66,7 @@ export async function runBoardFullSyncJob(
       progress?: {
         processedThreads?: number;
         processedReplies?: number;
+        skippedThreads?: number;
         skippedReplies?: number;
         progressNote?: string | null;
       },
@@ -127,6 +129,7 @@ export async function runBoardFullSyncJob(
     const successProgress = {
       processedThreads: importResult.importedThreads,
       processedReplies: importResult.importedReplies,
+      skippedThreads: importResult.skippedThreads ?? 0,
       skippedReplies: importResult.skippedReplies,
       progressNote: null,
     };

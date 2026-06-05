@@ -114,6 +114,37 @@ def test_fetch_page_uses_thread_endpoint_and_parses_response() -> None:
     assert result.posts[0].body == "正文"
 
 
+def test_fetch_page_retries_once_after_timeout() -> None:
+    calls = 0
+    sleeps: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.ReadTimeout("timed out", request=request)
+        return httpx.Response(
+            200,
+            content=THREAD_HTML.encode("gbk"),
+            headers={"content-type": "text/html; charset=gbk"},
+            request=request,
+        )
+
+    auth_client = FakeAuthClient(handler)
+    service = ThreadService(
+        auth_client,
+        sleep=sleeps.append,
+        request_retry_count=1,
+        request_retry_delay_seconds=2.5,
+    )
+
+    result = service.fetch_page(article_id="123")
+
+    assert result.article_id == "123"
+    assert calls == 2
+    assert sleeps == [2.5]
+
+
 def test_decode_text_respects_response_encoding() -> None:
     request = httpx.Request("GET", "https://bbs.byr.cn/article/IWhisper/123")
     response = httpx.Response(

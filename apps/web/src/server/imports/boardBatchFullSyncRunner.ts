@@ -38,6 +38,36 @@ type BatchRunnerInput = {
   releaseThrottle: () => void;
 };
 
+function sumBoardStat(
+  metadata: BoardBatchJobMetadata,
+  key: "processedThreads" | "processedReplies" | "skippedThreads",
+) {
+  return Object.values(metadata.perBoardStats).reduce(
+    (sum, stat) => sum + (stat[key] ?? 0),
+    0,
+  );
+}
+
+function formatSkippedThreadNote(
+  skippedThreadDetails:
+    | Array<{
+        board_name: string;
+        article_id: string;
+        title: string;
+        page: number | null;
+        reason: string;
+      }>
+    | undefined,
+) {
+  if (!skippedThreadDetails || skippedThreadDetails.length === 0) {
+    return "";
+  }
+
+  const first = skippedThreadDetails[0]!;
+  const page = first.page === null ? "?" : String(first.page);
+  return `，跳过 ${skippedThreadDetails.length} 个帖子：${first.board_name}/${first.article_id} 第 ${page} 页 ${first.reason}`;
+}
+
 export async function runBoardBatchFullSyncJob(
   deps: BatchRunnerDeps,
   input: BatchRunnerInput,
@@ -130,25 +160,26 @@ export async function runBoardBatchFullSyncJob(
             startPage,
             maxPages: boardPageChunkSize,
           });
+          const importedThreads = importResult.importedThreads ?? 0;
+          const importedReplies = importResult.importedReplies ?? 0;
+          const skippedThreads = importResult.skippedThreads ?? 0;
 
           if (importResult.hasMore && importResult.nextPage) {
             const pageMetadata = markBoardPageCompleted(current, {
               boardName,
               nextPage: importResult.nextPage,
-              processedThreads: importResult.importedThreads,
-              processedReplies: importResult.importedReplies,
+              processedThreads: importedThreads,
+              processedReplies: importedReplies,
+              skippedThreads,
             });
             await deps.updateJobProgress(input.jobId, {
               metadataJson: pageMetadata,
-              processedThreads: Object.values(pageMetadata.perBoardStats).reduce(
-                (sum, stat) => sum + stat.processedThreads,
-                0,
-              ),
-              processedReplies: Object.values(pageMetadata.perBoardStats).reduce(
-                (sum, stat) => sum + stat.processedReplies,
-                0,
-              ),
-              progressNote: `当前板块 ${boardName}，下一页 ${importResult.nextPage}`,
+              processedThreads: sumBoardStat(pageMetadata, "processedThreads"),
+              processedReplies: sumBoardStat(pageMetadata, "processedReplies"),
+              skippedThreads: sumBoardStat(pageMetadata, "skippedThreads"),
+              progressNote: `当前板块 ${boardName}，下一页 ${importResult.nextPage}${formatSkippedThreadNote(
+                importResult.skippedThreadDetails,
+              )}`,
             });
             current = pageMetadata;
 
@@ -169,24 +200,24 @@ export async function runBoardBatchFullSyncJob(
           };
           const nextMetadata = markBoardCompleted(current, {
             boardName,
-            processedThreads: currentStats.processedThreads + importResult.importedThreads,
-            processedReplies: currentStats.processedReplies + importResult.importedReplies,
+            processedThreads: currentStats.processedThreads + importedThreads,
+            processedReplies: currentStats.processedReplies + importedReplies,
+            skippedThreads: (currentStats.skippedThreads ?? 0) + skippedThreads,
           });
 
           try {
             await deps.updateJobProgress(input.jobId, {
               metadataJson: nextMetadata,
-              processedThreads: Object.values(nextMetadata.perBoardStats).reduce(
-                (sum, stat) => sum + stat.processedThreads,
-                0,
-              ),
-              processedReplies: Object.values(nextMetadata.perBoardStats).reduce(
-                (sum, stat) => sum + stat.processedReplies,
-                0,
-              ),
+              processedThreads: sumBoardStat(nextMetadata, "processedThreads"),
+              processedReplies: sumBoardStat(nextMetadata, "processedReplies"),
+              skippedThreads: sumBoardStat(nextMetadata, "skippedThreads"),
               progressNote: nextMetadata.currentBoardName
-                ? `当前板块 ${nextMetadata.currentBoardName}`
-                : "全部板块已完成",
+                ? `当前板块 ${nextMetadata.currentBoardName}${formatSkippedThreadNote(
+                    importResult.skippedThreadDetails,
+                  )}`
+                : `全部板块已完成${formatSkippedThreadNote(
+                    importResult.skippedThreadDetails,
+                  )}`,
             });
             current = nextMetadata;
             boardCompleted = true;

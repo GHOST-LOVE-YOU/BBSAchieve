@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import httpx
 import pytest
 
 from byr_sync import InMemorySyncCache, THREAD_TTL_SECONDS
@@ -75,9 +76,11 @@ class FakeThreadService:
         self,
         thread_page: FakeThreadPage | None = None,
         thread_pages: dict[int, FakeThreadPage] | None = None,
+        errors_by_article_id: dict[str, Exception] | None = None,
     ) -> None:
         self.thread_page = thread_page or FakeThreadPage(posts=[])
         self.thread_pages = thread_pages or {}
+        self.errors_by_article_id = errors_by_article_id or {}
         self.calls: list[tuple[str, str, int]] = []
 
     def fetch_page(
@@ -88,6 +91,8 @@ class FakeThreadService:
         page: int = 1,
     ) -> FakeThreadPage:
         self.calls.append((board_name, article_id, page))
+        if error := self.errors_by_article_id.get(article_id):
+            raise error
         return self.thread_pages.get(page, self.thread_page)
 
 
@@ -354,6 +359,45 @@ def test_list_updates_filters_old_posts_from_thread_page() -> None:
     assert cache.get_thread_progress(board_name="test_board", article_id="123").recent_post_ids == [
         "p24"
     ]
+
+
+def test_list_updates_skips_thread_when_detail_fetch_fails() -> None:
+    good_thread = FakeThread(article_id="good", title="Good thread", reply_count=1)
+    bad_thread = FakeThread(article_id="bad", title="Bad thread", reply_count=1)
+    request = httpx.Request("GET", "https://bbs.byr.cn/article/test_board/bad")
+    response = httpx.Response(500, request=request)
+    board_service = FakeBoardService([bad_thread, good_thread])
+    thread_service = FakeThreadService(
+        thread_page=FakeThreadPage(
+            posts=[
+                FakeThreadPost(
+                    post_id="p1",
+                    floor_label="1楼",
+                    author_display_name="alice",
+                    posted_at="Sat Apr 26 13:25:36 2026",
+                    body="new reply",
+                )
+            ]
+        ),
+        errors_by_article_id={"bad": httpx.HTTPStatusError("bad response", request=request, response=response)},
+    )
+    cache = InMemorySyncCache()
+    service = SyncService(
+        board_service=board_service,
+        thread_service=thread_service,
+        cache=cache,
+    )
+
+    result = service.list_updates(board_name="test_board", limit=2)
+
+    assert [thread.article_id for thread in result.threads] == ["good"]
+    assert len(result.skipped_threads) == 1
+    assert result.skipped_threads[0].board_name == "test_board"
+    assert result.skipped_threads[0].article_id == "bad"
+    assert result.skipped_threads[0].page == 1
+    assert result.skipped_threads[0].reason.startswith("HTTPStatusError: bad response")
+    assert cache.get_thread_progress(board_name="test_board", article_id="bad") is None
+    assert cache.get_thread_progress(board_name="test_board", article_id="good") is not None
 
 
 def test_fetch_original_post_returns_the_first_floor() -> None:
@@ -649,6 +693,50 @@ def test_list_updates_keeps_scanning_when_a_page_mixes_old_sticky_threads_with_r
         ("IWhisper", 2),
         ("IWhisper", 3),
     ]
+
+
+def test_list_updates_skips_thread_with_unsupported_board_time() -> None:
+    board_service = FakePagedBoardService(
+        {
+            1: FakeBoardPage(
+                threads=[
+                    FakeBoardThread(
+                        article_id="bad-time",
+                        title="bad time",
+                        reply_count=0,
+                        post_time="刚刚",
+                        latest_reply_time="",
+                    ),
+                    FakeBoardThread(
+                        article_id="recent",
+                        title="recent thread",
+                        reply_count=0,
+                        post_time="21:50:00",
+                        latest_reply_time="22:05:00",
+                    ),
+                ],
+                has_next_page=False,
+            )
+        }
+    )
+    service = SyncService(
+        board_service=board_service,
+        thread_service=FakeThreadService(),
+        cache=InMemorySyncCache(),
+    )
+
+    result = service.list_updates(
+        board_name="Ad_Agent",
+        limit=20,
+        window_minutes=30,
+        now=datetime(2026, 5, 3, 22, 10, 0),
+    )
+
+    assert [thread.article_id for thread in result.threads] == ["recent"]
+    assert len(result.skipped_threads) == 1
+    assert result.skipped_threads[0].article_id == "bad-time"
+    assert result.skipped_threads[0].page == 1
+    assert result.skipped_threads[0].reason == "ValueError: Unsupported board time format: 刚刚"
 
 
 def test_list_updates_uses_post_time_when_reply_time_is_empty() -> None:
