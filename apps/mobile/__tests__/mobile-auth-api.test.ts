@@ -1,9 +1,9 @@
 import { apiGetJson } from "@/lib/api";
+import { getMobileKindeLoginOptions } from "@/config/env";
 import {
   clearMobileAccessTokenGetter,
   setMobileAccessTokenGetter,
 } from "@/features/auth/mobileAuthToken";
-import { getMobileKindeLoginOptions } from "@/features/auth/MobileAuthProvider";
 
 const originalWebBaseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL;
 const fetchMock = jest.fn<typeof fetch>();
@@ -49,8 +49,8 @@ describe("mobile authenticated API client", () => {
   it("passes the API audience and callback URL to Kinde login", () => {
     expect(
       getMobileKindeLoginOptions({
-        EXPO_PUBLIC_KINDE_API_AUDIENCE: "https://bbsachieve.orlco/api",
-        EXPO_PUBLIC_KINDE_REDIRECT_URL: "byrachieve://orlco.kinde.com/kinde_callback",
+        kindeApiAudience: "https://bbsachieve.orlco/api",
+        kindeRedirectUrl: "byrachieve://orlco.kinde.com/kinde_callback",
       }),
     ).toEqual({
       audience: "https://bbsachieve.orlco/api",

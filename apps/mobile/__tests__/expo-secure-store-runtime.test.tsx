@@ -90,4 +90,38 @@ describe("Expo SecureStore runtime detection", () => {
     );
     errorSpy.mockRestore();
   });
+
+  it("shows an actionable setup message instead of crashing when Kinde env is missing", () => {
+    const originalDomain = process.env.EXPO_PUBLIC_KINDE_DOMAIN;
+    const originalClientId = process.env.EXPO_PUBLIC_KINDE_CLIENT_ID;
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    (globalThis as { expo?: unknown }).expo = {
+      modules: { ExpoSecureStore: {} },
+    };
+    delete process.env.EXPO_PUBLIC_KINDE_DOMAIN;
+    delete process.env.EXPO_PUBLIC_KINDE_CLIENT_ID;
+
+    try {
+      render(<MobileAuthProvider>Ready</MobileAuthProvider>);
+
+      expect(screen.getByText("移动端登录配置缺失")).toBeTruthy();
+      expect(screen.getByText(/EXPO_PUBLIC_KINDE_DOMAIN/)).toBeTruthy();
+      expect(screen.queryByText("Ready")).toBeNull();
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Mobile Kinde environment unavailable:",
+        expect.objectContaining({
+          title: "移动端登录配置缺失",
+          missingNames: expect.arrayContaining([
+            "EXPO_PUBLIC_KINDE_DOMAIN",
+            "EXPO_PUBLIC_KINDE_CLIENT_ID",
+          ]),
+        }),
+      );
+    } finally {
+      process.env.EXPO_PUBLIC_KINDE_DOMAIN = originalDomain;
+      process.env.EXPO_PUBLIC_KINDE_CLIENT_ID = originalClientId;
+      errorSpy.mockRestore();
+    }
+  });
 });

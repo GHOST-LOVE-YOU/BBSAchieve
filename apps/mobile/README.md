@@ -210,11 +210,22 @@ Expo 前端可读取的变量应使用 `EXPO_PUBLIC_` 前缀，例如：
 EXPO_PUBLIC_WEB_BASE_URL=http://127.0.0.1:3000
 ```
 
-代码中可通过下面方式读取：
+如果使用 Kinde 登录，还需要配置：
+
+```env
+EXPO_PUBLIC_KINDE_DOMAIN=https://example.kinde.com
+EXPO_PUBLIC_KINDE_CLIENT_ID=mobile-client-id
+EXPO_PUBLIC_KINDE_API_AUDIENCE=https://example.com/api
+EXPO_PUBLIC_KINDE_REDIRECT_URL=byrachieve://example.kinde.com/kinde_callback
+```
+
+代码中不要在业务文件里直接读取 `process.env.EXPO_PUBLIC_*`。移动端环境变量统一放在：
 
 ```ts
-const webBaseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL;
+src/config/env.ts
 ```
+
+新增变量时，在这个文件里用静态形式读取，例如 `process.env.EXPO_PUBLIC_NEW_VAR`，再导出结构化 helper 给业务代码使用。仓库里有测试约束，防止其他 `src` 文件直接读取 `EXPO_PUBLIC_`。
 
 当前首页会请求：
 
@@ -227,6 +238,8 @@ GET {EXPO_PUBLIC_WEB_BASE_URL}/api/public/boards
 - `EXPO_PUBLIC_WEB_BASE_URL` 必须指向可被移动端访问到的 Web 服务地址。
 - 可以写成 `http://127.0.0.1:3000` 或 `http://192.168.x.x:3000`，代码会自动去掉末尾多余的 `/`。
 - 如果没有配置这个变量，移动端公共阅读 client 会直接抛出错误：`Missing EXPO_PUBLIC_WEB_BASE_URL for mobile public reading API`。
+- `npx eas-cli@latest build --platform android --profile preview` 使用 EAS 远程环境里的变量，不会依赖本机被 gitignore 的 `.env`。需要在 EAS 的 `preview` 环境中配置上面的 `EXPO_PUBLIC_` 变量后重新打包。
+- 当前 `eas.json` 已把 `preview` profile 绑定到 EAS 的 `preview` 环境。
 - 不要把密钥、令牌等敏感信息放进前端环境变量。
 
 ## 常见问题

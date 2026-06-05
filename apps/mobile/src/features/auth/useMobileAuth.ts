@@ -1,7 +1,7 @@
 import { useKindeAuth } from "@kinde/expo";
 import type { KindeAuthHook } from "@kinde/expo";
 
-import { isMobileAuthDisabled } from "./MobileAuthProvider";
+import { isMobileAuthDisabled } from "@/config/env";
 
 export type MobileAuthHook = Pick<
   KindeAuthHook,

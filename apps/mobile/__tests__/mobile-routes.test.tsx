@@ -9,6 +9,7 @@ const originalWebBaseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL;
 const originalKindeDomain = process.env.EXPO_PUBLIC_KINDE_DOMAIN;
 const originalKindeClientId = process.env.EXPO_PUBLIC_KINDE_CLIENT_ID;
 const originalKindeApiAudience = process.env.EXPO_PUBLIC_KINDE_API_AUDIENCE;
+const originalKindeRedirectUrl = process.env.EXPO_PUBLIC_KINDE_REDIRECT_URL;
 const fetchMock = jest.fn<typeof fetch>();
 const authenticatedFetchOptions = {
   headers: {
@@ -29,6 +30,7 @@ describe("mobile routes", () => {
     process.env.EXPO_PUBLIC_KINDE_DOMAIN = "https://orlco.kinde.com";
     process.env.EXPO_PUBLIC_KINDE_CLIENT_ID = "mobile-client-id";
     process.env.EXPO_PUBLIC_KINDE_API_AUDIENCE = "https://bbsachieve.orlco/api";
+    process.env.EXPO_PUBLIC_KINDE_REDIRECT_URL = "byrachieve://orlco.kinde.com/kinde_callback";
   });
 
   afterAll(() => {
@@ -36,6 +38,7 @@ describe("mobile routes", () => {
     process.env.EXPO_PUBLIC_KINDE_DOMAIN = originalKindeDomain;
     process.env.EXPO_PUBLIC_KINDE_CLIENT_ID = originalKindeClientId;
     process.env.EXPO_PUBLIC_KINDE_API_AUDIENCE = originalKindeApiAudience;
+    process.env.EXPO_PUBLIC_KINDE_REDIRECT_URL = originalKindeRedirectUrl;
   });
 
   it("throws a clear error when EXPO_PUBLIC_WEB_BASE_URL is missing", async () => {

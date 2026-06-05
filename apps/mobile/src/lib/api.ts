@@ -1,13 +1,11 @@
+import { getRequiredWebBaseUrl } from "@/config/env";
 import { getRequiredMobileAccessToken } from "@/features/auth/mobileAuthToken";
 
 function getWebBaseUrl() {
-  const value = process.env.EXPO_PUBLIC_WEB_BASE_URL?.trim();
-
-  if (!value) {
-    throw new Error("Missing EXPO_PUBLIC_WEB_BASE_URL for mobile public reading API");
-  }
-
-  return value.replace(/\/$/, "");
+  return getRequiredWebBaseUrl(
+    undefined,
+    "Missing EXPO_PUBLIC_WEB_BASE_URL for mobile public reading API",
+  );
 }
 
 export async function apiGetJson<T>(path: string): Promise<T> {

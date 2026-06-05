@@ -1,3 +1,4 @@
+import { getRequiredWebBaseUrl } from "@/config/env";
 import { apiGetJson } from "@/lib/api";
 
 import type {
@@ -232,9 +233,5 @@ export async function deleteSubscription(subscriptionId: string) {
 }
 
 function getWebBaseUrl() {
-  const value = process.env.EXPO_PUBLIC_WEB_BASE_URL?.trim();
-  if (!value) {
-    throw new Error("Missing EXPO_PUBLIC_WEB_BASE_URL");
-  }
-  return value.replace(/\/$/, "");
+  return getRequiredWebBaseUrl();
 }
