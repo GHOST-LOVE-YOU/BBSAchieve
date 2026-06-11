@@ -333,6 +333,63 @@ describe("mapSyncPayload", () => {
     });
   });
 
+  it("removes NUL bytes from BYR text before building import DTOs", () => {
+    const batch = mapSyncPayload({
+      board_name: "BBSMan_Dev",
+      window_minutes: 180,
+      scanned_pages: 1,
+      cutoff_at: "2026-06-11T10:00:00+08:00",
+      threads: [
+        {
+          article_id: "984\u0000978",
+          title: "bad\u0000title",
+          reply_count: 1,
+          posts: [
+            {
+              post_id: "984978",
+              floor_label: "楼主",
+              author_display_name: "BBSMan\u0000",
+              posted_at: "Thu Jun 11 10:00:00 2026",
+              body: "opening\u0000body",
+            },
+            {
+              post_id: "984979",
+              floor_label: "1楼",
+              author_display_name: "\u0000reply-user",
+              posted_at: "Thu Jun 11 10:01:00 2026",
+              body: "reply\u0000body",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(batch.sourceLabel).toBe("BBSMan_Dev");
+    expect(batch.botUsers).toEqual([
+      {
+        username: "BBSMan",
+        displayName: "BBSMan",
+        mailboxKey: null,
+      },
+      {
+        username: "reply-user",
+        displayName: "reply-user",
+        mailboxKey: null,
+      },
+    ]);
+    expect(batch.threads[0]).toMatchObject({
+      sourceThreadId: "984978",
+      authorUsername: "BBSMan",
+      title: "badtitle",
+      body: "openingbody",
+    });
+    expect(batch.replies[0]).toMatchObject({
+      sourceThreadId: "984978",
+      authorUsername: "reply-user",
+      body: "replybody",
+    });
+  });
+
   it("preserves the legacy alias", () => {
     const payload = {
       board_name: "IWhisper",

@@ -29,7 +29,16 @@ function getNamedFloorIndex(floorLabel: string): number | null {
 }
 
 function normalizeBoardName(boardName: string): { slug: string; name: string } {
-  return resolveBoardIdentity(boardName);
+  return resolveBoardIdentity(removePostgresNul(boardName));
+}
+
+function removePostgresNul(value: string): string {
+  return value.replace(/\u0000/g, "");
+}
+
+function normalizeAuthorDisplayName(value: string): string {
+  const sanitized = removePostgresNul(value);
+  return sanitized.trim().length > 0 ? sanitized : "未知作者";
 }
 
 function parseReplyIndex(floorLabel: string): number {
@@ -71,12 +80,14 @@ function mapThreadReply(
   threadId: string,
   post: ByrSyncPayload["threads"][number]["posts"][number],
 ): SyncReplyDTO {
+  const authorDisplayName = normalizeAuthorDisplayName(post.author_display_name);
+
   return {
     sourceBoardSlug: boardSlug,
-    sourceThreadId: threadId,
+    sourceThreadId: removePostgresNul(threadId),
     replyIndex: parseReplyIndex(post.floor_label),
-    authorUsername: post.author_display_name,
-    body: post.body,
+    authorUsername: authorDisplayName,
+    body: removePostgresNul(post.body),
     publishedAt: parseByrPostedAt(post.posted_at) ?? new Date(),
   };
 }
@@ -89,10 +100,12 @@ function mapThread(
 
   return {
     sourceBoardSlug: boardSlug,
-    sourceThreadId: thread.article_id,
-    authorUsername: originalPost?.author_display_name ?? null,
-    title: thread.title,
-    body: originalPost?.body ?? null,
+    sourceThreadId: removePostgresNul(thread.article_id),
+    authorUsername: originalPost
+      ? normalizeAuthorDisplayName(originalPost.author_display_name)
+      : null,
+    title: removePostgresNul(thread.title),
+    body: originalPost ? removePostgresNul(originalPost.body) : null,
     publishedAt: originalPost ? parseByrPostedAt(originalPost.posted_at) : null,
     replyCount: thread.reply_count,
   };
@@ -103,10 +116,11 @@ function collectBotUsers(payload: ByrSyncPayload): SyncBotUserDTO[] {
 
   for (const thread of payload.threads) {
     for (const post of thread.posts) {
-      if (!displayNames.has(post.author_display_name)) {
-        displayNames.set(post.author_display_name, {
-          username: post.author_display_name,
-          displayName: post.author_display_name,
+      const authorDisplayName = normalizeAuthorDisplayName(post.author_display_name);
+      if (!displayNames.has(authorDisplayName)) {
+        displayNames.set(authorDisplayName, {
+          username: authorDisplayName,
+          displayName: authorDisplayName,
           mailboxKey: null,
         });
       }
@@ -118,10 +132,11 @@ function collectBotUsers(payload: ByrSyncPayload): SyncBotUserDTO[] {
 
 export function mapSyncPayload(payload: ByrSyncPayload): NormalizedImportBatch {
   const board = normalizeBoardName(payload.board_name);
+  const sourceLabel = removePostgresNul(payload.board_name);
 
   return {
     sourceType: "byr_sync_api",
-    sourceLabel: payload.board_name,
+    sourceLabel,
     boards: [
       {
         slug: board.slug,
