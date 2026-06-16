@@ -6,18 +6,30 @@ import {
 } from "@/features/auth/mobileAuthToken";
 
 const originalWebBaseUrl = process.env.EXPO_PUBLIC_WEB_BASE_URL;
+const originalDisableAuth = process.env.EXPO_PUBLIC_DISABLE_AUTH;
 const fetchMock = jest.fn<typeof fetch>();
+
+function restoreEnvValue(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
+}
 
 describe("mobile authenticated API client", () => {
   beforeEach(() => {
     fetchMock.mockReset();
     global.fetch = fetchMock as typeof fetch;
     process.env.EXPO_PUBLIC_WEB_BASE_URL = "https://web.example.com";
+    delete process.env.EXPO_PUBLIC_DISABLE_AUTH;
     clearMobileAccessTokenGetter();
   });
 
   afterAll(() => {
-    process.env.EXPO_PUBLIC_WEB_BASE_URL = originalWebBaseUrl;
+    restoreEnvValue("EXPO_PUBLIC_WEB_BASE_URL", originalWebBaseUrl);
+    restoreEnvValue("EXPO_PUBLIC_DISABLE_AUTH", originalDisableAuth);
     clearMobileAccessTokenGetter();
   });
 
@@ -44,6 +56,23 @@ describe("mobile authenticated API client", () => {
         Authorization: "Bearer mobile-token",
       },
     });
+  });
+
+  it("skips bearer tokens when local auth is disabled", async () => {
+    process.env.EXPO_PUBLIC_DISABLE_AUTH = "true";
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    } as Response);
+
+    await expect(apiGetJson("/api/public/boards")).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://web.example.com/api/public/boards",
+      undefined,
+    );
   });
 
   it("passes the API audience and callback URL to Kinde login", () => {

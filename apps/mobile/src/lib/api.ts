@@ -1,4 +1,4 @@
-import { getRequiredWebBaseUrl } from "@/config/env";
+import { getRequiredWebBaseUrl, isMobileAuthDisabled } from "@/config/env";
 import { getRequiredMobileAccessToken } from "@/features/auth/mobileAuthToken";
 
 function getWebBaseUrl() {
@@ -10,12 +10,16 @@ function getWebBaseUrl() {
 
 export async function apiGetJson<T>(path: string): Promise<T> {
   const url = `${getWebBaseUrl()}${path}`;
-  const accessToken = await getRequiredMobileAccessToken();
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const response = await fetch(
+    url,
+    isMobileAuthDisabled()
+      ? undefined
+      : {
+          headers: {
+            Authorization: `Bearer ${await getRequiredMobileAccessToken()}`,
+          },
+        },
+  );
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null);

@@ -18,6 +18,25 @@ type AuthFailure = {
   response: NextResponse;
 };
 
+const devIdentity: KindeIdentity = {
+  provider: "kinde",
+  subject: "local-mobile-user",
+  email: "dev-mobile@example.com",
+  givenName: "本地",
+  familyName: "测试用户",
+  name: "本地测试用户",
+  picture: null,
+  orgCodes: [],
+  source: "bearer",
+};
+
+function isLocalAuthDisabled() {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.WEB_DISABLE_AUTH?.trim().toLowerCase() === "true"
+  );
+}
+
 function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
@@ -33,6 +52,10 @@ function readBearerToken(request?: Request | null) {
 }
 
 export async function getRequestIdentity(request?: Request | null): Promise<KindeIdentity | null> {
+  if (isLocalAuthDisabled()) {
+    return devIdentity;
+  }
+
   const webIdentity = await getWebSessionIdentity().catch(() => null);
   if (webIdentity) {
     return webIdentity;
