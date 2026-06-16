@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Bot, BookOpen, MessageSquare, Search, X } from "lucide-react";
@@ -75,13 +76,11 @@ export function SearchTrigger({
     if (!open) return;
     const term = query.trim();
     if (term.length === 0) {
-      setResults(EMPTY_RESULTS);
-      setLoading(false);
       return;
     }
-    setLoading(true);
     const controller = new AbortController();
     const handle = window.setTimeout(async () => {
+      setLoading(true);
       try {
         const params = new URLSearchParams({ q: term, scope, limit: "8" });
         const response = await fetch(`/api/public/search?${params.toString()}`, {
@@ -110,6 +109,23 @@ export function SearchTrigger({
       window.clearTimeout(handle);
     };
   }, [open, query, scope]);
+
+  function updateQuery(value: string) {
+    setQuery(value);
+    if (value.trim().length === 0) {
+      setResults(EMPTY_RESULTS);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  }
+
+  function updateScope(nextScope: SearchScope) {
+    setScope(nextScope);
+    if (query.trim().length > 0) {
+      setLoading(true);
+    }
+  }
 
   function submitSearch() {
     const term = query.trim();
@@ -158,7 +174,7 @@ export function SearchTrigger({
             <input
               autoFocus
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => updateQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") submitSearch();
               }}
@@ -175,17 +191,17 @@ export function SearchTrigger({
           <div className="flex gap-0 border-b border-[color:var(--hairline-soft)] px-2">
             <ScopeTab
               active={scope === "posts"}
-              onClick={() => setScope("posts")}
+              onClick={() => updateScope("posts")}
               label="帖子"
             />
             <ScopeTab
               active={scope === "replies"}
-              onClick={() => setScope("replies")}
+              onClick={() => updateScope("replies")}
               label="回复"
             />
             <ScopeTab
               active={scope === "users"}
-              onClick={() => setScope("users")}
+              onClick={() => updateScope("users")}
               label="机器人"
               hint="仅机器人可被搜索"
             />
@@ -269,7 +285,7 @@ function SearchResultsList({
       <ul className="divide-y divide-[color:var(--hairline-soft)]">
         {results.posts.map((post) => (
           <li key={post.id}>
-            <a
+            <Link
               href={`/threads/${encodePathSegment(post.id)}`}
               onClick={onPick}
               className="flex items-start gap-3 px-4 py-2.5 hover:bg-[color:var(--canvas-soft)]"
@@ -284,7 +300,7 @@ function SearchResultsList({
                   {post.lastReplyAt ? relativeTime(post.lastReplyAt) : "暂无回复"}
                 </div>
               </div>
-            </a>
+            </Link>
           </li>
         ))}
         <li>
@@ -307,7 +323,7 @@ function SearchResultsList({
       <ul className="divide-y divide-[color:var(--hairline-soft)]">
         {results.replies.map((reply) => (
           <li key={reply.id}>
-            <a
+            <Link
               href={`/threads/${encodePathSegment(reply.threadId)}`}
               onClick={onPick}
               className="flex items-start gap-3 px-4 py-2.5 hover:bg-[color:var(--canvas-soft)]"
@@ -326,7 +342,7 @@ function SearchResultsList({
                   {reply.threadTitle.replace(/^\[镜像\]\s*/, "")}》
                 </div>
               </div>
-            </a>
+            </Link>
           </li>
         ))}
       </ul>
@@ -342,7 +358,7 @@ function SearchResultsList({
       </li>
       {results.users.map((user) => (
         <li key={user.id}>
-          <a
+          <Link
             href={`/users/${encodePathSegment(user.id)}`}
             onClick={onPick}
             className="flex items-center gap-3 px-4 py-2.5 hover:bg-[color:var(--canvas-soft)]"
@@ -365,7 +381,7 @@ function SearchResultsList({
               </div>
             </div>
             <Bot aria-hidden className="h-3.5 w-3.5 text-[color:var(--ink-tertiary)]" />
-          </a>
+          </Link>
         </li>
       ))}
     </ul>

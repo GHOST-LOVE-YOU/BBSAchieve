@@ -6,6 +6,7 @@ import { Moon, Sun } from "lucide-react";
 import { cn } from "@/src/lib/utils";
 
 const STORAGE_KEY = "byr-achieve.theme";
+const THEME_CHANGE_EVENT = "byr-achieve:theme-change";
 
 type Mode = "light" | "dark";
 
@@ -15,36 +16,65 @@ function applyTheme(mode: Mode) {
 
 function readInitialTheme(): Mode {
   if (typeof window === "undefined") return "light";
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") {
-    return stored;
+  try {
+    const stored = window.localStorage?.getItem(STORAGE_KEY);
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+  } catch {
+    // localStorage can be unavailable in restricted browsers or tests.
   }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  try {
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  } catch {
+    return "light";
+  }
+}
+
+function subscribeTheme(listener: () => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const mediaQuery = window.matchMedia?.("(prefers-color-scheme: dark)") ?? null;
+  window.addEventListener("storage", listener);
+  window.addEventListener(THEME_CHANGE_EVENT, listener);
+  mediaQuery?.addEventListener?.("change", listener);
+
+  return () => {
+    window.removeEventListener("storage", listener);
+    window.removeEventListener(THEME_CHANGE_EVENT, listener);
+    mediaQuery?.removeEventListener?.("change", listener);
+  };
+}
+
+function announceThemeChange() {
+  window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
 }
 
 export function ThemeToggle({ className }: { className?: string }) {
-  const [mode, setMode] = React.useState<Mode>("light");
-  const [mounted, setMounted] = React.useState(false);
+  const mode = React.useSyncExternalStore(
+    // Keep the snapshot typed as Mode so theme application stays narrow.
+    subscribeTheme,
+    readInitialTheme,
+    () => "light" as Mode,
+  );
 
-  // Run once on mount to sync state with whatever the inline <head> script set.
   React.useEffect(() => {
-    const initial = readInitialTheme();
-    setMode(initial);
-    applyTheme(initial);
-    setMounted(true);
-  }, []);
+    applyTheme(mode);
+  }, [mode]);
 
   function toggle() {
     const next: Mode = mode === "dark" ? "light" : "dark";
-    setMode(next);
     applyTheme(next);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
     } catch {
       // localStorage may be unavailable (e.g. private mode); ignore.
     }
+    announceThemeChange();
   }
 
   return (
@@ -57,7 +87,7 @@ export function ThemeToggle({ className }: { className?: string }) {
         className,
       )}
     >
-      {mounted && mode === "dark" ? (
+      {mode === "dark" ? (
         <Sun aria-hidden className="h-5 w-5" />
       ) : (
         <Moon aria-hidden className="h-5 w-5" />

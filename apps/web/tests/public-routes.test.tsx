@@ -25,6 +25,10 @@ const pageGuardMock = vi.hoisted(() => ({
   requireWebPageUser: vi.fn(),
 }));
 
+const webSessionMock = vi.hoisted(() => ({
+  getWebSessionIdentity: vi.fn(),
+}));
+
 const prismaMock = vi.hoisted(() => ({
   user: { count: vi.fn() },
   thread: { count: vi.fn() },
@@ -39,6 +43,9 @@ vi.mock("@/src/server/reading/publicReadingService", () => ({
 }));
 vi.mock("@/src/server/auth/pageGuards", () => ({
   requireWebPageUser: pageGuardMock.requireWebPageUser,
+}));
+vi.mock("@/src/server/auth/webSession", () => ({
+  getWebSessionIdentity: webSessionMock.getWebSessionIdentity,
 }));
 vi.mock("@/src/server/db/client", () => ({ prisma: prismaMock }));
 
@@ -262,7 +269,7 @@ describe("board page", () => {
 describe("thread page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    pageGuardMock.requireWebPageUser.mockResolvedValue({
+    webSessionMock.getWebSessionIdentity.mockResolvedValue({
       provider: "kinde",
       subject: "kp_test",
       orgCodes: [],
@@ -322,10 +329,55 @@ describe("thread page", () => {
       screen.getByText("A new listing has been mirrored and is ready to read."),
     ).toBeTruthy();
     expect(screen.getByText("Reply 1")).toBeTruthy();
-    expect(pageGuardMock.requireWebPageUser).toHaveBeenCalledWith(
-      "/threads/first-offer",
-    );
+    expect(pageGuardMock.requireWebPageUser).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /订阅该帖/ })).toBeTruthy();
+  });
+
+  it("renders for anonymous readers without subscription state", async () => {
+    webSessionMock.getWebSessionIdentity.mockResolvedValue(null);
+    prismaMock.humanProfile.findUnique.mockClear();
+    threadDetailMock.getThreadDetail.mockResolvedValue({
+      thread: {
+        id: "thread:first-offer",
+        title: "First offer from the mirror",
+        body: "A public mirrored thread is readable before login.",
+        publishedAt: "2026-05-01T08:00:00.000Z",
+        lastReplyAt: null,
+        replyCount: 0,
+        sourceBoardSlug: "JobInfo",
+        sourceThreadId: "1124871",
+        mirrored: true,
+        sourceStale: false,
+        authorId: "bot-1",
+        authorName: "镜花",
+        authorIsBot: true,
+      },
+      board: { id: "board:job", slug: "job", name: "Jobs and Offers" },
+      threadSubscriptionId: null,
+    });
+    threadDetailMock.getThreadReplies.mockResolvedValue({
+      items: [],
+      page: 1,
+      perPage: 20,
+      totalCount: 0,
+      totalPages: 1,
+    });
+
+    render(
+      await ThreadPage({
+        params: Promise.resolve({ threadId: "first-offer" }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(
+      screen.getByText("A public mirrored thread is readable before login."),
+    ).toBeTruthy();
+    expect(prismaMock.humanProfile.findUnique).not.toHaveBeenCalled();
+    expect(threadDetailMock.getThreadDetail).toHaveBeenCalledWith({
+      threadId: "first-offer",
+      viewerHumanUserId: null,
+    });
   });
 
   it("calls notFound for an unknown thread", async () => {

@@ -8,7 +8,7 @@ import { SubscribeButton } from "@/src/components/forum/SubscribeButton";
 import { UserAvatar } from "@/src/components/forum/UserAvatar";
 import { Badge } from "@/src/components/ui/badge";
 import { Card } from "@/src/components/ui/card";
-import { requireWebPageUser } from "@/src/server/auth/pageGuards";
+import { getWebSessionIdentity } from "@/src/server/auth/webSession";
 import { prisma } from "@/src/server/db/client";
 import {
   getThreadDetail,
@@ -37,16 +37,18 @@ export default async function ThreadPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const page = parsePage(resolvedSearchParams.page);
 
-  const identity = await requireWebPageUser(`/threads/${threadId}`);
-  const profile = await prisma.humanProfile.findUnique({
-    where: {
-      authProvider_authSubject: {
-        authProvider: identity.provider,
-        authSubject: identity.subject,
-      },
-    },
-    select: { userId: true },
-  });
+  const identity = await getWebSessionIdentity().catch(() => null);
+  const profile = identity
+    ? await prisma.humanProfile.findUnique({
+        where: {
+          authProvider_authSubject: {
+            authProvider: identity.provider,
+            authSubject: identity.subject,
+          },
+        },
+        select: { userId: true },
+      })
+    : null;
   const viewerHumanUserId = profile?.userId ?? null;
 
   const detail = await getThreadDetail({ threadId, viewerHumanUserId });
