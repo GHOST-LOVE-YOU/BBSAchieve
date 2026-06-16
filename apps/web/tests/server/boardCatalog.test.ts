@@ -30,32 +30,35 @@ describe("boardCatalog", () => {
     );
   });
 
-  it("derives the expected scheduled task details for the fixed homepage boards", () => {
-    expect(getScheduledBoardTasks()).toEqual([
-      {
-        taskKey: "job-info_recent_sync",
-        title: "JobInfo 最近内容同步",
-        description: "每 120 分钟同步一次 JobInfo 最近 180 分钟内容",
-        sourceType: "byr_sync_api",
-        sourceLabel: "JobInfo recent sync",
-        boardName: "JobInfo",
-        intervalMinutes: 120,
-        windowMinutes: 180,
-        enabled: true,
-        runnerType: "byr_sync_recent_window",
-      },
-      {
-        taskKey: "iwhisper_recent_sync",
-        title: "IWhisper 最近内容同步",
-        description: "每 20 分钟同步一次 IWhisper 最近 30 分钟内容",
-        sourceType: "byr_sync_api",
-        sourceLabel: "IWhisper recent sync",
-        boardName: "IWhisper",
-        intervalMinutes: 20,
-        windowMinutes: 30,
-        enabled: true,
-        runnerType: "byr_sync_recent_window",
-      },
-    ]);
+  it("derives one scheduled task for every board with the configured sync windows", () => {
+    const scheduledTasks = getScheduledBoardTasks();
+
+    expect(scheduledTasks).toHaveLength(boardCatalog.length);
+    expect(scheduledTasks.find((task) => task.boardName === "JobInfo")).toMatchObject({
+      taskKey: "job-info_recent_sync",
+      title: "JobInfo 最近内容同步",
+      description: "每 43200 分钟同步一次 JobInfo 最近 44640 分钟内容",
+      sourceType: "byr_sync_api",
+      sourceLabel: "JobInfo recent sync",
+      intervalMinutes: 43200,
+      windowMinutes: 44640,
+      enabled: true,
+      runnerType: "byr_sync_recent_window",
+    });
+    expect(scheduledTasks.find((task) => task.boardName === "IWhisper")).toMatchObject({
+      taskKey: "iwhisper_recent_sync",
+      title: "IWhisper 最近内容同步",
+      description: "每 60 分钟同步一次 IWhisper 最近 90 分钟内容",
+      sourceType: "byr_sync_api",
+      sourceLabel: "IWhisper recent sync",
+      intervalMinutes: 60,
+      windowMinutes: 90,
+      enabled: true,
+      runnerType: "byr_sync_recent_window",
+    });
+    expect(scheduledTasks.find((task) => task.boardName === "Advertising")).toMatchObject({
+      intervalMinutes: 1440,
+      windowMinutes: 1560,
+    });
   });
 });

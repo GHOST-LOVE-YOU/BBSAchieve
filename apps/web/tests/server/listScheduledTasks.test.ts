@@ -73,8 +73,8 @@ describe("listScheduledTasks", () => {
         expect.objectContaining({
           taskKey: "iwhisper_recent_sync",
           title: "IWhisper 最近内容同步",
-          intervalMinutes: 20,
-          windowMinutes: 30,
+          intervalMinutes: 60,
+          windowMinutes: 90,
           latestRun: expect.objectContaining({
             status: "succeeded",
             importedThreads: 2,
@@ -84,8 +84,8 @@ describe("listScheduledTasks", () => {
         expect.objectContaining({
           taskKey: "job-info_recent_sync",
           title: "JobInfo 最近内容同步",
-          intervalMinutes: 120,
-          windowMinutes: 180,
+          intervalMinutes: 43200,
+          windowMinutes: 44640,
           latestRun: null,
         }),
       ]),

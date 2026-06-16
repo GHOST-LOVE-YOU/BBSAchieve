@@ -38,10 +38,10 @@ describe("admin scheduled tasks page", () => {
       {
         taskKey: "iwhisper_recent_sync",
         title: "IWhisper 最近内容同步",
-        description: "每 20 分钟同步一次 IWhisper 最近 30 分钟内的内容",
+        description: "每 60 分钟同步一次 IWhisper 最近 90 分钟内的内容",
         boardName: "IWhisper",
-        intervalMinutes: 20,
-        windowMinutes: 30,
+        intervalMinutes: 60,
+        windowMinutes: 90,
         enabled: true,
         latestRun: {
           id: "run-1",
@@ -49,8 +49,8 @@ describe("admin scheduled tasks page", () => {
           taskTitle: "IWhisper 最近内容同步",
           triggerSource: "manual",
           status: "succeeded",
-          intervalMinutes: 20,
-          windowMinutes: 30,
+          intervalMinutes: 60,
+          windowMinutes: 90,
           boardName: "IWhisper",
           importedThreads: 2,
           importedReplies: 3,
@@ -70,8 +70,8 @@ describe("admin scheduled tasks page", () => {
 
     expect(screen.getByText("定时任务")).toBeTruthy();
     expect(screen.getByText("IWhisper 最近内容同步")).toBeTruthy();
-    expect(screen.getByText("20 分钟")).toBeTruthy();
-    expect(screen.getByText("30 分钟")).toBeTruthy();
+    expect(screen.getByText("60 分钟")).toBeTruthy();
+    expect(screen.getByText("90 分钟")).toBeTruthy();
     expect(screen.getByText("最近状态：succeeded")).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "立即执行一次" }),
