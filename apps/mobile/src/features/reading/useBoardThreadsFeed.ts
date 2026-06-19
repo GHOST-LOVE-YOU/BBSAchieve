@@ -57,30 +57,30 @@ export function useBoardThreadsFeed(boardId?: string | null): BoardThreadsFeedSt
     let active = true;
     const requestVersion = requestVersionRef.current;
 
-    if (!boardId) {
+    const run = async () => {
+      if (!boardId) {
+        if (!active) return;
+        setBoard(null);
+        setItems([]);
+        setInitialStatus("notFound");
+        setInitialError(null);
+        setLoadMoreError(null);
+        setIsLoadingMore(false);
+        setHasMore(false);
+        nextCursorRef.current = null;
+        return;
+      }
+
+      if (!active) return;
       setBoard(null);
       setItems([]);
-      setInitialStatus("notFound");
+      setInitialStatus("loading");
       setInitialError(null);
       setLoadMoreError(null);
       setIsLoadingMore(false);
       setHasMore(false);
       nextCursorRef.current = null;
-      return () => {
-        active = false;
-      };
-    }
 
-    setBoard(null);
-    setItems([]);
-    setInitialStatus("loading");
-    setInitialError(null);
-    setLoadMoreError(null);
-    setIsLoadingMore(false);
-    setHasMore(false);
-    nextCursorRef.current = null;
-
-    void (async () => {
       try {
         const [boardDetail, feed] = await Promise.all([
           fetchBoard(boardId),
@@ -110,7 +110,9 @@ export function useBoardThreadsFeed(boardId?: string | null): BoardThreadsFeedSt
         setInitialStatus(errorStatus);
         setInitialError(errorStatus === "error" ? getErrorMessage(error) : null);
       }
-    })();
+    };
+
+    void run();
 
     return () => {
       active = false;
@@ -149,11 +151,11 @@ export function useBoardThreadsFeed(boardId?: string | null): BoardThreadsFeedSt
 
       setLoadMoreError(getErrorMessage(error));
     } finally {
+      loadMoreInFlightRef.current = false;
       if (requestVersionRef.current !== requestVersion) {
         return;
       }
 
-      loadMoreInFlightRef.current = false;
       setIsLoadingMore(false);
     }
   }, [boardId, hasMore, initialStatus]);

@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const STORAGE_KEY_PREFIX = "notification_prefs_";
 
@@ -66,23 +66,48 @@ function getStorageKey(userId: string) {
 export function useNotificationPreferences(userId: string | null) {
   const [state, setState] = useState<StoredPreferences>(DEFAULT_PREFS);
   const [loaded, setLoaded] = useState(false);
+  const mountedRef = useRef(true);
+  const requestVersionRef = useRef(0);
 
   useEffect(() => {
-    if (!userId) {
-      setState(DEFAULT_PREFS);
-      setLoaded(true);
-      return;
-    }
-    void AsyncStorage.getItem(getStorageKey(userId)).then((raw: string | null) => {
+    let active = true;
+    mountedRef.current = true;
+    requestVersionRef.current += 1;
+    const requestVersion = requestVersionRef.current;
+    const isActive = () => active && requestVersionRef.current === requestVersion;
+
+    const load = async () => {
+      if (!userId) {
+        if (!isActive()) return;
+        setState(DEFAULT_PREFS);
+        setLoaded(true);
+        return;
+      }
+
+      if (!isActive()) return;
+      setLoaded(false);
+
+      const raw = await AsyncStorage.getItem(getStorageKey(userId));
+      if (!isActive()) return;
+
       if (raw) {
         try {
           setState({ ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<StoredPreferences>) });
         } catch {
           setState(DEFAULT_PREFS);
         }
+      } else {
+        setState(DEFAULT_PREFS);
       }
       setLoaded(true);
-    });
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+      mountedRef.current = false;
+    };
   }, [userId]);
 
   const persist = useCallback(
@@ -95,6 +120,7 @@ export function useNotificationPreferences(userId: string | null) {
 
   const update = useCallback(
     (partial: Partial<StoredPreferences>) => {
+      if (!mountedRef.current) return;
       setState((prev) => {
         const next = { ...prev, ...partial };
         persist(next);

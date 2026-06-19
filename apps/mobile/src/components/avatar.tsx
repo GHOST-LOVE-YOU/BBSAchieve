@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {

@@ -11,6 +11,7 @@ export const Colors = {
 
     // Surface
     canvas: '#f6e9d8',
+    canvasTranslucent: '#f6e9d8f5',
     canvasSoft: '#f9efe4',
     canvasCream: '#f0e4d6',
     surface: '#fdfdfd',
@@ -66,6 +67,7 @@ export const Colors = {
 
     // Surface
     canvas: '#0c0d10',
+    canvasTranslucent: '#0c0d10f5',
     canvasSoft: '#15171c',
     canvasCream: '#1d1f25',
     surface: '#1d1f25',
@@ -159,5 +161,4 @@ export const Radius = {
   full: 9999,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;

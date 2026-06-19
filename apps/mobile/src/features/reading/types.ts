@@ -247,10 +247,13 @@ export type SubscriptionItem = {
   targetType: "thread" | "reply";
   threadId: string | null;
   replyId: string | null;
+  status?: "active" | "muted" | "revoked";
   subscriptionStatus: "active" | "muted" | "revoked";
   threadTitle: string | null;
+  replyExcerpt?: string | null;
   replyFloor: number | null;
   createdAt: string;
+  lastReplyAt?: string | null;
 };
 
 export type SubscriptionsResponse = {

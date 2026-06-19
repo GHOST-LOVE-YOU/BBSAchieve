@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
   pill: {
     paddingHorizontal: Spacing.two + 2,
     paddingVertical: 3,
-    borderRadius: Radius.xs,
+    borderRadius: Radius.pillLg,
     alignSelf: 'flex-start',
   },
   pillSmall: {

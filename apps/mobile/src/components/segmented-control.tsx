@@ -33,17 +33,17 @@ export function SegmentedControl({ items, selected, onChange }: Props) {
 const styles = StyleSheet.create({
   track: {
     flexDirection: 'row',
-    borderRadius: Radius.sm,
-    padding: 3,
+    borderRadius: 12,
+    padding: 4,
   },
   segment: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: Spacing.two,
-    borderRadius: Radius.xs,
+    borderRadius: 9,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

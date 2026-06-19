@@ -2,18 +2,19 @@ import React, { useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Platform,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Link } from "expo-router";
+import { useRouter } from "expo-router";
 
 import { PostCard } from "@/components/post-card";
 import { EmptyState } from "@/components/empty-state";
-import { BottomTabInset, Spacing } from "@/constants/theme";
+import { MOBILE_TABBAR_SCROLL_GAP } from "@/components/bottom-tab-visuals";
+import { Radius, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { useFeed } from "@/features/reading/useFeed";
 import type { FeedThreadItem } from "@/features/reading/types";
@@ -37,6 +38,7 @@ function boardPillColor(slug: string) {
 export default function HomeScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const feed = useFeed("bot", 15);
 
   const renderItem = useCallback(
@@ -63,35 +65,59 @@ export default function HomeScreen() {
     </View>
   ) : null;
 
-  const bottomPad = Platform.select({ ios: insets.bottom + BottomTabInset, default: BottomTabInset + Spacing.three });
+  const bottomPad = MOBILE_TABBAR_SCROLL_GAP + insets.bottom;
 
   return (
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
+      <View
+        style={[
+          styles.topbar,
+          {
+            backgroundColor: theme.canvas,
+            borderBottomColor: theme.hairlineSoft,
+            paddingTop: insets.top + 6,
+          },
+        ]}>
+        <View style={[styles.brandMark, { backgroundColor: theme.inkStrong }]}>
+          <Text style={[styles.brandLetter, { color: theme.canvas }]}>B</Text>
+        </View>
+        <Text style={[styles.brandText, { color: theme.ink }]}>
+          BYR <Text style={{ color: theme.primary }}>Achieve</Text>
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="搜索"
+          android_ripple={{ color: "transparent", borderless: true }}
+          hitSlop={8}
+          onPress={() => router.push({ pathname: "/search" })}
+          style={[
+            styles.iconButton,
+            { backgroundColor: "transparent" },
+          ]}>
+          <SearchIcon color={theme.inkSecondary} />
+        </Pressable>
+      </View>
       <FlatList
         data={feed.items}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: bottomPad, paddingHorizontal: Spacing.three }}
+        contentContainerStyle={{ paddingBottom: bottomPad }}
         contentInsetAdjustmentBehavior="automatic"
         ListHeaderComponent={
-          <View style={styles.hero}>
-            <Text style={[styles.heroTitle, { color: theme.ink }]}>
-              机器人镜像信息流
-            </Text>
-            <Text style={[styles.heroSub, { color: theme.inkSecondary }]}>
-              {feed.totalCount > 0
-                ? `共 ${feed.totalCount} 条镜像帖子`
-                : "来自 BYR 论坛的实时镜像"}
-            </Text>
-            <Link href="/search" asChild>
-              <Text
-                style={StyleSheet.flatten([
-                  styles.searchHint,
-                  { color: theme.ash, backgroundColor: theme.canvasCream },
-                ])}>
-                🔍 搜索帖子、回复、机器人…
+          <View>
+            <View style={[styles.hero, { backgroundColor: theme.surfaceBlush }]}>
+              <Text style={[styles.eyebrow, { color: theme.inkTertiary }]}>机器人镜像信息流</Text>
+              <Text style={[styles.heroTitle, { color: theme.ink }]}>
+                今天，机器人替你巡视北邮人论坛
               </Text>
-            </Link>
+              <Text style={[styles.heroSub, { color: theme.inkSecondary }]}>
+                每条镜像内容都以机器人身份发帖回帖。按最新回复排序。
+              </Text>
+              <View style={[styles.stat, { backgroundColor: "rgba(255,255,255,0.55)" }]}>
+                <Text style={[styles.statStrong, { color: theme.ink }]}>{feed.totalCount || feed.items.length}</Text>
+                <Text style={[styles.statText, { color: theme.inkSecondary }]}>今日镜像帖</Text>
+              </View>
+            </View>
           </View>
         }
         ListEmptyComponent={
@@ -106,7 +132,9 @@ export default function HomeScreen() {
           )
         }
         ListFooterComponent={footer}
-        ItemSeparatorComponent={() => <View style={{ height: Spacing.two }} />}
+        ItemSeparatorComponent={() => (
+          <View style={[styles.separator, { backgroundColor: theme.hairlineSoft }]} />
+        )}
         onEndReached={() => void feed.loadMore()}
         onEndReachedThreshold={0.5}
         refreshControl={
@@ -121,28 +149,116 @@ export default function HomeScreen() {
   );
 }
 
+function SearchIcon({ color }: { color: string }) {
+  return (
+    <View style={styles.searchIcon}>
+      <View style={[styles.searchLens, { borderColor: color }]} />
+      <View style={[styles.searchHandle, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  topbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    zIndex: 10,
+  },
+  brandMark: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandLetter: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  brandText: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: "600",
+    lineHeight: 20,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchIcon: {
+    width: 19,
+    height: 19,
+    position: "relative",
+  },
+  searchLens: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 14,
+    borderWidth: 2,
+  },
+  searchHandle: {
+    position: "absolute",
+    right: 0,
+    bottom: 2,
+    width: 8,
+    height: 2,
+    borderRadius: 2,
+    transform: [{ rotate: "45deg" }],
+  },
   hero: {
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.three,
-    gap: Spacing.two,
+    marginHorizontal: 14,
+    marginTop: 12,
+    marginBottom: 18,
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 8,
+  },
+  eyebrow: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    letterSpacing: 0,
   },
   heroTitle: {
-    fontSize: 26,
-    fontWeight: "700",
-    letterSpacing: -0.5,
+    fontSize: 20,
+    fontWeight: "500",
+    lineHeight: 26,
   },
   heroSub: {
-    fontSize: 14,
+    fontSize: 13.5,
+    lineHeight: 20,
   },
-  searchHint: {
-    fontSize: 14,
-    paddingVertical: Spacing.two + 2,
-    paddingHorizontal: Spacing.three,
-    borderRadius: 10,
-    overflow: "hidden",
-    marginTop: Spacing.two,
+  stat: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+    borderRadius: Radius.pillLg,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginTop: 4,
+  },
+  statStrong: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  statText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
   },
   center: {
     paddingVertical: Spacing.six,

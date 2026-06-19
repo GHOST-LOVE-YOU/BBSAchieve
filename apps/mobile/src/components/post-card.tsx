@@ -1,11 +1,11 @@
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from './avatar';
 import { Pill, PillColor } from './pill';
 
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -27,25 +27,24 @@ export function PostCard({
   excerpt,
   authorName,
   boardName,
-  boardSlug,
   replyCount,
   time,
   pillColor = 'blue',
   isBot,
 }: Props) {
   const theme = useTheme();
+  const router = useRouter();
 
   return (
-    <Link href={{ pathname: '/threads/[threadId]', params: { threadId } }} asChild>
-      <Pressable style={({ pressed }) => [styles.card, { backgroundColor: theme.surface }, pressed && styles.pressed]}>
-        <View style={styles.topRow}>
-          <Avatar name={authorName} size={28} color={isBot ? theme.surfaceButter : undefined} />
-          <Text style={[styles.author, { color: theme.inkSecondary }]} numberOfLines={1}>
-            {authorName}
-          </Text>
-          {time ? <Text style={[styles.time, { color: theme.ash }]}>{time}</Text> : null}
-        </View>
-
+    <Pressable
+      onPress={() => router.push({ pathname: '/threads/[threadId]', params: { threadId } })}
+      style={({ pressed }) => [
+        styles.card,
+        { backgroundColor: theme.surface },
+        pressed && { backgroundColor: theme.canvasSoft },
+      ]}>
+      <Avatar name={authorName} size={36} color={isBot ? theme.surfaceButter : undefined} />
+      <View style={styles.content}>
         <Text style={[styles.title, { color: theme.ink }]} numberOfLines={2}>
           {title}
         </Text>
@@ -58,56 +57,69 @@ export function PostCard({
 
         <View style={styles.bottomRow}>
           {boardName ? <Pill label={boardName} color={pillColor} small /> : null}
+          <Text style={[styles.author, { color: theme.inkSecondary }]} numberOfLines={1}>
+            {authorName}
+          </Text>
+          {time ? <Text style={[styles.time, { color: theme.ash }]}>· {time}</Text> : null}
           {replyCount != null && replyCount > 0 ? (
-            <Text style={[styles.replies, { color: theme.ash }]}>
-              {replyCount} 回复
-            </Text>
+            <View style={[styles.replyPill, { backgroundColor: theme.canvasSoft }]}>
+              <Text style={[styles.replies, { color: theme.inkSecondary }]}>
+                {replyCount} 回复
+              </Text>
+            </View>
           ) : null}
         </View>
-      </Pressable>
-    </Link>
+      </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
-    gap: Spacing.two,
-  },
-  pressed: {
-    opacity: 0.85,
-  },
-  topRow: {
+    width: '100%',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
+    gap: 12,
+  },
+  content: {
+    flex: 1,
+    minWidth: 0,
   },
   author: {
-    fontSize: 13,
+    fontSize: 11.5,
     fontWeight: '500',
-    flex: 1,
+    flexShrink: 1,
   },
   time: {
-    fontSize: 12,
+    fontSize: 11.5,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 22,
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 21,
+    marginTop: 2,
+    marginBottom: 4,
   },
   excerpt: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 19.5,
+    marginBottom: 6,
   },
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    marginTop: 2,
+    minHeight: 20,
+  },
+  replyPill: {
+    marginLeft: 'auto',
+    borderRadius: 50,
+    paddingHorizontal: 9,
+    paddingVertical: 2,
   },
   replies: {
-    fontSize: 12,
-    marginLeft: 'auto',
+    fontSize: 11,
+    fontWeight: '500',
   },
 });

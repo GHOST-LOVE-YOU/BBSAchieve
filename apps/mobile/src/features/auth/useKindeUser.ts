@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useMobileAuth } from "./useMobileAuth";
 
@@ -10,25 +10,48 @@ type KindeUser = {
 };
 
 export function useKindeUser() {
-  const auth = useMobileAuth();
+  const { getUserProfile, isAuthenticated } = useMobileAuth();
   const [user, setUser] = useState<KindeUser | null>(null);
+  const requestVersionRef = useRef(0);
 
   useEffect(() => {
-    if (!auth.isAuthenticated) {
-      setUser(null);
-      return;
-    }
-    void auth.getUserProfile().then((profile) => {
-      if (profile) {
-        setUser({
-          id: profile.id,
-          givenName: profile.givenName,
-          familyName: profile.familyName,
-          email: profile.email,
-        });
+    let active = true;
+    requestVersionRef.current += 1;
+    const requestVersion = requestVersionRef.current;
+
+    const load = async () => {
+      if (!isAuthenticated) {
+        if (!active || requestVersionRef.current !== requestVersion) return;
+        setUser(null);
+        return;
       }
-    });
-  }, [auth.isAuthenticated]);
+
+      try {
+        const profile = await getUserProfile();
+        if (!active || requestVersionRef.current !== requestVersion) return;
+
+        if (profile) {
+          setUser({
+            id: profile.id,
+            givenName: profile.givenName,
+            familyName: profile.familyName,
+            email: profile.email,
+          });
+        } else {
+          setUser(null);
+        }
+      } catch {
+        if (!active || requestVersionRef.current !== requestVersion) return;
+        setUser(null);
+      }
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+    };
+  }, [getUserProfile, isAuthenticated]);
 
   return user;
 }

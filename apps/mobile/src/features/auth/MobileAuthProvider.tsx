@@ -1,6 +1,6 @@
 import { KindeAuthProvider, useKindeAuth } from "@kinde/expo";
 import type { KindeAuthHook } from "@kinde/expo";
-import React, { useLayoutEffect } from "react";
+import React, { useEffect, useLayoutEffect } from "react";
 import { ActivityIndicator, Button, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -59,41 +59,51 @@ function MobileAuthGate({ children }: MobileAuthGateProps) {
   return <>{children}</>;
 }
 
+function AuthSetupIssueScreen({
+  issue,
+  logPrefix,
+}: {
+  issue: { title: string; message: string };
+  logPrefix: string;
+}) {
+  useEffect(() => {
+    if (__DEV__) {
+      console.error(logPrefix, issue);
+    }
+  }, [issue, logPrefix]);
+
+  return (
+    <View style={styles.centered}>
+      <Text style={styles.title}>{issue.title}</Text>
+      <Text style={styles.message}>{issue.message}</Text>
+    </View>
+  );
+}
+
 export function MobileAuthProvider({ children }: MobileAuthGateProps) {
   if (isMobileAuthDisabled()) {
-    if (__DEV__) {
-      console.warn("EXPO_PUBLIC_DISABLE_AUTH is enabled — bypassing Kinde authentication");
-    }
     return <>{children}</>;
   }
 
   const secureStoreRuntimeIssue = getCurrentExpoSecureStoreRuntimeIssue();
 
   if (secureStoreRuntimeIssue) {
-    if (__DEV__) {
-      console.error("Kinde SecureStore runtime unavailable:", secureStoreRuntimeIssue);
-    }
-
     return (
-      <View style={styles.centered}>
-        <Text style={styles.title}>{secureStoreRuntimeIssue.title}</Text>
-        <Text style={styles.message}>{secureStoreRuntimeIssue.message}</Text>
-      </View>
+      <AuthSetupIssueScreen
+        issue={secureStoreRuntimeIssue}
+        logPrefix="Kinde SecureStore runtime unavailable:"
+      />
     );
   }
 
   const setupIssue = getMobileAuthSetupIssue();
 
   if (setupIssue) {
-    if (__DEV__) {
-      console.error("Mobile Kinde environment unavailable:", setupIssue);
-    }
-
     return (
-      <View style={styles.centered}>
-        <Text style={styles.title}>{setupIssue.title}</Text>
-        <Text style={styles.message}>{setupIssue.message}</Text>
-      </View>
+      <AuthSetupIssueScreen
+        issue={setupIssue}
+        logPrefix="Mobile Kinde environment unavailable:"
+      />
     );
   }
 

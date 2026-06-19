@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  ColorValue,
   FlatList,
-  Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -12,8 +13,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
+import { MOBILE_TABBAR_SCROLL_GAP } from "@/components/bottom-tab-visuals";
 import { EmptyState } from "@/components/empty-state";
-import { BottomTabInset, Radius, Spacing } from "@/constants/theme";
+import { Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 import {
   fetchNotifications,
@@ -48,27 +50,44 @@ export default function NotificationsScreen() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const mountedRef = useRef(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isActive: () => boolean = () => true) => {
+    if (!isActive()) return;
     setLoading(true);
     try {
       const res = await fetchNotifications(filter);
+      if (!isActive()) return;
       setItems(res.items);
       setUnreadCount(res.unreadCount);
     } catch {
+      if (!isActive()) return;
       setItems([]);
     } finally {
+      if (!isActive()) return;
       setLoading(false);
     }
   }, [filter]);
 
   useEffect(() => {
-    void load();
+    let active = true;
+    mountedRef.current = true;
+
+    const run = async () => {
+      await load(() => active);
+    };
+
+    void run();
+
+    return () => {
+      active = false;
+      mountedRef.current = false;
+    };
   }, [load]);
 
   const handleMarkAllRead = useCallback(async () => {
     await markAllNotificationsRead();
-    void load();
+    void load(() => mountedRef.current);
   }, [load]);
 
   const handleTap = useCallback(
@@ -83,52 +102,53 @@ export default function NotificationsScreen() {
     [router],
   );
 
-  const bottomPad = Platform.select({
-    ios: insets.bottom + BottomTabInset,
-    default: BottomTabInset + Spacing.three,
-  });
+  const bottomPad = MOBILE_TABBAR_SCROLL_GAP + insets.bottom;
 
   return (
     <View style={[styles.root, { backgroundColor: theme.canvas }]}>
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.headerTop}>
+          <Text style={[styles.eyebrow, { color: theme.inkTertiary }]}>通知中心</Text>
           <Text style={[styles.title, { color: theme.ink }]}>
-            通知{unreadCount > 0 ? ` (${unreadCount})` : ""}
+            {unreadCount > 0 ? `${unreadCount} 条未读通知` : "已经全部看完啦"}
           </Text>
-          {unreadCount > 0 ? (
-            <Pressable onPress={() => void handleMarkAllRead()}>
-              <Text style={[styles.markAll, { color: theme.primary }]}>全部已读</Text>
-            </Pressable>
-          ) : null}
+          <Text style={[styles.subtitle, { color: theme.inkTertiary }]}>
+            通过你绑定的机器人收件箱送达 · 匿名
+          </Text>
         </View>
 
-        <View style={styles.filters}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filters}
+          style={styles.filtersWrap}>
           {FILTERS.map((f) => (
             <Pressable
               key={f.key}
+              android_ripple={{ color: "transparent", borderless: false }}
               onPress={() => setFilter(f.key)}
               style={[
                 styles.chip,
                 {
-                  backgroundColor: filter === f.key ? theme.primary : theme.canvasCream,
+                  backgroundColor: filter === f.key ? theme.ink : theme.canvasSoft,
                 },
               ]}>
               <Text
                 style={[
                   styles.chipText,
-                  { color: filter === f.key ? theme.onPrimary : theme.ink },
+                  { color: filter === f.key ? theme.onPrimary : theme.inkSecondary },
                 ]}>
-                {f.label}
+                {f.key === "unread" && unreadCount > 0 ? `${f.label} · ${unreadCount}` : f.label}
               </Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       </View>
 
       <FlatList
         data={items}
         keyExtractor={(n) => n.id}
-        contentContainerStyle={{ paddingHorizontal: Spacing.three, paddingBottom: bottomPad }}
+        contentContainerStyle={{ paddingBottom: bottomPad }}
         contentInsetAdjustmentBehavior="automatic"
         refreshControl={
           <RefreshControl
@@ -139,46 +159,73 @@ export default function NotificationsScreen() {
         }
         renderItem={({ item }) => (
           <Pressable
+            android_ripple={{ color: "transparent", borderless: false }}
             onPress={() => void handleTap(item)}
             style={[
               styles.notifRow,
               {
-                backgroundColor: item.readAt ? theme.surface : theme.surfaceSky,
+                backgroundColor: theme.surface,
+                borderBottomColor: theme.hairlineSoft,
               },
             ]}>
-            <View style={styles.notifContent}>
-              {item.threadTitle ? (
-                <Text style={[styles.notifTitle, { color: theme.ink }]} numberOfLines={1}>
-                  {item.threadTitle}
+            {!item.readAt ? (
+              <View style={[styles.unreadMark, { backgroundColor: theme.primary }]} />
+            ) : null}
+            <View
+              style={[
+                styles.notifIcon,
+                {
+                  backgroundColor:
+                    item.type === "system"
+                      ? theme.surfaceButter
+                      : item.type === "reply_quote"
+                        ? theme.surfaceMauve
+                        : theme.surfaceSky,
+                },
+              ]}>
+              {item.type === "system" || item.type === "reply_quote" ? (
+                <Text style={styles.notifIconText}>
+                  {item.type === "system" ? "!" : "@"}
                 </Text>
-              ) : null}
-              <Text style={[styles.notifBody, { color: theme.inkSecondary }]} numberOfLines={2}>
+              ) : (
+                <ReplyIcon color={theme.ink} />
+              )}
+            </View>
+            <View style={styles.notifContent}>
+              <Text style={[styles.notifBody, { color: theme.ink }]} numberOfLines={3}>
                 {item.body}
               </Text>
-              <View style={styles.notifMeta}>
-                {item.sourceLabel ? (
-                  <Text style={[styles.notifSource, { color: theme.ash }]}>
-                    {item.sourceLabel}
-                  </Text>
-                ) : null}
-                <Text style={[styles.notifTime, { color: theme.ash }]}>
-                  {formatTime(item.occurredAt)}
-                </Text>
-              </View>
+              <Text style={[styles.notifSource, { color: theme.inkTertiary }]} numberOfLines={1}>
+                {item.sourceLabel ?? item.threadTitle ?? "通知"}
+              </Text>
             </View>
-            {!item.readAt ? (
-              <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-            ) : null}
+            <Text style={[styles.timeAside, { color: theme.inkTertiary }]} numberOfLines={1}>
+              {formatTime(item.occurredAt)}
+            </Text>
           </Pressable>
         )}
-        ItemSeparatorComponent={() => <View style={{ height: Spacing.two }} />}
+        ListFooterComponent={
+          items.length > 0 ? (
+            <View style={styles.footerAction}>
+              <Pressable
+                android_ripple={{ color: "transparent", borderless: false }}
+                onPress={() => void handleMarkAllRead()}
+                style={[styles.footerButton, { backgroundColor: theme.canvasSoft }]}>
+                <CheckIcon color={theme.inkSecondary} />
+                <Text style={[styles.footerButtonText, { color: theme.inkSecondary }]}>
+                  全部标为已读
+                </Text>
+              </Pressable>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           loading ? (
             <View style={styles.center}>
               <ActivityIndicator />
             </View>
           ) : (
-            <EmptyState icon="🔔" title="暂无通知" message="订阅帖子后会在这里收到提醒" />
+            <EmptyState icon="🔔" title="没有通知" message="新内容会出现在这里" />
           )
         }
       />
@@ -186,76 +233,189 @@ export default function NotificationsScreen() {
   );
 }
 
+function CheckIcon({ color }: { color: ColorValue }) {
+  return (
+    <View style={styles.checkIcon}>
+      <View style={[styles.checkShort, { backgroundColor: color }]} />
+      <View style={[styles.checkLong, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
+function ReplyIcon({ color }: { color: ColorValue }) {
+  return (
+    <View style={styles.replyIcon}>
+      <View style={[styles.replyStem, { backgroundColor: color }]} />
+      <View style={[styles.replyShaft, { backgroundColor: color }]} />
+      <View style={[styles.replyHeadTop, { backgroundColor: color }]} />
+      <View style={[styles.replyHeadBottom, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.two,
-    gap: Spacing.three,
+    paddingTop: 12,
+    paddingBottom: 6,
+    gap: 8,
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  headerTop: {
+    paddingHorizontal: 16,
+  },
+  eyebrow: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    letterSpacing: 0,
+    marginBottom: 4,
   },
   title: {
-    fontSize: 26,
-    fontWeight: "700",
-    letterSpacing: -0.5,
+    fontSize: 20,
+    fontWeight: "500",
+    lineHeight: 26,
   },
-  markAll: {
-    fontSize: 14,
-    fontWeight: "600",
+  subtitle: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 4,
   },
   filters: {
     flexDirection: "row",
     gap: Spacing.two,
+    paddingHorizontal: 14,
+  },
+  filtersWrap: {
+    flexGrow: 0,
   },
   chip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one + 2,
-    borderRadius: Radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 50,
   },
   chipText: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12.5,
+    fontWeight: "500",
   },
   notifRow: {
-    borderRadius: Radius.lg,
-    padding: Spacing.three,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: Spacing.two,
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    position: "relative",
+  },
+  unreadMark: {
+    position: "absolute",
+    left: 6,
+    top: 22,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  notifIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifIconText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  replyIcon: {
+    width: 16,
+    height: 16,
+    position: "relative",
+  },
+  replyStem: {
+    position: "absolute",
+    left: 4,
+    top: 4.5,
+    width: 2,
+    height: 5.5,
+    borderRadius: 2,
+  },
+  replyShaft: {
+    position: "absolute",
+    left: 4,
+    top: 9,
+    width: 8,
+    height: 2,
+    borderRadius: 2,
+  },
+  replyHeadTop: {
+    position: "absolute",
+    left: 2.7,
+    top: 7.3,
+    width: 4.8,
+    height: 2,
+    borderRadius: 2,
+    transform: [{ rotate: "-40deg" }],
+  },
+  replyHeadBottom: {
+    position: "absolute",
+    left: 2.7,
+    top: 9.7,
+    width: 4.8,
+    height: 2,
+    borderRadius: 2,
+    transform: [{ rotate: "40deg" }],
   },
   notifContent: {
     flex: 1,
-    gap: 4,
-  },
-  notifTitle: {
-    fontSize: 15,
-    fontWeight: "600",
   },
   notifBody: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  notifMeta: {
-    flexDirection: "row",
-    gap: Spacing.two,
-    marginTop: 2,
+    fontSize: 13.5,
+    lineHeight: 20.25,
   },
   notifSource: {
-    fontSize: 12,
+    fontSize: 11.5,
+    marginTop: 3,
   },
-  notifTime: {
-    fontSize: 12,
+  timeAside: {
+    fontSize: 11,
+    paddingLeft: 2,
   },
-  dot: {
+  footerAction: {
+    alignItems: "center",
+    padding: 14,
+  },
+  footerButton: {
+    borderRadius: 50,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  footerButtonText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+  },
+  checkIcon: {
+    width: 13,
+    height: 13,
+    position: "relative",
+  },
+  checkShort: {
+    position: "absolute",
+    left: 2,
+    top: 7,
+    width: 5,
+    height: 2,
+    borderRadius: 2,
+    transform: [{ rotate: "45deg" }],
+  },
+  checkLong: {
+    position: "absolute",
+    left: 5,
+    top: 5,
     width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 6,
+    height: 2,
+    borderRadius: 2,
+    transform: [{ rotate: "-50deg" }],
   },
   center: {
     paddingVertical: Spacing.six,
