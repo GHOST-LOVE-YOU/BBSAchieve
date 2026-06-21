@@ -101,7 +101,7 @@ docker build -f Dockerfile.web -t bbs-web:local .
 其中：
 
 - `WEB_SCHEDULER_ENABLED=false` 可用于本地禁用定时任务
-- `WEB_SCHEDULER_RUN_ON_BOOT=true` 控制进程启动后是否立即执行一次
+- `WEB_SCHEDULER_RUN_ON_BOOT=true` 控制进程启动后是否立即执行一次；默认不在启动时立即跑同步，避免云端重启时集中触发抓取
 
 ```bash
 docker run --rm -p 3000:3000 \

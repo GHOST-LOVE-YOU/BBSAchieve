@@ -30,10 +30,13 @@ describe("boardCatalog", () => {
     );
   });
 
-  it("derives one scheduled task for every board with the configured sync windows", () => {
+  it("derives scheduled tasks only for whitelisted boards with configured sync windows", () => {
     const scheduledTasks = getScheduledBoardTasks();
 
-    expect(scheduledTasks).toHaveLength(boardCatalog.length);
+    expect(scheduledTasks.map((task) => task.boardName)).toEqual([
+      "JobInfo",
+      "IWhisper",
+    ]);
     expect(scheduledTasks.find((task) => task.boardName === "JobInfo")).toMatchObject({
       taskKey: "job-info_recent_sync",
       title: "JobInfo 最近内容同步",
@@ -56,9 +59,6 @@ describe("boardCatalog", () => {
       enabled: true,
       runnerType: "byr_sync_recent_window",
     });
-    expect(scheduledTasks.find((task) => task.boardName === "Advertising")).toMatchObject({
-      intervalMinutes: 1440,
-      windowMinutes: 1560,
-    });
+    expect(scheduledTasks.find((task) => task.boardName === "Advertising")).toBeUndefined();
   });
 });

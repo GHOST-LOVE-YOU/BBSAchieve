@@ -25,6 +25,7 @@ describe("startWebScheduler", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     resetWebSchedulerState();
   });
@@ -67,6 +68,58 @@ describe("startWebScheduler", () => {
     expect(registerSpy).toHaveBeenCalledTimes(enabledTaskCount);
   });
 
+  it("does not run scheduled tasks immediately unless WEB_SCHEDULER_RUN_ON_BOOT is true", async () => {
+    vi.stubEnv("WEB_SCHEDULER_ENABLED", "true");
+    const runScheduledTask = vi.fn();
+
+    vi.doMock("@/src/server/scheduler/runScheduledTask", () => ({
+      runScheduledTask,
+    }));
+
+    const { startWebScheduler } = await import(
+      "@/src/server/scheduler/webScheduler"
+    );
+
+    await startWebScheduler();
+
+    expect(runScheduledTask).not.toHaveBeenCalled();
+  });
+
+  it("caps long timer delays below the Node timeout overflow threshold", async () => {
+    vi.stubEnv("WEB_SCHEDULER_ENABLED", "true");
+    const timeoutSpy = vi
+      .spyOn(globalThis, "setTimeout")
+      .mockImplementation(() => ({ unref: vi.fn() }) as never);
+
+    const { startWebScheduler } = await import(
+      "@/src/server/scheduler/webScheduler"
+    );
+
+    await startWebScheduler();
+
+    const delays = timeoutSpy.mock.calls.map((call) => call[1]);
+    expect(delays).toContain(2_147_483_647);
+    expect(delays).not.toContain(2_592_000_000);
+  });
+
+  it("runs scheduled tasks on startup when WEB_SCHEDULER_RUN_ON_BOOT is true", async () => {
+    vi.stubEnv("WEB_SCHEDULER_ENABLED", "true");
+    vi.stubEnv("WEB_SCHEDULER_RUN_ON_BOOT", "true");
+    const runScheduledTask = vi.fn();
+
+    vi.doMock("@/src/server/scheduler/runScheduledTask", () => ({
+      runScheduledTask,
+    }));
+
+    const { startWebScheduler } = await import(
+      "@/src/server/scheduler/webScheduler"
+    );
+
+    await startWebScheduler();
+
+    expect(runScheduledTask).toHaveBeenCalledTimes(enabledTaskCount);
+  });
+
   it("allows retry when task registration fails before startup completes", async () => {
     vi.stubEnv("WEB_SCHEDULER_ENABLED", "true");
     const registerSpy = vi
@@ -98,6 +151,7 @@ describe("instrumentation register", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     resetWebSchedulerState();
   });

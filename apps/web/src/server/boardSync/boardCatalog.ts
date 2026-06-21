@@ -24,6 +24,7 @@ export type BoardCatalogEntry = BoardCatalogSectionEntry & {
 const DEFAULT_FULL_SYNC_WINDOW_MINUTES = 60 * 24 * 365 * 30;
 const DEFAULT_SCHEDULED_INTERVAL_MINUTES = 60 * 24 * 30;
 const DEFAULT_SCHEDULED_WINDOW_MINUTES = 60 * 24 * 31;
+const SCHEDULED_SYNC_BOARD_NAMES = new Set(["JobInfo", "IWhisper"]);
 
 function createBoardEntry(input: {
   boardName: string;
@@ -43,7 +44,9 @@ function createBoardEntry(input: {
       `管理员可手动全量抓取 ${input.title}，并按配置定时同步最近内容。`,
     fullSyncEnabled: true,
     fullSyncWindowMinutes: DEFAULT_FULL_SYNC_WINDOW_MINUTES,
-    scheduledSyncEnabled: input.scheduledSyncEnabled ?? false,
+    scheduledSyncEnabled:
+      input.scheduledSyncEnabled === true &&
+      SCHEDULED_SYNC_BOARD_NAMES.has(input.boardName),
     scheduledIntervalMinutes:
       input.scheduledIntervalMinutes ?? DEFAULT_SCHEDULED_INTERVAL_MINUTES,
     scheduledWindowMinutes:

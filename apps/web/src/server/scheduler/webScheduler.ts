@@ -5,6 +5,8 @@ import { scheduledTasks, type ScheduledTaskDefinition } from "./taskRegistry";
 
 type SchedulerIntervalHandle = ReturnType<typeof setInterval>;
 
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 type WebSchedulerState = {
   started: boolean;
   intervalHandles: SchedulerIntervalHandle[];
@@ -32,7 +34,7 @@ function readEnabledFlag() {
 
 function readRunOnBootFlag() {
   const value = process.env.WEB_SCHEDULER_RUN_ON_BOOT?.trim().toLowerCase();
-  return value !== "false";
+  return value === "true";
 }
 
 async function runTask(task: ScheduledTaskDefinition) {
@@ -58,15 +60,26 @@ function defaultScheduleTaskLoop(task: ScheduledTaskDefinition) {
   }
 
   const intervalMs = task.intervalMinutes * 60 * 1000;
-  const intervalHandle = setInterval(() => {
-    void runTask(task);
-  }, intervalMs);
 
-  if (typeof intervalHandle.unref === "function") {
-    intervalHandle.unref();
-  }
+  const scheduleNextRun = (delayMs: number) => {
+    const timerHandle = setTimeout(() => {
+      if (delayMs > MAX_TIMER_DELAY_MS) {
+        scheduleNextRun(delayMs - MAX_TIMER_DELAY_MS);
+        return;
+      }
 
-  state.intervalHandles.push(intervalHandle);
+      void runTask(task);
+      scheduleNextRun(intervalMs);
+    }, Math.min(delayMs, MAX_TIMER_DELAY_MS));
+
+    if (typeof timerHandle.unref === "function") {
+      timerHandle.unref();
+    }
+
+    state.intervalHandles.push(timerHandle);
+  };
+
+  scheduleNextRun(intervalMs);
 }
 
 export async function startWebScheduler(deps?: {
