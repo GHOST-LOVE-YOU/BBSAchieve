@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogOut } from "lucide-react";
 
 import { AppShell } from "@/src/components/forum/AppShell";
 import { HeroBand } from "@/src/components/forum/HeroBand";
@@ -43,6 +44,7 @@ export default async function ProfilePage({
   if (!profile) {
     return (
       <AppShell activeKey="profile">
+        <LogoutAction />
         <EmptyState
           icon="🙈"
           title="尚未创建本地档案"
@@ -77,6 +79,7 @@ export default async function ProfilePage({
       activeKey="profile"
       unreadNotificationCount={notifSummary.unreadCount}
     >
+      <LogoutAction />
       <HeroBand
         eyebrow="个人中心"
         title={`你好，${profile.user.displayName}`}
@@ -179,5 +182,20 @@ export default async function ProfilePage({
         </Card>
       </div>
     </AppShell>
+  );
+}
+
+function LogoutAction() {
+  return (
+    <div className="mb-4 flex justify-end">
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- 退出认证必须完整页面导航，避免客户端路由和预取。 */}
+      <a
+        href="/api/auth/logout"
+        className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface)] px-4 py-2 text-sm font-medium text-[color:var(--ink-secondary)] transition-colors hover:bg-[color:var(--canvas-soft)] hover:text-[color:var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--primary)]"
+      >
+        <LogOut aria-hidden className="h-4 w-4" />
+        退出登录
+      </a>
+    </div>
   );
 }
