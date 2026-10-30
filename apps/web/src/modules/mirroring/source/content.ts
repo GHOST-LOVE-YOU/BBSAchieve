@@ -1,4 +1,6 @@
 import { load } from "cheerio";
+import emoticons from "@/src/lib/byr-emoticons.json";
+const knownEmoticons = new Set(emoticons);
 export function plainText(html: string) {
   const $ = load(html);
   $("script,style,iframe,object").remove();
@@ -7,7 +9,10 @@ export function plainText(html: string) {
     $(el).append("\n");
   });
   $("img").each((_, el) => {
-    $(el).replaceWith($(el).attr("alt") ?? "[图片]");
+    const alt = $(el).attr("alt") ?? "";
+    const match = ($(el).attr("src") ?? "").match(/\/img\/ubb\/(em[a-c]?)\/(\d+)\.gif(?:\?.*)?$/);
+    const name = match ? match[1] + match[2] : alt.replace(/^\[|\]$/g, "");
+    $(el).replaceWith(knownEmoticons.has(name) ? `[${name}]` : alt || "[图片]");
   });
   $("a").each((_, el) => {
     const href = $(el).attr("href") ?? "";

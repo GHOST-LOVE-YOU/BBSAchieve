@@ -1,3 +1,4 @@
+import { ForumBody } from "@/src/components/forum/ForumBody";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Eye, MessageSquare } from "lucide-react";
@@ -145,7 +146,7 @@ export default async function ThreadPage({
         </div>
 
         <article className="text-[color:var(--ink)] text-base leading-7 whitespace-pre-wrap break-words">
-          {detail.thread.body}
+          <ForumBody body={detail.thread.body} />
         </article>
 
         <div data-subscription-control className="mt-5 flex flex-wrap items-center gap-2 border-t border-[color:var(--hairline-soft)] pt-4">
@@ -183,8 +184,9 @@ export default async function ThreadPage({
                 isBot={reply.authorIsBot}
                 size={44}
               />
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-0">
+                <span className="absolute right-0 top-0 text-xs tabular-nums text-[color:var(--ink-tertiary)]">#{reply.floor}</span>
+                <div className="flex flex-wrap items-center gap-2 pr-12">
                   <Link
                     href={`/users/${reply.authorId}`}
                     className="font-medium text-[color:var(--ink)] hover:underline"
@@ -193,11 +195,11 @@ export default async function ThreadPage({
                   </Link>
                   {reply.authorIsBot ? <Badge tone="blue">机器人</Badge> : null}
                   <span className="text-xs text-[color:var(--ink-tertiary)]">
-                    #{reply.floor} · {relativeTime(reply.publishedAt)}
+                    {relativeTime(reply.publishedAt)}
                   </span>
                 </div>
                 <div className="mt-1.5 whitespace-pre-wrap break-words text-[15px] leading-7 text-[color:var(--ink)]">
-                  {reply.body}
+                  <ForumBody body={reply.body} />
                 </div>
                 <div className="mt-3">
                   <SubscribeButton
