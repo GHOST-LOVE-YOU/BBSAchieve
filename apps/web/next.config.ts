@@ -3,6 +3,7 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  skipTrailingSlashRedirect: true,
   outputFileTracingRoot: path.join(__dirname, "../../"),
   async headers() {
     const protectedCacheHeaders = [

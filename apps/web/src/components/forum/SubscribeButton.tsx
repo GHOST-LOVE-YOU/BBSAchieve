@@ -53,14 +53,6 @@ export function SubscribeButton({
         const payload = (await response.json().catch(() => ({}))) as {
           error?: string;
         };
-        if (response.status === 401) {
-          // Bounce to Kinde login. Preserve the page so the user lands back
-          // on the thread they were trying to subscribe to.
-          window.location.href = `/api/auth/login?post_login_redirect_url=${encodeURIComponent(
-            window.location.pathname + window.location.search,
-          )}`;
-          return;
-        }
         throw new Error(payload.error ?? "订阅失败");
       }
       const payload = (await response.json()) as { id: string };

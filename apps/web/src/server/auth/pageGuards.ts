@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { prisma } from "@/src/server/db/client";
 
@@ -6,17 +6,11 @@ import { getKindeAdminOrgCode } from "./env";
 import { ensureLocalHumanUser } from "./localUser";
 import { getWebSessionIdentity } from "./webSession";
 
-function loginUrl(returnTo: string) {
-  const searchParams = new URLSearchParams({
-    post_login_redirect_url: returnTo,
-  });
-  return `/api/auth/login?${searchParams.toString()}`;
-}
-
-export async function requireWebPageUser(returnTo: string) {
-  const identity = await getWebSessionIdentity();
+export async function requireWebPageUser(_returnTo: string) {
+  void _returnTo;
+  const identity = await getWebSessionIdentity().catch(() => null);
   if (!identity) {
-    redirect(loginUrl(returnTo));
+    notFound();
   }
 
   await ensureLocalHumanUser(prisma, identity);

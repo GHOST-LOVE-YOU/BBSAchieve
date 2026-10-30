@@ -232,10 +232,10 @@ describe("public api routes", () => {
     );
   });
 
-  it("returns 401 for anonymous thread detail API access", async () => {
+  it("returns 404 for anonymous thread detail API access", async () => {
     authGuardMock.requireRouteUser.mockResolvedValueOnce({
       ok: false,
-      response: Response.json({ error: "Unauthorized" }, { status: 401 }),
+      response: new Response("Not Found", { status: 404 }),
     });
 
     const response = await getThread(
@@ -243,8 +243,8 @@ describe("public api routes", () => {
       { params: Promise.resolve({ threadId: "first-offer" }) },
     );
 
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
+    expect(response.status).toBe(404);
+    await expect(response.text()).resolves.toBe("Not Found");
     expect(publicReadingServiceMock.getThread).not.toHaveBeenCalled();
   });
 
@@ -295,10 +295,10 @@ describe("public api routes", () => {
     );
   });
 
-  it("returns 401 for anonymous thread replies API access", async () => {
+  it("returns 404 for anonymous thread replies API access", async () => {
     authGuardMock.requireRouteUser.mockResolvedValueOnce({
       ok: false,
-      response: Response.json({ error: "Unauthorized" }, { status: 401 }),
+      response: new Response("Not Found", { status: 404 }),
     });
 
     const response = await getThreadRepliesFeed(
@@ -308,8 +308,8 @@ describe("public api routes", () => {
       { params: Promise.resolve({ threadId: "first-offer" }) },
     );
 
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
+    expect(response.status).toBe(404);
+    await expect(response.text()).resolves.toBe("Not Found");
     expect(publicReadingServiceMock.getThreadRepliesFeed).not.toHaveBeenCalled();
   });
 

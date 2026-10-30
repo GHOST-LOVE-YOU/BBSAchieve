@@ -38,7 +38,7 @@ function isLocalAuthDisabled() {
 }
 
 function unauthorizedResponse() {
-  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  return new NextResponse("Not Found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
 }
 
 function forbiddenResponse() {

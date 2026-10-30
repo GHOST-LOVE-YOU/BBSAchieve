@@ -6,3 +6,5 @@ packages/*/dist/
 kinde_export/
 .claude/settings.json
 .idea/
+
+/.env
