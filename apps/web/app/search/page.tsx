@@ -32,18 +32,20 @@ export default async function SearchResultsPage({
   searchParams?: Promise<{
     q?: string | string[];
     scope?: string | string[];
+    page?: string | string[];
   }>;
 }) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const query = pickString(resolvedSearchParams.q, "").trim();
   const scope = parseScope(resolvedSearchParams.scope);
+  const rawPage = Number.parseInt(pickString(resolvedSearchParams.page, "1"), 10);
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
 
   const results = query
-    ? await searchForum({ query, scope, limit: 25 })
-    : { posts: [], replies: [], users: [] };
+    ? await searchForum({ query, scope, page, perPage: 25 })
+    : { posts: [], replies: [], users: [], page, perPage: 25, totals: { posts: 0, replies: 0, users: 0 } };
 
-  const totalHits =
-    results.posts.length + results.replies.length + results.users.length;
+  const totalHits = results.totals.posts + results.totals.replies + results.totals.users;
 
   return (
     <AppShell activeKey="search">
@@ -63,7 +65,7 @@ export default async function SearchResultsPage({
         tone="butter"
       />
 
-      <ScopeNav query={query} scope={scope} counts={results} />
+      <ScopeNav query={query} scope={scope} counts={results.totals} page={page} />
 
       {!query ? (
         <EmptyState
@@ -74,7 +76,7 @@ export default async function SearchResultsPage({
       ) : null}
 
       {query && (scope === "all" || scope === "posts") ? (
-        <ScopeBlock title="帖子" count={results.posts.length}>
+        <ScopeBlock title="帖子" count={results.totals.posts}>
           {results.posts.length === 0 ? (
             <EmptyState
               title="暂无匹配的帖子"
@@ -105,7 +107,7 @@ export default async function SearchResultsPage({
       ) : null}
 
       {query && (scope === "all" || scope === "replies") ? (
-        <ScopeBlock title="回复" count={results.replies.length}>
+        <ScopeBlock title="回复" count={results.totals.replies}>
           {results.replies.length === 0 ? (
             <EmptyState
               title="暂无匹配的回复"
@@ -135,7 +137,7 @@ export default async function SearchResultsPage({
       ) : null}
 
       {query && (scope === "all" || scope === "users") ? (
-        <ScopeBlock title="机器人" count={results.users.length}>
+        <ScopeBlock title="机器人" count={results.totals.users}>
           {results.users.length === 0 ? (
             <EmptyState
               title="暂无匹配的机器人"
@@ -173,6 +175,7 @@ export default async function SearchResultsPage({
           )}
         </ScopeBlock>
       ) : null}
+      {query ? <SearchPagination query={query} scope={scope} page={page} totalPages={Math.max(1, Math.ceil((scope === "posts" ? results.totals.posts : scope === "replies" ? results.totals.replies : scope === "users" ? results.totals.users : Math.max(results.totals.posts, results.totals.replies, results.totals.users)) / results.perPage))} /> : null}
     </AppShell>
   );
 }
@@ -181,16 +184,18 @@ function ScopeNav({
   query,
   scope,
   counts,
+  page,
 }: {
   query: string;
   scope: SearchScope | "all";
-  counts: { posts: unknown[]; replies: unknown[]; users: unknown[] };
+  counts: { posts: number; replies: number; users: number };
+  page: number;
 }) {
   const items = [
-    { key: "all", label: "全部", n: counts.posts.length + counts.replies.length + counts.users.length },
-    { key: "posts", label: "帖子", n: counts.posts.length },
-    { key: "replies", label: "回复", n: counts.replies.length },
-    { key: "users", label: "机器人", n: counts.users.length },
+    { key: "all", label: "全部", n: counts.posts + counts.replies + counts.users },
+    { key: "posts", label: "帖子", n: counts.posts },
+    { key: "replies", label: "回复", n: counts.replies },
+    { key: "users", label: "机器人", n: counts.users },
   ] as const;
   return (
     <div className="mb-4 flex flex-wrap items-center gap-1 rounded-xl bg-[color:var(--canvas-soft)] p-1">
@@ -199,6 +204,7 @@ function ScopeNav({
         const params = new URLSearchParams();
         if (query) params.set("q", query);
         if (item.key !== "all") params.set("scope", item.key);
+        if (page !== 1) params.set("page", String(page));
         return (
           <Link
             key={item.key}
@@ -244,4 +250,10 @@ function ScopeBlock({
       {children}
     </section>
   );
+}
+
+function SearchPagination({query,scope,page,totalPages}:{query:string;scope:SearchScope|"all";page:number;totalPages:number}) {
+ const link=(next:number)=>{const p=new URLSearchParams({q:query});if(scope!=="all")p.set("scope",scope);if(next>1)p.set("page",String(next));return `/search?${p}`;};
+ if(totalPages<=1)return null;
+ return <nav aria-label="搜索结果分页" className="mt-6 flex items-center justify-between rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface)] px-4 py-3 text-sm"><span className="text-[color:var(--ink-secondary)]">第 {page} / {totalPages} 页</span><div className="flex gap-2">{page>1?<Link href={link(page-1)} className="rounded-lg px-3 py-2 hover:bg-[color:var(--canvas-soft)]">上一页</Link>:null}{page<totalPages?<Link href={link(page+1)} className="rounded-lg bg-[color:var(--ink)] px-3 py-2 text-[color:var(--on-primary)]">下一页</Link>:null}</div></nav>;
 }
