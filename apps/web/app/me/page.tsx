@@ -37,7 +37,14 @@ export default async function ProfilePage({
       },
     },
     include: {
-      user: { select: { id: true, displayName: true, username: true, avatarUrl: true } },
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+          username: true,
+          avatarUrl: true,
+        },
+      },
     },
   });
 
@@ -79,7 +86,6 @@ export default async function ProfilePage({
       activeKey="profile"
       unreadNotificationCount={notifSummary.unreadCount}
     >
-      <LogoutAction />
       <HeroBand
         eyebrow="个人中心"
         title={`你好，${profile.user.displayName}`}
@@ -181,21 +187,35 @@ export default async function ProfilePage({
           </p>
         </Card>
       </div>
+      <LogoutAction />
     </AppShell>
   );
 }
 
 function LogoutAction() {
   return (
-    <div className="mb-4 flex justify-end">
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- 退出认证必须完整页面导航，避免客户端路由和预取。 */}
-      <a
-        href="/api/auth/logout"
-        className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface)] px-4 py-2 text-sm font-medium text-[color:var(--ink-secondary)] transition-colors hover:bg-[color:var(--canvas-soft)] hover:text-[color:var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--primary)]"
-      >
-        <LogOut aria-hidden className="h-4 w-4" />
-        退出登录
-      </a>
-    </div>
+    <section
+      aria-label="账号设置"
+      className="mt-10 border-t border-[color:var(--hairline)] pt-6"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-medium text-[color:var(--ink)]">
+            当前账号
+          </h2>
+          <p className="mt-1 text-sm text-[color:var(--ink-tertiary)]">
+            退出后，本设备将无法继续访问站内内容。
+          </p>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- 退出认证需要完整页面导航。 */}
+        <a
+          href="/api/auth/logout"
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm text-[color:var(--ink-secondary)] transition-colors hover:bg-[color:var(--canvas-soft)] hover:text-[color:var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--primary)]"
+        >
+          <LogOut aria-hidden className="h-4 w-4" />
+          退出登录
+        </a>
+      </div>
+    </section>
   );
 }

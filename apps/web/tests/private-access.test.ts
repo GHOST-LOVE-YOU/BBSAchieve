@@ -18,7 +18,7 @@ async function expectHidden(req: NextRequest) {
 }
 describe("private site boundary", () => {
   beforeEach(() => { vi.resetAllMocks(); });
-  it.each(["/", "/threads/example", "/search", "/admin", "/api/public/feed", "/admin/api/imports/byr-sync", "/_next/static/example.js", "/favicon.ico", "/robots.txt", "/missing", "/?invitation_code=anything"])("hides anonymous %s", async path => {
+  it.each(["/", "/threads/example", "/search", "/admin", "/api/public/feed", "/api/internal/bots/actions", "/admin/api/imports/byr-sync", "/_next/static/example.js", "/favicon.ico", "/robots.txt", "/missing", "/?invitation_code=anything"])("hides anonymous %s", async path => {
     await expectHidden(request(path));
     expect(mocks.withAuth).not.toHaveBeenCalled();
   });
@@ -53,4 +53,13 @@ describe("private site boundary", () => {
     mocks.verifyBearerToken.mockRejectedValue(new Error("bad signature"));
     await expectHidden(request("/api/public/feed", { authorization: "Bearer forged" }));
   });
+  it("only permits the private publishing API with its dedicated secret", async () => {
+    vi.stubEnv("BOT_PUBLISH_TOKEN", "a".repeat(64));
+    try {
+      await expectHidden(request("/api/internal/bots/actions", { authorization: "Bearer wrong" }));
+      const response = await proxy(request("/api/internal/bots/actions", { authorization: "Bearer " + "a".repeat(64) }));
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    } finally { vi.unstubAllEnvs(); }
+  });
+
 });

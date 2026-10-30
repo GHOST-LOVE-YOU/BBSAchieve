@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig, configDefaults } from "vitest/config";
 import { resolve } from "node:path";
 
 export default defineConfig({
@@ -19,5 +19,6 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    exclude: [...configDefaults.exclude, "tests/e2e/**", "**/._*"],
   },
 });

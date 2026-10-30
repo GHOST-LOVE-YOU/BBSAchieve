@@ -9,7 +9,13 @@
     "test": "vitest run",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test"
+    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "dev:setup": "pnpm db:up && pnpm --filter @bbs/web exec tsx src/modules/mirroring/dev/setup.ts",
+    "dev:local": "pnpm --filter @bbs/web exec next dev --webpack --hostname 127.0.0.1 --port 3307",
+    "mirror:tick": "pnpm --filter @bbs/web exec tsx src/modules/mirroring/dev/cli.ts tick",
+    "mirror:probe": "pnpm --filter @bbs/web exec tsx src/modules/mirroring/dev/cli.ts probe",
+    "mirror:test": "pnpm --filter @bbs/web exec vitest run tests/mirroring tests/private-access.test.ts && pnpm --filter @bbs/web exec tsx src/modules/mirroring/dev/integration.ts",
+    "ui:test": "pnpm --filter @bbs/web exec playwright test"
   },
   "pnpm": {
     "overrides": {

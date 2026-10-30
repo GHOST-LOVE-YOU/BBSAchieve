@@ -15,6 +15,14 @@ function hiddenNotFound() {
 
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+  if (pathname === "/api/internal/bots/actions") {
+    const { authorizedBotRequest } = await import("./src/modules/mirroring/publishing/auth");
+    return authorizedBotRequest(request) ? privateResponse(NextResponse.next()) : hiddenNotFound();
+  }
+  const { localDevelopmentHost } = await import("./src/modules/mirroring/dev/auth");
+  if (localDevelopmentHost(request.headers.get("host")) && !pathname.startsWith("/api/auth/")) {
+    return privateResponse(NextResponse.next());
+  }
   // 只放行明确的登录入口和 OAuth 回调，不公开 SDK 的注册、setup 等入口。
   if (pathname === "/api/auth/login" || pathname === "/api/auth/kinde_callback") {
     return privateResponse(NextResponse.next());

@@ -8,3 +8,9 @@ kinde_export/
 .idea/
 
 /.env
+
+# macOS 外置卷元数据
+._*
+
+apps/web/test-results/
+apps/web/playwright-report/

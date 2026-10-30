@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { localDevelopmentHost, localDevelopmentIdentity } from "@/src/modules/mirroring/dev/auth";
 import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 
 import { identityFromJwtClaims, type KindeIdentity } from "./identity";
@@ -57,6 +59,7 @@ export function identityFromWebSession(input: {
 }
 
 export async function getWebSessionIdentity(): Promise<KindeIdentity | null> {
+  if (localDevelopmentHost((await headers()).get("host"))) return localDevelopmentIdentity();
   const session = getKindeServerSession();
   const isAuthenticated = await session.isAuthenticated();
 

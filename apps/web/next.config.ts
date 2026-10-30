@@ -3,6 +3,7 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  turbopack: { root: path.join(__dirname, "../../") },
   skipTrailingSlashRedirect: true,
   outputFileTracingRoot: path.join(__dirname, "../../"),
   async headers() {

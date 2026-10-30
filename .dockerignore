@@ -15,3 +15,7 @@ docs
 *.log
 
 kinde_export
+
+**/._*
+.agents
+.impeccable

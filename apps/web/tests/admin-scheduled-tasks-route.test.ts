@@ -1,126 +1,63 @@
+// @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const routeMocks = vi.hoisted(() => ({
-  prisma: {},
-  runScheduledTask: vi.fn(),
-}));
-
-const adminAuthGuardMock = vi.hoisted(() => ({
-  requireAdminRouteUser: vi.fn(),
-}));
-
-vi.mock("@/src/server/db/client", () => ({
-  prisma: routeMocks.prisma,
-}));
-
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), queue: vi.fn() }));
 vi.mock("@/src/server/auth/routeGuards", () => ({
-  requireAdminRouteUser: adminAuthGuardMock.requireAdminRouteUser,
+  requireAdminRouteUser: mocks.auth,
 }));
-
-vi.mock("@/src/server/scheduler/runScheduledTask", () => ({
-  runScheduledTask: routeMocks.runScheduledTask,
+vi.mock("@/src/server/db/client", () => ({ prisma: {} }));
+vi.mock("@/src/modules/mirroring/scheduling/control", () => ({
+  queueBoard: mocks.queue,
 }));
-
 import { POST } from "../app/admin/api/scheduled-tasks/[taskKey]/run/route";
-
-describe("admin scheduled tasks run route", () => {
+describe("手动定时任务入口", () => {
   beforeEach(() => {
-    routeMocks.runScheduledTask.mockReset();
-    adminAuthGuardMock.requireAdminRouteUser.mockReset();
-    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValue({
-      ok: true,
-      identity: {
-        provider: "kinde",
-        subject: "kp_admin_user",
-        orgCodes: ["org_ed7de8344b99"],
-      },
-    });
+    vi.resetAllMocks();
+    mocks.auth.mockResolvedValue({ ok: true });
+    mocks.queue.mockResolvedValue({ id: "run" });
   });
-
-  it("returns 403 before running a scheduled task when admin auth fails", async () => {
-    adminAuthGuardMock.requireAdminRouteUser.mockResolvedValueOnce({
+  it("未授权不入队", async () => {
+    mocks.auth.mockResolvedValue({
       ok: false,
-      response: Response.json({ error: "Forbidden" }, { status: 403 }),
+      response: new Response("Not Found", { status: 404 }),
     });
-
-    const response = await POST(new Request("http://localhost"), {
-      params: Promise.resolve({ taskKey: "iwhisper_recent_sync" }),
-    });
-
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({ error: "Forbidden" });
-    expect(routeMocks.runScheduledTask).not.toHaveBeenCalled();
+    expect(
+      (
+        await POST(new Request("http://localhost"), {
+          params: Promise.resolve({ taskKey: "iwhisper_recent_sync" }),
+        })
+      ).status,
+    ).toBe(404);
+    expect(mocks.queue).not.toHaveBeenCalled();
   });
-
-  it("runs a scheduled task immediately by task key", async () => {
-    routeMocks.runScheduledTask.mockResolvedValue({
-      id: "run-1",
-      status: "succeeded",
-    });
-
-    const response = await POST(new Request("http://localhost"), {
+  it("只入队，不在 HTTP 请求中执行爬取", async () => {
+    const r = await POST(new Request("http://localhost", { method: "POST" }), {
       params: Promise.resolve({ taskKey: "iwhisper_recent_sync" }),
     });
-
-    expect(routeMocks.runScheduledTask).toHaveBeenCalledWith({
-      prisma: routeMocks.prisma,
-      task: expect.objectContaining({
-        taskKey: "iwhisper_recent_sync",
-      }),
-      triggerSource: "manual",
-    });
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    expect(r.status).toBe(202);
+    expect(await r.json()).toEqual({
       ok: true,
-      run: { id: "run-1", status: "succeeded" },
+      status: "queued",
+      runId: "run",
     });
   });
-
-  it("returns a failure response when the run finishes with failed status", async () => {
-    routeMocks.runScheduledTask.mockResolvedValue({
-      id: "run-2",
-      status: "failed",
-      errorMessage: "sync boom",
-    });
-
-    const response = await POST(new Request("http://localhost"), {
-      params: Promise.resolve({ taskKey: "iwhisper_recent_sync" }),
-    });
-
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({
-      ok: false,
-      error: "sync boom",
-      run: {
-        id: "run-2",
-        status: "failed",
-        errorMessage: "sync boom",
-      },
-    });
+  it("未知任务返回 404", async () => {
+    expect(
+      (
+        await POST(new Request("http://localhost"), {
+          params: Promise.resolve({ taskKey: "missing" }),
+        })
+      ).status,
+    ).toBe(404);
   });
-
-  it("redirects form submissions back to the admin page instead of rendering raw json", async () => {
-    routeMocks.runScheduledTask.mockResolvedValue({
-      id: "run-3",
-      status: "succeeded",
-    });
-
-    const response = await POST(
-      new Request("http://localhost/admin/api/scheduled-tasks/iwhisper_recent_sync/run", {
+  it("表单提交仅跳回固定的管理页", async () => {
+    const r = await POST(
+      new Request("http://localhost", {
         method: "POST",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-        },
-        body: "redirectTo=%2Fadmin%2Fscheduled-tasks",
+        body: new URLSearchParams({ redirectTo: "https://evil.test" }),
       }),
-      {
-        params: Promise.resolve({ taskKey: "iwhisper_recent_sync" }),
-      },
+      { params: Promise.resolve({ taskKey: "iwhisper_recent_sync" }) },
     );
-
-    expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe(
-      "/admin/scheduled-tasks?runTaskKey=iwhisper_recent_sync&runStatus=succeeded",
-    );
+    expect(r.status).toBe(303);
+    expect(r.headers.get("location")).toBe("/admin/scheduled-tasks");
   });
 });

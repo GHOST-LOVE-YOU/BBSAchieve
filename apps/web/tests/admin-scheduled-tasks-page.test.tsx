@@ -1,89 +1,46 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-
-vi.mock("@/src/server/admin/listScheduledTasks", () => ({
-  listScheduledTasks: vi.fn(),
+vi.mock("@/src/modules/mirroring/ui/data", () => ({
+  getMirrorDashboard: vi.fn(),
 }));
-
-vi.mock("next/link", () => ({
-  default: ({
-    children,
-    href,
-    className,
-  }: {
-    children: React.ReactNode;
-    href: string;
-    className?: string;
-  }) => {
-    return (
-      <a className={className} href={href}>
-        {children}
-      </a>
-    );
-  },
+vi.mock("@/src/modules/mirroring/ui/actions", () => ({
+  controlBoard: vi.fn(),
 }));
-
-import AdminScheduledTasksPage, {
-  dynamic,
-} from "../app/admin/scheduled-tasks/page";
-import { listScheduledTasks } from "@/src/server/admin/listScheduledTasks";
-
-describe("admin scheduled tasks page", () => {
-  it("marks the page as dynamic so build-time prerender does not require DATABASE_URL", () => {
+vi.mock("@/src/modules/mirroring/ui/LiveControls", () => ({
+  RefreshStatus: () => null,
+  TaskButton: ({ children }: { children: React.ReactNode }) => (
+    <button>{children}</button>
+  ),
+}));
+import Page, { dynamic } from "../app/admin/scheduled-tasks/page";
+import { getMirrorDashboard } from "@/src/modules/mirroring/ui/data";
+describe("定时任务概况", () => {
+  it("保持动态渲染且如实显示调度关闭状态", async () => {
     expect(dynamic).toBe("force-dynamic");
-  });
-
-  it("renders scheduled tasks and latest run summaries", async () => {
-    vi.mocked(listScheduledTasks).mockResolvedValue([
-      {
-        taskKey: "iwhisper_recent_sync",
-        title: "IWhisper 最近内容同步",
-        description: "每 60 分钟同步一次 IWhisper 最近 90 分钟内的内容",
-        boardName: "IWhisper",
-        intervalMinutes: 60,
-        windowMinutes: 90,
-        enabled: true,
-        latestRun: {
-          id: "run-1",
-          taskKey: "iwhisper_recent_sync",
-          taskTitle: "IWhisper 最近内容同步",
-          triggerSource: "manual",
-          status: "succeeded",
-          intervalMinutes: 60,
-          windowMinutes: 90,
-          boardName: "IWhisper",
-          importedThreads: 2,
-          importedReplies: 3,
-          skippedReason: null,
-          errorMessage: null,
-          metadataJson: null,
-          startedAt: new Date("2026-05-03T22:00:00.000Z"),
-          finishedAt: new Date("2026-05-03T22:00:08.000Z"),
-          durationMs: 8000,
-          createdAt: new Date("2026-05-03T22:00:00.000Z"),
-          updatedAt: new Date("2026-05-03T22:00:08.000Z"),
+    vi.mocked(getMirrorDashboard).mockResolvedValue({
+      enabled: false,
+      fixture: true,
+      boards: [
+        {
+          definition: {
+            name: "IWhisper",
+            slug: "iwhisper",
+            title: "悄悄话",
+            intervalMinutes: 60,
+            windowMinutes: 90,
+          },
+          state: null,
+          latest: null,
+          actions: [],
+          published: 0,
+          pending: 0,
+          failed: 0,
         },
-      },
-    ]);
-
-    const { container } = render(await AdminScheduledTasksPage());
-
-    expect(screen.getByText("定时任务")).toBeTruthy();
-    expect(screen.getByText("IWhisper 最近内容同步")).toBeTruthy();
-    expect(screen.getByText("60 分钟")).toBeTruthy();
-    expect(screen.getByText("90 分钟")).toBeTruthy();
-    expect(screen.getByText("最近状态：succeeded")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "立即执行一次" }),
-    ).toBeTruthy();
-
-    const form = container.querySelector(
-      'form[action="/admin/api/scheduled-tasks/iwhisper_recent_sync/run"]',
-    );
-    expect(form).toBeTruthy();
-    expect(
-      (form?.querySelector('input[name="redirectTo"]') as HTMLInputElement | null)
-        ?.value,
-    ).toBe("/admin/scheduled-tasks");
+      ],
+    });
+    render(await Page());
+    expect(screen.getByText("后台调度未开启")).toBeTruthy();
+    expect(screen.getByText("等待首次执行")).toBeTruthy();
+    expect(screen.getByText(/查看最近的原子任务/)).toBeTruthy();
   });
 });
