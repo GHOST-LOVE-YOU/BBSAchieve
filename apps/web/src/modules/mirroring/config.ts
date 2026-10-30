@@ -5,22 +5,14 @@ export type BoardDefinition = {
   intervalMinutes: number;
   windowMinutes: number;
 };
-export const mirrorBoards: readonly BoardDefinition[] = [
-  {
-    name: "IWhisper",
-    slug: "iwhisper",
-    title: "悄悄话",
-    intervalMinutes: 60,
-    windowMinutes: 90,
-  },
-  {
-    name: "JobInfo",
-    slug: "job-info",
-    title: "招聘信息",
-    intervalMinutes: 43_200,
-    windowMinutes: 44_640,
-  },
-];
+import { boardCatalog } from "@/src/server/boardSync/boardCatalog";
+export const mirrorBoards: readonly BoardDefinition[] = boardCatalog.filter(board => board.scheduledSyncEnabled).map(board => ({
+  name: board.boardName,
+  slug: board.boardSlug,
+  title: board.title,
+  intervalMinutes: board.scheduledIntervalMinutes,
+  windowMinutes: board.scheduledWindowMinutes,
+}));
 export function getMirrorBoard(name: string) {
   const board = mirrorBoards.find((b) => b.name === name);
   if (!board) throw new Error("未配置的采集版面");
