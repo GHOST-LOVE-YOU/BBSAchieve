@@ -148,7 +148,7 @@ export default async function ThreadPage({
           {detail.thread.body}
         </article>
 
-        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[color:var(--hairline-soft)] pt-4">
+        <div data-subscription-control className="mt-5 flex flex-wrap items-center gap-2 border-t border-[color:var(--hairline-soft)] pt-4">
           <SubscribeButton
             variant="thread"
             threadId={detail.thread.id}

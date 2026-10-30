@@ -97,7 +97,7 @@ export function SubscribeButton({
   const Icon = subscribed ? Check : Bell;
 
   return (
-    <div className={cn("inline-flex flex-col gap-1", className)}>
+    <div data-subscription-control className={cn("inline-flex flex-col gap-1", className)}>
       <Button
         type="button"
         variant={subscribed ? "secondary" : "primary"}

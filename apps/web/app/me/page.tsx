@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SubscriptionVisibilitySetting } from "@/src/components/forum/SubscriptionVisibilitySetting";
 import { LogOut } from "lucide-react";
 
 import { AppShell } from "@/src/components/forum/AppShell";
@@ -178,6 +179,7 @@ export default async function ProfilePage({
         <p className="mb-4 text-sm text-[color:var(--ink-tertiary)]">
           站内通知中心总是开启；外部通道（邮箱、Telegram）将在后续版本里加入此页。
         </p>
+        <SubscriptionVisibilitySetting />
         <Card className="px-5 py-4 text-sm text-[color:var(--ink-secondary)]">
           <p>
             为保护匿名性，本站不会展示真实姓名或学号。订阅仅表示「希望接收通知」，不表示「认领该镜像内容」。

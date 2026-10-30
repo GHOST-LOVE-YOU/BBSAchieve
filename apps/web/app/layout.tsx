@@ -25,6 +25,9 @@ export const metadata: Metadata = {
 
 const themeBootstrap = `(() => {
   try {
+    document.documentElement.dataset.hideSubscriptions = String(window.localStorage.getItem('byr-achieve.hide-subscription-controls') === 'true');
+  } catch { /* ignore */ }
+  try {
     const saved = window.localStorage.getItem('byr-achieve.theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const mode = saved === 'dark' || saved === 'light'

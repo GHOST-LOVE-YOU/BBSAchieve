@@ -293,3 +293,8 @@ button {
     background-position: -200% 0;
   }
 }
+
+/* 阅读偏好：首屏脚本在绘制前恢复，避免订阅入口闪现。 */
+html[data-hide-subscriptions="true"] [data-subscription-control] {
+  display: none !important;
+}
