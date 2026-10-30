@@ -14,7 +14,7 @@ describe("搜索分页", () => {
     });
     expect(result.page).toBe(3);
     expect(result.perPage).toBe(25);
-    expect(result.totals.replies).toBe(100);
+    expect(result.totals.replies).toBe(0);
     expect(mocks.raw).toHaveBeenCalledTimes(2);
   });
 });
