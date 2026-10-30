@@ -67,6 +67,7 @@ describe("源站规范化", () => {
     );
     expect(tasks.map((x) => [x.kind, x.sourcePostId])).toEqual([
       ["thread", "10"],
+      ["reply", "11"],
       ["reply", "12"],
     ]);
   });

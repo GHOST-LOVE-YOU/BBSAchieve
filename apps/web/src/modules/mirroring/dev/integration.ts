@@ -178,23 +178,87 @@ async function main() {
       1,
     );
     console.log("PASS 已删除的源站帖子可跳过并记录");
-    const longRun = await queueBoard(db, "IWhisper", "manual");
-    await db.mirrorThreadState.deleteMany();
-    const longSource = new FixtureSource();
-    const visited: number[] = [];
-    longSource.article = async (_board, id, page) => {
-      visited.push(page);
-      return {
-        observedAt: new Date(),
-        data: {
-          gid: id, title: "长帖测试", anony: true, pagination: { current: page, total: 1000 },
-          articles: [{ id: page === 1 ? id : String(Number(id) + page * 10), pos: page === 1 ? 0 : page * 10, subject: page === 1, time: page === 1000 ? "5分钟前" : "昨天 10:00", content: "内容", poster: { id: "测试机器人" } }],
+    const gapTask = await db.mirrorAction.create({
+      data: {
+        runId: run.id,
+        boardName: "IWhisper",
+        sourceThreadId: original.sourceThreadId,
+        sourcePostId: "999999999",
+        kind: "reply",
+        summary: "gap",
+        payload: {
+          ...(reply.payload as Prisma.JsonObject),
+          sourcePostId: "999999999",
+          sourceFloor: 50,
         },
-      };
+      },
+    });
+    await assert.rejects(publishAtomicAction(db, gapTask.id), /楼层不连续/);
+    assert.equal(
+      await db.mirrorAnomaly.count({ where: { actionId: gapTask.id } }),
+      1,
+    );
+    assert.equal(await db.reply.count(), 3);
+    const duplicate = await db.mirrorAction.create({
+      data: {
+        runId: run.id,
+        boardName: "IWhisper",
+        sourceThreadId: original.sourceThreadId,
+        sourcePostId: "999999998",
+        kind: "reply",
+        summary: "duplicate",
+        payload: {
+          ...(reply.payload as Prisma.JsonObject),
+          sourcePostId: "999999998",
+          body: "不同文本但相同楼层",
+        },
+      },
+    });
+    assert.equal((await publishAtomicAction(db, duplicate.id)).duplicate, true);
+    assert.equal(
+      await db.mirrorAnomaly.count({ where: { actionId: duplicate.id } }),
+      0,
+    );
+    console.log("PASS 跳楼拒绝并持久记录，重复楼层静默跳过");
+    await db.mirrorThreadState.update({
+      where: {
+        boardName_sourceThreadId: {
+          boardName: "IWhisper",
+          sourceThreadId: original.sourceThreadId,
+        },
+      },
+      data: { collectedThroughFloor: 11, checkedAt: new Date(0) },
+    });
+    const incremental = await queueBoard(db, "IWhisper", "manual");
+    const incrementalSource = new FixtureSource();
+    const visited: number[] = [];
+    const read = incrementalSource.article.bind(incrementalSource);
+    incrementalSource.article = async (b, id, page) => {
+      visited.push(page);
+      return read(b, id, page);
     };
-    await collectSlice(db, longSource, getMirrorBoard("IWhisper"), longRun!, 8);
-    assert.deepEqual(visited, [1, 1000, 999]);
-    console.log("PASS 千页长帖只读主帖和窗口末尾，不重扫全部历史");
+    await collectSlice(
+      db,
+      incrementalSource,
+      getMirrorBoard("IWhisper"),
+      incremental!,
+      8,
+    );
+    assert.deepEqual(visited, [2]);
+    assert.equal(
+      (
+        await db.mirrorThreadState.findUniqueOrThrow({
+          where: {
+            boardName_sourceThreadId: {
+              boardName: "IWhisper",
+              sourceThreadId: original.sourceThreadId,
+            },
+          },
+        })
+      ).collectedThroughFloor,
+      13,
+    );
+    console.log("PASS 已采集至 11 楼直接请求第 2 页，不读第一页");
   } finally {
     await db.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
     await db.$disconnect();

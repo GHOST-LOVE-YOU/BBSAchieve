@@ -22,12 +22,13 @@ export function planActions(
   start: Date,
   end: Date,
 ): AtomicAction[] {
+  void start;
+  void end;
   return page.articles.flatMap((post) => {
     const publishedAt = parseSourceTime(post.time, observedAt);
     // 主帖是回复的发布依赖，窗口外的主帖也需要被确保存在。
     const original = post.subject && post.id === page.gid;
-    if (!original && (publishedAt < start || publishedAt > end)) return [];
-    if (publishedAt > end) return [];
+
     return [
       actionPayloadSchema.parse({
         boardName,

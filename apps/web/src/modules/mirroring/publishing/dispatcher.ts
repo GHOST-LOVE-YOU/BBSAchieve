@@ -13,23 +13,13 @@ export async function dispatchActions(
   const parsed = new URL(base);
   if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(parsed.hostname))
     throw new Error("机器人发布接口必须使用本机地址");
-  const paused = await db.mirrorBoardState.findMany({
-    where: { paused: true },
-    select: { boardName: true },
+  const ids = await db.$queryRaw<
+    Array<{ id: string }>
+  >`SELECT id FROM mirror_actions WHERE status IN ('pending','retrying') AND "nextAttemptAt" <= NOW() AND "boardName" NOT IN (SELECT "boardName" FROM mirror_board_states WHERE paused=true) ORDER BY "boardName", "sourceThreadId", (payload->>'sourceFloor')::int, "createdAt" LIMIT ${limit}`;
+  const records = await db.mirrorAction.findMany({
+    where: { id: { in: ids.map((x) => x.id) } },
   });
-  const actions = await db.mirrorAction.findMany({
-    where: {
-      status: { in: ["pending", "retrying"] },
-      nextAttemptAt: { lte: new Date() },
-      boardName: { notIn: paused.map((b) => b.boardName) },
-    },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    take: limit,
-  });
-  // 主帖先于回复发出；每次 HTTP 请求只执行一条任务。
-  actions.sort(
-    (a, b) => Number(b.kind === "thread") - Number(a.kind === "thread"),
-  );
+  const actions = ids.map((x) => records.find((a) => a.id === x.id)!);
   for (const action of actions) {
     await ensureLease();
     let failure = "发布接口连接失败或响应丢失，将按退避策略重试";
@@ -49,7 +39,10 @@ export async function dispatchActions(
       );
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        failure = typeof data?.error === "string" ? data.error.slice(0, 300) : `发布接口返回 HTTP ${response.status}`;
+        failure =
+          typeof data?.error === "string"
+            ? data.error.slice(0, 300)
+            : `发布接口返回 HTTP ${response.status}`;
         throw new Error("发布失败");
       }
       await response.body?.cancel();

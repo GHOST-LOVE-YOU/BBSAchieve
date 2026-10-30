@@ -1,9 +1,10 @@
 import type { PrismaClient, Prisma, MirrorRun } from "@prisma/client";
+import { initializeProgress } from "./progress";
 import { PAGE_BUDGET, type BoardDefinition } from "../config";
 import { planActions } from "../planning/actions";
 import { parseSourceTime } from "../source/time";
 import { SourceError, type SourceClient } from "../source/types";
-type Candidate = { id: string; fingerprint: string };
+type Candidate = { id: string; fingerprint: string; startPage?: number };
 export async function collectSlice(
   db: PrismaClient,
   source: SourceClient,
@@ -47,6 +48,13 @@ export async function collectSlice(
         await ensureLease();
         const candidates: Candidate[] = [];
         let anyRecent = false;
+        const states = await db.mirrorThreadState.findMany({
+          where: {
+            boardName: definition.name,
+            sourceThreadId: { in: page.data.posts.map((t) => t.gid) },
+          },
+        });
+        const stateMap = new Map(states.map((s) => [s.sourceThreadId, s]));
         for (const thread of page.data.posts) {
           if (thread.tag === "top") continue;
           let recent = true;
@@ -60,26 +68,30 @@ export async function collectSlice(
           if (!recent) continue;
           anyRecent = true;
           const fingerprint = `${thread.replyCount}:${thread.replyTime}`;
-          const cached = await db.mirrorThreadState.findUnique({
-            where: {
-              boardName_sourceThreadId: {
-                boardName: definition.name,
-                sourceThreadId: thread.gid,
-              },
-            },
-          });
+          const cached = stateMap.get(thread.gid);
           if (
             cached?.fingerprint === fingerprint &&
             Date.now() - cached.checkedAt.getTime() < 60_000
           )
             continue;
-          candidates.push({ id: thread.gid, fingerprint });
+          const progress = cached?.progressInitialized
+            ? cached
+            : await db.$transaction((tx) =>
+                initializeProgress(tx, definition.name, thread.gid),
+              );
+          candidates.push({
+            id: thread.gid,
+            fingerprint,
+            startPage:
+              Math.floor((progress.collectedThroughFloor + 1) / 10) + 1,
+          });
         }
         run = await db.mirrorRun.update({
           where: { id: run.id },
           data: {
             pendingThreads: candidates,
             nextBoardPage: run.nextBoardPage + 1,
+            nextThreadPage: candidates[0]?.startPage ?? 1,
             boardComplete:
               !anyRecent ||
               page.data.pagination.current >= page.data.pagination.total,
@@ -109,23 +121,39 @@ export async function collectSlice(
           run.windowStart,
           run.windowEnd,
         );
-        // 第一页确保主帖存在；随后从末页倒序扫描，遇到整页早于窗口即停止。
-        // 不依赖“回复数 = 已采集数”，大热帖也无需每轮重扫全部历史。
-        const isFirst = run.nextThreadPage === 1;
-        const outsideWindow = page.data.articles.every(
-          (post) =>
-            parseSourceTime(post.time, page.observedAt) < run.windowStart,
-        );
-        const complete = isFirst
-          ? page.data.pagination.total <= 1
-          : run.nextThreadPage <= 2 || outsideWindow;
+        const complete =
+          page.data.pagination.current >= page.data.pagination.total;
         const nextPage = complete
-          ? 1
-          : isFirst
-            ? page.data.pagination.total
-            : run.nextThreadPage - 1;
+          ? (pending[1]?.startPage ?? 1)
+          : run.nextThreadPage + 1;
         // 原子任务持久化与采集页码一起提交；发布失败不会倒退采集，也不会丢失待发布任务。
         run = await db.$transaction(async (tx) => {
+          const progress = await initializeProgress(
+            tx,
+            definition.name,
+            current.id,
+          );
+          let through = progress.collectedThroughFloor;
+          for (const action of [...actions].sort(
+            (a, b) => a.sourceFloor - b.sourceFloor,
+          )) {
+            if (action.sourceFloor <= through) continue;
+            if (action.sourceFloor !== through + 1)
+              throw new SourceError(
+                "format",
+                `源站楼层缺口：期望 ${through + 1}，收到 ${action.sourceFloor}`,
+              );
+            through = action.sourceFloor;
+          }
+          await tx.mirrorThreadState.update({
+            where: {
+              boardName_sourceThreadId: {
+                boardName: definition.name,
+                sourceThreadId: current.id,
+              },
+            },
+            data: { collectedThroughFloor: through },
+          });
           const created = await tx.mirrorAction.createMany({
             data: actions.map((action) => ({
               runId: run.id,
@@ -173,6 +201,17 @@ export async function collectSlice(
           });
         });
       } catch (error) {
+        await db.mirrorAnomaly.create({
+          data: {
+            boardName: definition.name,
+            sourceThreadId: current.id,
+            stage: "collection",
+            message:
+              error instanceof SourceError
+                ? error.message
+                : "采集事务异常，请核对源站和本地进度",
+          },
+        });
         if (!(error instanceof SourceError) || error.code !== "missing")
           throw error;
         if (run.nextThreadPage > 1) {

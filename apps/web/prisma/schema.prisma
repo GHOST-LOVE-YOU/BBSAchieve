@@ -374,10 +374,13 @@ model MirrorRun {
 }
 
 model MirrorThreadState {
-  boardName      String
-  sourceThreadId String
-  fingerprint    String
-  checkedAt      DateTime
+  publishedThroughFloor Int      @default(-1)
+  collectedThroughFloor Int      @default(-1)
+  progressInitialized   Boolean  @default(false)
+  boardName             String
+  sourceThreadId        String
+  fingerprint           String
+  checkedAt             DateTime
 
   @@id([boardName, sourceThreadId])
   @@map("mirror_thread_states")
@@ -405,4 +408,17 @@ model MirrorAction {
   @@index([boardName, createdAt])
   @@index([runId, status])
   @@map("mirror_actions")
+}
+
+model MirrorAnomaly {
+  id             String   @id @default(uuid())
+  boardName      String
+  sourceThreadId String
+  actionId       String?
+  stage          String
+  message        String
+  createdAt      DateTime @default(now())
+
+  @@index([boardName, sourceThreadId, createdAt])
+  @@map("mirror_anomalies")
 }
