@@ -188,7 +188,7 @@ export const boardCatalogSections: readonly BoardCatalogSection[] = [
       createBoardEntry({ boardName: 'Food', boardSlug: 'food', title: '秀色可餐', scheduledSyncEnabled: true, scheduledIntervalMinutes: 1440, scheduledWindowMinutes: 1500 }),
       createBoardEntry({ boardName: 'Friends', boardSlug: 'friends', title: '缘来如此', scheduledSyncEnabled: true, scheduledIntervalMinutes: 1440, scheduledWindowMinutes: 1500 }),
       createBoardEntry({ boardName: 'Health', boardSlug: 'health', title: '健康保健', scheduledSyncEnabled: true, scheduledIntervalMinutes: 1440, scheduledWindowMinutes: 1500 }),
-      createBoardEntry({ boardName: 'IWhisper', boardSlug: 'iwhisper', title: '悄悄话', description: '悄悄话板块，支持全量和定时同步。', scheduledSyncEnabled: true, scheduledIntervalMinutes: 1440, scheduledWindowMinutes: 1500 }),
+      createBoardEntry({ boardName: 'IWhisper', boardSlug: 'iwhisper', title: '悄悄话', description: '悄悄话板块，支持全量和定时同步。', scheduledSyncEnabled: true, scheduledIntervalMinutes: 30, scheduledWindowMinutes: 40 }),
       createBoardEntry({ boardName: 'LostandFound', boardSlug: 'lostand-found', title: '失物招领与拾金不昧', scheduledSyncEnabled: true, scheduledIntervalMinutes: 1440, scheduledWindowMinutes: 1500 }),
       createBoardEntry({ boardName: 'Talking', boardSlug: 'talking', title: '谈天说地', scheduledSyncEnabled: true, scheduledIntervalMinutes: 1440, scheduledWindowMinutes: 1500 }),
     ],
